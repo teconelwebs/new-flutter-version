@@ -1,0 +1,23 @@
+name: welfog
+description: Welfog main Flutter app
+publish_to: "none"
+version: 1.2.0+64
+
+environment:
+  sdk: ">=3.2.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  welfog_flutter_play:
+    path: ./flutter_play_module
+  http: ^1.2.0
+  shared_preferences: ^2.3.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
