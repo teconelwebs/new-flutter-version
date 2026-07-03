@@ -63,8 +63,7 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
 
   // Scroll Interpolation States
   double _logoOpacity = 1.0;
-  double _translateY = 0.0;
-  double _searchTranslateY = 0.0;
+  double _logoHeight = 46.0;
 
   @override
   void initState() {
@@ -97,7 +96,6 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  // Scroll offset listener for interpolations
   void _onScroll() {
     if (!mounted || widget.scrollController == null) return;
     final double offset = widget.scrollController!.offset;
@@ -106,11 +104,8 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
       // 1. Logo opacity: maps scroll offset [0, 30] to [1.0, 0.0]
       _logoOpacity = (1.0 - (offset.clamp(0.0, 30.0) / 30.0));
 
-      // 2. Logo container Translate Y: maps scroll offset [0, 46] to [0, -46]
-      _translateY = (offset.clamp(0.0, 46.0) / 46.0) * -46.0;
-
-      // 3. Search input Translate Y: maps scroll offset [0, 46] to [0, -46]
-      _searchTranslateY = (offset.clamp(0.0, 46.0) / 46.0) * -46.0;
+      // 2. Logo height: maps scroll offset [0, 46] to [46.0, 0.0]
+      _logoHeight = 46.0 - (offset.clamp(0.0, 46.0));
     });
   }
 
@@ -213,98 +208,103 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
               ),
 
             // 2. Animated Logo and Action Buttons Bar
-            Transform.translate(
-              offset: Offset(0.0, _translateY),
-              child: Opacity(
-                opacity: _logoOpacity,
-                child: Container(
-                  height: 46,
-                  color: widget.backgroundColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Logo Touch Event
-                      GestureDetector(
-                        onTap: _handleLogoPress,
-                        child: Image.asset(
-                          "assets/images/welf.png",
-                          width: 120,
-                          height: 28,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-
-                      // Wishlist & Notification Action Buttons
-                      Row(
+            Opacity(
+              opacity: _logoOpacity,
+              child: ClipRect(
+                child: SizedBox(
+                  height: _logoHeight,
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: Container(
+                      height: 46,
+                      color: widget.backgroundColor,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Wishlist click
+                          // Logo Touch Event
                           GestureDetector(
-                            onTap: () {
-                              if (widget.isGuest) {
-                                if (widget.promptLogin != null) {
-                                  widget.promptLogin!();
-                                }
-                                return;
-                              }
-                              // Navigator.pushNamed(context, '/wishlist');
-                            },
-                            child: const Padding(
-                              padding: EdgeInsets.all(6.0),
-                              child: Icon(Icons.favorite_border, color: Color(0xFFFB5404), size: 22),
+                            onTap: _handleLogoPress,
+                            child: Image.asset(
+                              "assets/images/welf.png",
+                              width: 120,
+                              height: 28,
+                              fit: BoxFit.contain,
                             ),
                           ),
-                          const SizedBox(width: 10),
 
-                          // Notification click
-                          GestureDetector(
-                            onTap: () {
-                              if (widget.isGuest) {
-                                if (widget.promptLogin != null) {
-                                  widget.promptLogin!();
-                                }
-                                return;
-                              }
-                              // Navigator.pushNamed(context, '/notifications');
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.all(6.0),
-                              child: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  const Icon(Icons.notifications_none, color: Color(0xFFFB5404), size: 22),
-                                  // Badge indicator
-                                  if (_unreadCount > 0)
-                                    Positioned(
-                                      top: -6,
-                                      right: -6,
-                                      child: Container(
-                                        height: 18,
-                                        constraints: const BoxConstraints(minWidth: 18),
-                                        padding: const EdgeInsets.symmetric(horizontal: 3),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF008083),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(color: Colors.white, width: 1.5),
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          _unreadCount > 99 ? "99+" : '$_unreadCount',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
+                          // Wishlist & Notification Action Buttons
+                          Row(
+                            children: [
+                              // Wishlist click
+                              GestureDetector(
+                                onTap: () {
+                                  if (widget.isGuest) {
+                                    if (widget.promptLogin != null) {
+                                      widget.promptLogin!();
+                                    }
+                                    return;
+                                  }
+                                  // Navigator.pushNamed(context, '/wishlist');
+                                },
+                                child: const Padding(
+                                  padding: EdgeInsets.all(6.0),
+                                  child: Icon(Icons.favorite_border, color: Color(0xFFFB5404), size: 22),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+
+                              // Notification click
+                              GestureDetector(
+                                onTap: () {
+                                  if (widget.isGuest) {
+                                    if (widget.promptLogin != null) {
+                                      widget.promptLogin!();
+                                    }
+                                    return;
+                                  }
+                                  // Navigator.pushNamed(context, '/notifications');
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(6.0),
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      const Icon(Icons.notifications_none, color: Color(0xFFFB5404), size: 22),
+                                      // Badge indicator
+                                      if (_unreadCount > 0)
+                                        Positioned(
+                                          top: -6,
+                                          right: -6,
+                                          child: Container(
+                                            height: 18,
+                                            constraints: const BoxConstraints(minWidth: 18),
+                                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF008083),
+                                              shape: BoxShape.circle,
+                                              border: Border.all(color: Colors.white, width: 1.5),
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: Text(
+                                              _unreadCount > 99 ? "99+" : '$_unreadCount',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    ),
-                                ],
+                                    ],
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -312,46 +312,43 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
 
             // 3. Search Box Bar (if enabled)
             if (!widget.hideSearch)
-              Transform.translate(
-                offset: Offset(0.0, _searchTranslateY),
-                child: Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: GestureDetector(
-                    onTap: _handleSearchPress,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8F8F8),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE8E8E8)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.search, color: Color(0xFF666666), size: 20),
-                          const SizedBox(width: 12),
-                          const Text(
-                            "Search for ",
-                            style: TextStyle(color: Color(0xFF999999), fontSize: 15),
-                          ),
-                          AnimatedBuilder(
-                            animation: _fadeAnimation,
-                            builder: (context, child) {
-                              return Opacity(
-                                opacity: _fadeAnimation.value,
-                                child: Text(
-                                  _placeholders[_placeholderIndex],
-                                  style: TextStyle(
-                                    color: _placeholderColors[_colorIndex],
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: GestureDetector(
+                  onTap: _handleSearchPress,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8F8F8),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE8E8E8)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.search, color: Color(0xFF666666), size: 20),
+                        const SizedBox(width: 12),
+                        const Text(
+                          "Search for ",
+                          style: TextStyle(color: Color(0xFF999999), fontSize: 15),
+                        ),
+                        AnimatedBuilder(
+                          animation: _fadeAnimation,
+                          builder: (context, child) {
+                            return Opacity(
+                              opacity: _fadeAnimation.value,
+                              child: Text(
+                                _placeholders[_placeholderIndex],
+                                style: TextStyle(
+                                  color: _placeholderColors[_colorIndex],
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
                                 ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 ),
