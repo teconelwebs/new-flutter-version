@@ -95,15 +95,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         statusBarColor = const Color(0xFFFF7A00);
         barIconBrightness = Brightness.light;
         break;
-      case 2: // Play
-        statusBarColor = Colors.black;
-        barIconBrightness = Brightness.light;
-        break;
-      case 3: // Cart
+      case 2: // Cart
         statusBarColor = const Color(0xFFF6F6F6);
         barIconBrightness = Brightness.dark;
         break;
-      case 4: // Account
+      case 3: // Account
         statusBarColor = const Color(0xFFF8F9FA);
         barIconBrightness = Brightness.dark;
         break;
@@ -285,10 +281,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 },
               ),
               const CategoryScreen(embedded: true),
-              play.EmbeddedReelsWrapper(
-                key: ValueKey('play_session_$_userId'),
-                viewerId: _userId,
-              ),
+              // play.EmbeddedReelsWrapper(
+              //   key: ValueKey('play_session_$_userId'),
+              //   viewerId: _userId,
+              // ),
               const CartScreen(embedded: true),
               const AccountScreen(embedded: true),
             ],

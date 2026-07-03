@@ -17,7 +17,7 @@ class TabModel {
 const List<TabModel> tabs = [
   TabModel(label: "Home", screen: "index", route: "/"),
   TabModel(label: "Categories", screen: "Categorys", route: "/Categorys"),
-  TabModel(label: "Play", screen: "Play", route: "/Play"),
+  // TabModel(label: "Play", screen: "Play", route: "/Play"),
   TabModel(label: "Cart", screen: "Cart", route: "/Cart"),
   TabModel(label: "Account", screen: "Account", route: "/Account"),
 ];
@@ -94,7 +94,7 @@ class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isPlayScreenActive = widget.currentIndex == 2;
+    final bool isPlayScreenActive = false;
     if (isPlayScreenActive) return const SizedBox.shrink();
 
     final bottomPadding = MediaQuery.of(context).padding.bottom;
