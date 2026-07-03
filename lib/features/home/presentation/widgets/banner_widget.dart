@@ -55,7 +55,7 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
   late AnimationController _progressController;
   late Animation<double> _progressAnimation;
 
-  static const String cacheKey = "home_mobile_slider_v1";
+  static const String cacheKey = "home_mobile_slider_v2";
 
   @override
   void initState() {

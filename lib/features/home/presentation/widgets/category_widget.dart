@@ -89,7 +89,7 @@ class _CategoryWidgetState extends State<CategoryWidget> {
   Future<void> _initCategoriesData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString("home_nav_cat_strip_v1");
+      final raw = prefs.getString("home_nav_cat_strip_v2");
       
       if (raw != null) {
         final List<dynamic> parsed = jsonDecode(raw);
@@ -137,7 +137,7 @@ class _CategoryWidgetState extends State<CategoryWidget> {
 
         final next = [allCategory, ...apiCategories];
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString("home_nav_cat_strip_v1", jsonEncode(next));
+        await prefs.setString("home_nav_cat_strip_v2", jsonEncode(next));
 
         if (mounted) {
           setState(() {
