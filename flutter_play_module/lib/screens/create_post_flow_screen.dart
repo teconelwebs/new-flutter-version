@@ -33,6 +33,7 @@ class _CreatePostFlowScreenState extends State<CreatePostFlowScreen> {
   final _captionController = TextEditingController();
   bool _submitting = false;
   double _uploadProgress = 0;
+  // ignore: unused_field
   String _uploadPhase = 'uploading';
   VideoPlayerController? _previewController;
   final AudioPlayer _previewAudio = AudioPlayer();
@@ -272,6 +273,7 @@ class _CreatePostFlowScreenState extends State<CreatePostFlowScreen> {
         thumb = File(draft.coverPath!);
       }
 
+      // ignore: unused_local_variable
       final uploadResult = await api.uploadReelFull(
         videoFile: draft.videoFile,
         thumbnailFile: thumb,

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../search/presentation/search_screen.dart';
+import 'delivery_icon.dart';
+import 'wishlist_heart_icon.dart';
 
 class Header extends StatefulWidget {
   final Color backgroundColor;
@@ -189,7 +191,7 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.location_pin, size: 16, color: Color(0xFFFB5404)),
+                    const DeliveryIcon(size: 16, color: Color(0xFFFB5404)),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
@@ -249,7 +251,7 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
                                 },
                                 child: const Padding(
                                   padding: EdgeInsets.all(6.0),
-                                  child: Icon(Icons.favorite_border, color: Color(0xFFFB5404), size: 22),
+                                  child: WishlistHeartIcon(size: 22, color: Color(0xFFFB5404), active: false),
                                 ),
                               ),
                               const SizedBox(width: 10),

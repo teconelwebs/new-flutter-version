@@ -273,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     });
     _toastAnimController.forward(from: 0.0);
 
-    _toastTimer = Timer(const Duration(seconds: 3), () {
+    _toastTimer = Timer(const Duration(seconds: 1), () {
       if (mounted) {
         _toastAnimController.reverse().then((_) {
           if (mounted) {
@@ -300,6 +300,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           // Background Effects

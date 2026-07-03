@@ -159,6 +159,10 @@ class _AccountScreenState extends State<AccountScreen> {
             .map((s) => s.trim()[0].toUpperCase())
             .join();
 
+    final double screenWidth = MediaQuery.of(context).size.width;
+    // Calculate aspect ratio dynamically based on screen size to prevent text truncation
+    final double childAspectRatio = screenWidth < 360 ? 2.3 : (screenWidth < 400 ? 2.65 : 2.9);
+
     return SafeArea(
       top: true,
       child: RefreshIndicator(
@@ -230,11 +234,11 @@ class _AccountScreenState extends State<AccountScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _menu.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                childAspectRatio: 2.35,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
+                childAspectRatio: childAspectRatio,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
               ),
               itemBuilder: (_, i) {
                 final m = _menu[i];
@@ -242,7 +246,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   borderRadius: BorderRadius.circular(8),
                   onTap: () => _onMenuTap(m),
                   child: Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
@@ -251,15 +255,15 @@ class _AccountScreenState extends State<AccountScreen> {
                     child: Row(
                       children: [
                         Container(
-                          width: 36,
-                          height: 36,
+                          width: 32,
+                          height: 32,
                           decoration: BoxDecoration(
                             color: m.bg,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(m.icon, size: 18, color: m.tint),
+                          child: Icon(m.icon, size: 16, color: m.tint),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,7 +283,7 @@ class _AccountScreenState extends State<AccountScreen> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 10.5,
                                   color: Color(0xFF6B7280),
                                 ),
                               ),
@@ -288,7 +292,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         ),
                         const Icon(
                           Icons.chevron_right_rounded,
-                          size: 16,
+                          size: 20,
                           color: Color(0xFFC7C7C7),
                         ),
                       ],

@@ -447,6 +447,7 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
     if (!await ensurePlayProfileForAction(context)) return;
     final target = widget.reel.user.id;
     if (target.isEmpty) return;
+    // ignore: use_build_context_synchronously
     await AppRoutes.openProfile(context, target);
     if (!mounted) return;
     _syncFollowFromRegistry();
@@ -466,6 +467,7 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
   Future<void> _openComments() async {
     if (!await ensurePlayProfileForAction(context)) return;
     await CommentsSheet.show(
+      // ignore: use_build_context_synchronously
       context,
       api: widget.api,
       reelId: widget.reel.id,
@@ -481,6 +483,7 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
     final isOwnReel = widget.reel.user.id.isNotEmpty &&
         widget.reel.user.id == widget.api.viewerId;
     await showModalBottomSheet(
+      // ignore: use_build_context_synchronously
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => lightSheetWrapper(
@@ -651,6 +654,7 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
     final user = widget.reel.user;
     final layout = ReelLayoutMetrics.of(context, productStripOpen: _productStripOpen && _hasProducts);
     final hasThumb = widget.reel.thumbnailUrl != null && widget.reel.thumbnailUrl!.isNotEmpty;
+    // ignore: unused_local_variable
     final hasMusic = widget.reel.musicId != null && widget.reel.musicId!.isNotEmpty;
     final musicLabel = widget.reel.music;
     final showMusicLabel = musicLabel != null &&

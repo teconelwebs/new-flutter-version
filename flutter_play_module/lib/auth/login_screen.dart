@@ -251,6 +251,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           // Background Effects (Absolute Positioning like React Native)

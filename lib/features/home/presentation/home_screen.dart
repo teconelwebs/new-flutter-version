@@ -94,15 +94,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         barIconBrightness = Brightness.dark;
         break;
       case 1: // Category
-        statusBarColor = const Color(0xFFFF7A00);
-        barIconBrightness = Brightness.light;
+        statusBarColor = Colors.white;
+        barIconBrightness = Brightness.dark;
         break;
       case 2: // Cart
-        statusBarColor = const Color(0xFFF6F6F6);
+        statusBarColor = Colors.white;
         barIconBrightness = Brightness.dark;
         break;
       case 3: // Account
-        statusBarColor = const Color(0xFFF8F9FA);
+        statusBarColor = Colors.white;
         barIconBrightness = Brightness.dark;
         break;
       default:
@@ -555,4 +555,5 @@ class _HomeTabState extends State<_HomeTab> {
     );
   }
 }
+
 

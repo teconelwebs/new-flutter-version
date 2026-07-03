@@ -21,7 +21,7 @@ class CategoryWidget extends StatefulWidget {
 
 class _CategoryWidgetState extends State<CategoryWidget> {
   final ScrollController _scrollController = ScrollController();
-  
+
   // Layout Constants matching original styling
   static const double iconBoxSize = 56.0;
   static const double tileGap = 5.0;
@@ -58,7 +58,7 @@ class _CategoryWidgetState extends State<CategoryWidget> {
   void initState() {
     super.initState();
     _categories = [allCategory];
-    
+
     _initCategoriesData();
     _startAutoScroll();
   }
@@ -66,7 +66,8 @@ class _CategoryWidgetState extends State<CategoryWidget> {
   @override
   void didUpdateWidget(covariant CategoryWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.pullRefreshKey > 0 && widget.pullRefreshKey != oldWidget.pullRefreshKey) {
+    if (widget.pullRefreshKey > 0 &&
+        widget.pullRefreshKey != oldWidget.pullRefreshKey) {
       _fetchCategories(fromRefresh: true);
     }
   }
@@ -89,8 +90,8 @@ class _CategoryWidgetState extends State<CategoryWidget> {
   Future<void> _initCategoriesData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString("home_nav_cat_strip_v2");
-      
+      final raw = prefs.getString("home_nav_cat_strip_v3");
+
       if (raw != null) {
         final List<dynamic> parsed = jsonDecode(raw);
         if (parsed.isNotEmpty) {
@@ -107,7 +108,8 @@ class _CategoryWidgetState extends State<CategoryWidget> {
   }
 
   // HTTP API Call equivalent
-  Future<void> _fetchCategories({bool fromRefresh = false, bool cacheMiss = false}) async {
+  Future<void> _fetchCategories(
+      {bool fromRefresh = false, bool cacheMiss = false}) async {
     if (mounted && _categories.length <= 1) {
       setState(() {
         _loading = true;
@@ -122,12 +124,14 @@ class _CategoryWidgetState extends State<CategoryWidget> {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final decoded = jsonDecode(response.body);
         final rawList = decoded['categories'] as List? ?? [];
-        
+
         final List<dynamic> apiCategories = rawList.whereType<Map>().map((e) {
           final String img = (e['icon_url'] ?? "").toString();
           final String fullImg = img.isEmpty
               ? ""
-              : (img.startsWith("http") ? img : "$cdnBase${img.startsWith('/') ? img.substring(1) : img}");
+              : (img.startsWith("http")
+                  ? img
+                  : "$cdnBase${img.startsWith('/') ? img.substring(1) : img}");
           return {
             "id": (e['id'] ?? "").toString(),
             "name": (e['name'] ?? "").toString(),
@@ -137,7 +141,7 @@ class _CategoryWidgetState extends State<CategoryWidget> {
 
         final next = [allCategory, ...apiCategories];
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString("home_nav_cat_strip_v2", jsonEncode(next));
+        await prefs.setString("home_nav_cat_strip_v3", jsonEncode(next));
 
         if (mounted) {
           setState(() {
@@ -159,10 +163,13 @@ class _CategoryWidgetState extends State<CategoryWidget> {
   // Automatically scroll horizontal strip at regular intervals
   void _startAutoScroll() {
     _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      final scrollCategories = _categories.where((c) => c['id'] != 'all').toList();
+      final scrollCategories =
+          _categories.where((c) => c['id'] != 'all').toList();
       final double step = itemWidth + tileGap;
 
-      if (_scrollController.hasClients && !_isUserScrolling && scrollCategories.length > 1) {
+      if (_scrollController.hasClients &&
+          !_isUserScrolling &&
+          scrollCategories.length > 1) {
         _scrollPosition += step;
         if (_scrollPosition >= scrollCategories.length * step) {
           _scrollPosition = 0;
@@ -216,8 +223,10 @@ class _CategoryWidgetState extends State<CategoryWidget> {
       return _buildSkeletonLoader();
     }
 
-    final scrollableCategories = _categories.where((c) => c['id'] != 'all').toList();
-    final allItem = _categories.firstWhere((c) => c['id'] == 'all', orElse: () => allCategory);
+    final scrollableCategories =
+        _categories.where((c) => c['id'] != 'all').toList();
+    final allItem = _categories.firstWhere((c) => c['id'] == 'all',
+        orElse: () => allCategory);
 
     return Container(
       color: Colors.white,
@@ -292,7 +301,8 @@ class _CategoryWidgetState extends State<CategoryWidget> {
                       width: 40,
                       height: 40,
                       fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.category, color: Colors.grey, size: 24),
+                      errorBuilder: (_, __, ___) => const Icon(Icons.category,
+                          color: Colors.grey, size: 24),
                     ),
             ),
             const SizedBox(height: 6),
@@ -305,7 +315,8 @@ class _CategoryWidgetState extends State<CategoryWidget> {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isAll ? FontWeight.w600 : FontWeight.w500,
-                color: isAll ? const Color(0xFFF47405) : const Color(0xFF333333),
+                color:
+                    isAll ? const Color(0xFFF47405) : const Color(0xFF333333),
               ),
               textAlign: TextAlign.center,
             ),

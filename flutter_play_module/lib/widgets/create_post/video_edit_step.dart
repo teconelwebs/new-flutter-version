@@ -734,6 +734,7 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
   }
 
   // ── Cover picker sheet ─────────────────────
+  // ignore: unused_element
   Future<void> _showCoverPicker() async {
     final mainController = _videoController;
     if (mainController == null || !mainController.value.isInitialized) return;
