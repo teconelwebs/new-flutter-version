@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_routes.dart';
 
@@ -55,7 +56,6 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
   late Animation<double> _progressAnimation;
 
   static const String cacheKey = "home_mobile_slider_v1";
-  static const String cdnBaseUrl = "https://welfogapi.welfog.com/uploads/";
 
   @override
   void initState() {
@@ -134,38 +134,51 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
       });
     }
 
-    // Simulated network requests with exponential backoffs
+    const String apiUrl = "https://welfogapi.welfog.com/api/v2/bannerdata/";
+    const String cdnBase = "https://d1f02fefkbso7w.cloudfront.net/";
+
     int attempts = 3;
     for (int i = 1; i <= attempts; i++) {
       try {
-        await Future.delayed(Duration(milliseconds: 300 * i));
-        
-        // Mock success response from '/bannerdata/'
-        final List<dynamic> networkSlides = [
-          {"image": "banners/slide1.jpg", "link": "/DynamicPromotion/promo-one"},
-          {"image": "banners/slide2.jpg", "link": "/DynamicPromotion/promo-two"},
-          {"image": "banners/slide3.jpg", "link": "/DynamicPromotion/promo-three"},
-        ];
-
-        final parsedSlides = networkSlides.map((s) => BannerData.fromJson(s)).toList();
-        
-        if (parsedSlides.isNotEmpty) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(cacheKey, jsonEncode({'ts': DateTime.now().millisecondsSinceEpoch, 'slides': networkSlides}));
+        final response = await http.get(Uri.parse(apiUrl));
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final decoded = jsonDecode(response.body);
+          final rawSlides = decoded['mobile_slider'] as List? ?? [];
           
-          if (mounted) {
-            setState(() {
-              _slides = parsedSlides;
-              _loading = false;
-              _error = false;
-            });
-            _precalculateAspectRatios();
-            _startAutoCarousel();
-            _startProgressAnimation();
+          final List<BannerData> parsedSlides = rawSlides.whereType<Map>().map((e) {
+            final String img = (e['image'] ?? "").toString();
+            final String fullImg = img.startsWith("http") ? img : "$cdnBase$img";
+            return BannerData(
+              image: fullImg,
+              link: (e['link'] ?? "").toString(),
+            );
+          }).toList();
+
+          if (parsedSlides.isNotEmpty) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString(
+              cacheKey,
+              jsonEncode({
+                'ts': DateTime.now().millisecondsSinceEpoch,
+                'slides': parsedSlides.map((s) => s.toJson()).toList(),
+              }),
+            );
+
+            if (mounted) {
+              setState(() {
+                _slides = parsedSlides;
+                _loading = false;
+                _error = false;
+              });
+              _precalculateAspectRatios();
+              _startAutoCarousel();
+              _startProgressAnimation();
+            }
+            return;
           }
-          return;
         }
       } catch (err) {
+        debugPrint("Error fetching banners attempt $i: $err");
         if (i == attempts && mounted) {
           setState(() {
             _error = _slides.isEmpty;
@@ -173,13 +186,14 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
           });
         }
       }
+      await Future.delayed(Duration(milliseconds: 300 * i));
     }
   }
 
   // Dynamic Image resolution/aspect ratio calculations
   void _precalculateAspectRatios() {
     for (int i = 0; i < _slides.length; i++) {
-      final imgUrl = "$cdnBaseUrl${_slides[i].image}";
+      final imgUrl = _slides[i].image;
       final Image image = Image.network(imgUrl);
       
       image.image.resolve(const ImageConfiguration()).addListener(
@@ -316,7 +330,7 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Image.network(
-                        "$cdnBaseUrl${slide.image}",
+                        slide.image,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
                           color: Colors.grey.shade300,

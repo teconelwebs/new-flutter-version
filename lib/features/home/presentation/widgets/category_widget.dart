@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_routes.dart';
 
@@ -25,7 +26,6 @@ class _CategoryWidgetState extends State<CategoryWidget> {
   static const double iconBoxSize = 56.0;
   static const double tileGap = 5.0;
   static const double itemWidth = 68.0;
-  static const String cdnBaseUrl = "https://welfogapi.welfog.com/uploads/";
 
   final List<String> pastelColors = [
     "#fde3d2",
@@ -114,27 +114,36 @@ class _CategoryWidgetState extends State<CategoryWidget> {
       });
     }
 
+    const String apiUrl = "https://welfogapi.welfog.com/api/nav_cat_data/";
+    const String cdnBase = "https://d1f02fefkbso7w.cloudfront.net/";
+
     try {
-      // Simulate network request to: secondAPI.get('/nav_cat_data/')
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Mock categories returned from API response
-      final List<dynamic> apiCategories = [
-        {"id": "1", "name": "Mobile", "icon_url": "categories/mobile.png"},
-        {"id": "2", "name": "Cloths", "icon_url": "categories/cloths.png"},
-        {"id": "3", "name": "Pants", "icon_url": "categories/pants.png"},
-        {"id": "4", "name": "Jewelry", "icon_url": "categories/jewelry.png"},
-        {"id": "5", "name": "Shoes", "icon_url": "categories/shoes.png"},
-      ];
+      final response = await http.get(Uri.parse(apiUrl));
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final decoded = jsonDecode(response.body);
+        final rawList = decoded['categories'] as List? ?? [];
+        
+        final List<dynamic> apiCategories = rawList.whereType<Map>().map((e) {
+          final String img = (e['icon_url'] ?? "").toString();
+          final String fullImg = img.isEmpty
+              ? ""
+              : (img.startsWith("http") ? img : "$cdnBase${img.startsWith('/') ? img.substring(1) : img}");
+          return {
+            "id": (e['id'] ?? "").toString(),
+            "name": (e['name'] ?? "").toString(),
+            "icon_url": fullImg,
+          };
+        }).toList();
 
-      final next = [allCategory, ...apiCategories];
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString("home_nav_cat_strip_v1", jsonEncode(next));
+        final next = [allCategory, ...apiCategories];
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString("home_nav_cat_strip_v1", jsonEncode(next));
 
-      if (mounted) {
-        setState(() {
-          _categories = next;
-        });
+        if (mounted) {
+          setState(() {
+            _categories = next;
+          });
+        }
       }
     } catch (e) {
       debugPrint("Error fetching categories: $e");
@@ -279,7 +288,7 @@ class _CategoryWidgetState extends State<CategoryWidget> {
               child: isAll
                   ? _buildAllIconGrid()
                   : Image.network(
-                      "$cdnBaseUrl${category['icon_url']}",
+                      category['icon_url'] ?? "",
                       width: 40,
                       height: 40,
                       fit: BoxFit.contain,
