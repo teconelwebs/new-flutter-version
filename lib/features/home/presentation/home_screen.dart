@@ -15,6 +15,8 @@ import '../data/home_models.dart';
 import 'widgets/home_widgets.dart';
 import 'widgets/custom_bottom_tab_bar.dart';
 import 'widgets/header.dart';
+import 'widgets/category_widget.dart';
+import 'widgets/banner_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -279,6 +281,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     _checkGuestStatus();
                   });
                 },
+                onTabChange: (index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                  _updateStatusBarColor();
+                },
               ),
               const CategoryScreen(embedded: true),
               // play.EmbeddedReelsWrapper(
@@ -364,19 +372,21 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 }
 
 class _HomeTab extends StatefulWidget {
+  final VoidCallback onSearch;
+  final Future<HomeBundle> bundleFuture;
+  final Future<void> Function() onRefresh;
+  final bool isGuest;
+  final VoidCallback promptLogin;
+  final ValueChanged<int>? onTabChange;
+
   const _HomeTab({
     required this.onSearch,
     required this.bundleFuture,
     required this.onRefresh,
     required this.isGuest,
     required this.promptLogin,
+    this.onTabChange,
   });
-
-  final VoidCallback onSearch;
-  final Future<HomeBundle> bundleFuture;
-  final Future<void> Function() onRefresh;
-  final bool isGuest;
-  final VoidCallback promptLogin;
 
   @override
   State<_HomeTab> createState() => _HomeTabState();
@@ -384,6 +394,7 @@ class _HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<_HomeTab> {
   late ScrollController _scrollController;
+  int _pullRefreshKey = 0;
 
   @override
   void initState() {
@@ -448,7 +459,12 @@ class _HomeTabState extends State<_HomeTab> {
         return Stack(
           children: [
             RefreshIndicator(
-              onRefresh: widget.onRefresh,
+              onRefresh: () async {
+                setState(() {
+                  _pullRefreshKey++;
+                });
+                await widget.onRefresh();
+              },
               child: CustomScrollView(
                 controller: _scrollController,
                 slivers: [
@@ -456,9 +472,14 @@ class _HomeTabState extends State<_HomeTab> {
                     child: SizedBox(height: MediaQuery.of(context).padding.top + 140),
                   ),
                   SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: BannerCarousel(items: bundle.mobileSlider),
+                    child: CategoryWidget(
+                      pullRefreshKey: _pullRefreshKey,
+                      onTabChange: widget.onTabChange,
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: BannerWidget(
+                      pullRefreshKey: _pullRefreshKey,
                     ),
                   ),
                   SliverToBoxAdapter(
