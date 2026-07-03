@@ -172,14 +172,14 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final double topSafeArea = MediaQuery.of(context).padding.top;
-    final double headerPaddingTop = widget.isHome ? 0.0 : topSafeArea;
 
     return Positioned(
       top: 0,
       left: 0,
       right: 0,
-      child: Padding(
-        padding: EdgeInsets.only(top: headerPaddingTop),
+      child: Container(
+        color: widget.backgroundColor,
+        padding: EdgeInsets.only(top: topSafeArea),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,

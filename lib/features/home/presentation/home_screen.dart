@@ -456,8 +456,8 @@ class _HomeTabState extends State<_HomeTab> {
               child: CustomScrollView(
                 controller: _scrollController,
                 slivers: [
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: 140),
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: MediaQuery.of(context).padding.top + 140),
                   ),
                   SliverToBoxAdapter(
                     child: Padding(
