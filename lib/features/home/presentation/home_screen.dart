@@ -14,6 +14,7 @@ import '../data/home_api_service.dart';
 import '../data/home_models.dart';
 import 'widgets/home_widgets.dart';
 import 'widgets/custom_bottom_tab_bar.dart';
+import 'widgets/header.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -276,6 +277,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 onSearch: () {
                   Navigator.of(context).pushNamed(SearchScreen.routeName);
                 },
+                isGuest: _isGuest,
+                promptLogin: () {
+                  Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
+                    _checkGuestStatus();
+                  });
+                },
               ),
               const CategoryScreen(embedded: true),
               play.EmbeddedReelsWrapper(
@@ -360,16 +367,39 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 }
 
-class _HomeTab extends StatelessWidget {
+class _HomeTab extends StatefulWidget {
   const _HomeTab({
     required this.onSearch,
     required this.bundleFuture,
     required this.onRefresh,
+    required this.isGuest,
+    required this.promptLogin,
   });
 
   final VoidCallback onSearch;
   final Future<HomeBundle> bundleFuture;
   final Future<void> Function() onRefresh;
+  final bool isGuest;
+  final VoidCallback promptLogin;
+
+  @override
+  State<_HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<_HomeTab> {
+  late ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   ProductItem _toProductItem(HomeProduct p, int index) {
     const fallbackColors = [
@@ -395,12 +425,9 @@ class _HomeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: true,
-      bottom: false,
-      child: FutureBuilder<HomeBundle>(
-        future: bundleFuture,
-        builder: (context, snap) {
+    return FutureBuilder<HomeBundle>(
+      future: widget.bundleFuture,
+      builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -411,7 +438,7 @@ class _HomeTab extends StatelessWidget {
               children: [
                 const Text('Failed to load home data'),
                 const SizedBox(height: 8),
-                OutlinedButton(onPressed: onRefresh, child: const Text('Retry')),
+                OutlinedButton(onPressed: widget.onRefresh, child: const Text('Retry')),
               ],
             ),
           );
@@ -422,83 +449,92 @@ class _HomeTab extends StatelessWidget {
         final sections = bundle.sections.take(4).toList();
         final promo = [...bundle.banner1, ...bundle.banner2].take(3).toList();
 
-        return RefreshIndicator(
-          onRefresh: onRefresh,
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: HomeHeader(
-                  city: bundle.city,
-                  pincode: bundle.pincode,
-                  onSearchTap: onSearch,
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: BannerCarousel(items: bundle.mobileSlider),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: ProductStrip(
-                    title: 'Today Deals',
-                    products: dealList,
-                    onProductTap: (p) {
-                      Navigator.of(context).pushNamed(
-                        AppRoutes.product,
-                        arguments: _toProductItem(p, 0),
-                      );
-                    },
+        return Stack(
+          children: [
+            RefreshIndicator(
+              onRefresh: widget.onRefresh,
+              child: CustomScrollView(
+                controller: _scrollController,
+                slivers: [
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: 140),
                   ),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-                  child: Column(
-                    children: promo
-                        .map(
-                          (b) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.network(
-                                b.image,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ),
-              ),
-              ...sections.map(
-                (s) => SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: ProductStrip(
-                      title: s.name,
-                      products: s.products.take(10).toList(),
-                      onProductTap: (p) {
-                        Navigator.of(context).pushNamed(
-                          AppRoutes.product,
-                          arguments: _toProductItem(p, s.products.indexOf(p)),
-                        );
-                      },
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: BannerCarousel(items: bundle.mobileSlider),
                     ),
                   ),
-                ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: ProductStrip(
+                        title: 'Today Deals',
+                        products: dealList,
+                        onProductTap: (p) {
+                          Navigator.of(context).pushNamed(
+                            AppRoutes.product,
+                            arguments: _toProductItem(p, 0),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                      child: Column(
+                        children: promo
+                            .map(
+                              (b) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.network(
+                                    b.image,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                  ),
+                  ...sections.map(
+                    (s) => SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: ProductStrip(
+                          title: s.name,
+                          products: s.products.take(10).toList(),
+                          onProductTap: (p) {
+                            Navigator.of(context).pushNamed(
+                              AppRoutes.product,
+                              arguments: _toProductItem(p, s.products.indexOf(p)),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
+                ],
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 20)),
-            ],
-          ),
+            ),
+            Header(
+              isHome: true,
+              scrollController: _scrollController,
+              city: bundle.city,
+              pincode: bundle.pincode,
+              isGuest: widget.isGuest,
+              onSearchTap: widget.onSearch,
+              promptLogin: widget.promptLogin,
+            ),
+          ],
         );
-        },
-      ),
+      },
     );
   }
 }
