@@ -36,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   bool _isCheckingLocation = false;
   bool _isGuest = true;
   int _cartCount = 3; // Initial mock cart items count
+  String _userId = 'guest';
 
   // Stream/Timer references for events
   StreamSubscription? _subConnectivity;
@@ -243,9 +244,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Future<void> _checkGuestStatus() async {
     final loggedIn = await SessionStore.isLoggedIn();
+    final uid = await SessionStore.getUserId();
     if (mounted) {
       setState(() {
         _isGuest = !loggedIn;
+        _userId = (loggedIn && uid != null && uid.isNotEmpty) ? uid : 'guest';
       });
     }
   }
@@ -275,7 +278,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 },
               ),
               const CategoryScreen(embedded: true),
-              const play.ReelsScreen(),
+              play.EmbeddedReelsWrapper(
+                key: ValueKey('play_session_$_userId'),
+                viewerId: _userId,
+              ),
               const CartScreen(embedded: true),
               const AccountScreen(embedded: true),
             ],

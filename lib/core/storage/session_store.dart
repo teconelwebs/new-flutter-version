@@ -42,4 +42,9 @@ class SessionStore {
     await prefs.remove(_kLoginUser);
     await prefs.remove(_kMobile);
   }
+
+  static Future<String?> getUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_kUserId);
+  }
 }
