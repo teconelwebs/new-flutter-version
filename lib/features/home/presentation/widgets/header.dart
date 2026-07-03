@@ -187,11 +187,10 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
             // 1. Top Location Address bar (if enabled)
             if (!widget.hideLocation)
               Container(
-                color: widget.backgroundColor,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Color(0xFFE9ECEF))),
-                  color: Colors.white,
+                decoration: BoxDecoration(
+                  border: const Border(bottom: BorderSide(color: Color(0xFFE9ECEF))),
+                  color: widget.backgroundColor,
                 ),
                 child: Row(
                   children: [
