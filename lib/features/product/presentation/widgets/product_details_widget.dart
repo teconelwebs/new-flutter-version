@@ -14,6 +14,7 @@ class ProductDetailsWidget extends StatefulWidget {
   final String pincode;
   final VoidCallback? onRatingTap;
 
+  // ignore: use_super_parameters
   const ProductDetailsWidget({
     Key? key,
     required this.data,
@@ -335,7 +336,9 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                     child: Row(
                       children: [
                         Text(
-                          _apiRating > 0 ? _apiRating.toStringAsFixed(1) : '4.3',
+                          _apiRating > 0
+                              ? _apiRating.toStringAsFixed(1)
+                              : '4.3',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 13,
@@ -561,20 +564,22 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
           ),
 
           // Pincode check responses
-          if (_checkingDelivery || _deliveryMessage.isNotEmpty || _errorMessage.isNotEmpty)
+          if (_checkingDelivery ||
+              _deliveryMessage.isNotEmpty ||
+              _errorMessage.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 4, bottom: 6),
               child: _checkingDelivery
                   ? Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF9FAFB),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: const Color(0xFFD1D5DB)),
                       ),
-                      child: Row(
-                        children: const [
+                      child: const Row(
+                        children: [
                           SizedBox(
                             width: 16,
                             height: 16,

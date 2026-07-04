@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 class RelatedProductsWidget extends StatefulWidget {
   final String productId;
 
+  // ignore: use_super_parameters
   const RelatedProductsWidget({
     Key? key,
     required this.productId,
@@ -131,6 +132,7 @@ class _RelatedProductsWidgetState extends State<RelatedProductsWidget> {
                     arguments: {'id': 'all', 'name': 'All Categories'},
                   );
                 },
+                // ignore: prefer_const_constructors
                 child: Row(
                   children: const [
                     Text('Explore All', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),

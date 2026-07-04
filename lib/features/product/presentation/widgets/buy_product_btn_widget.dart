@@ -6,10 +6,14 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
+import '../../../../core/constants/app_routes.dart';
+
+
 class BuyProductBtnWidget extends StatefulWidget {
   final Map<String, dynamic> data;
   final int selectedQuantity;
 
+  // ignore: use_super_parameters
   const BuyProductBtnWidget({
     Key? key,
     required this.data,
@@ -23,6 +27,7 @@ class BuyProductBtnWidget extends StatefulWidget {
 class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
   bool _buyNowLoading = false;
   bool _loading = false;
+  // ignore: unused_field
   bool _wishlist = false;
 
   @override
@@ -64,6 +69,7 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
     final isGuest = (accessToken == null || userId == null);
 
     if (isGuest) {
+      // ignore: use_build_context_synchronously
       Navigator.of(context).pushNamed('/User/Login');
       return;
     }
@@ -154,8 +160,9 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
           }
 
           if (navigateToCart) {
+            // ignore: use_build_context_synchronously
             Navigator.of(context).pushNamed(
-              '/(tabs)/Checkout',
+              AppRoutes.confirmAddress,
               arguments: {'buy_now': widget.data['id']},
             );
           }

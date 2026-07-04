@@ -34,7 +34,8 @@ class ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            AspectRatio(
+              aspectRatio: 1,
               child: Container(
                 width: double.infinity,
                 clipBehavior: Clip.antiAlias,
@@ -48,7 +49,7 @@ class ProductCard extends StatelessWidget {
                       )
                     : Image.network(
                         item.imageUrl,
-                        fit: BoxFit.cover,
+                        fit: BoxFit.contain,
                         errorBuilder: (_, __, ___) => const Center(
                           child: Icon(Icons.image_not_supported_outlined, size: 26),
                         ),
@@ -80,10 +81,17 @@ class ProductCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+                const Icon(Icons.local_shipping_rounded, color: Color(0xFF6B7280), size: 13),
+                const SizedBox(width: 4),
                 Text(
-                  item.rating.toStringAsFixed(1),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  item.durationMinutes > 0
+                      ? '${item.durationMinutes}-${item.durationMinutes + 1} days'
+                      : '7-8 days',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF4B5563),
+                  ),
                 ),
               ],
             ),

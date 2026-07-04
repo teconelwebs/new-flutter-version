@@ -1,7 +1,6 @@
 // lib/features/product/presentation/widgets/image_gallery_widget.dart
 // Converted from: component/ImageGallery.tsx
 
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -21,6 +20,7 @@ class ImageGalleryWidget extends StatefulWidget {
   final String? userId;
   final bool showFloatingActions;
 
+  // ignore: use_super_parameters
   const ImageGalleryWidget({
     Key? key,
     required this.images,
@@ -86,7 +86,8 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
 
     final prefs = await SharedPreferences.getInstance();
     if (widget.productId != null) {
-      await prefs.setString('wishlist_state_${widget.productId}', newState.toString());
+      await prefs.setString(
+          'wishlist_state_${widget.productId}', newState.toString());
     }
 
     if (widget.onWishlistPress != null) {
@@ -97,7 +98,9 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
     if (widget.productId != null && widget.userId != null) {
       try {
         final token = prefs.getString('access_token');
-        final endpoint = previousState ? 'wishlists-remove-product' : 'wishlists-add-product';
+        final endpoint = previousState
+            ? 'wishlists-remove-product'
+            : 'wishlists-add-product';
         final url = Uri.parse(
           'https://welfogapi.welfog.com/api/v2/$endpoint?product_id=${widget.productId}&user_id=${widget.userId}&islogin=true',
         );
@@ -125,7 +128,8 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
     try {
       final url = 'https://www.welfog.com/products/${widget.slug}';
       final price = widget.newPrice ?? widget.oldPrice ?? 0.0;
-      await Share.share('${widget.name} - ₹${price.toStringAsFixed(0)}\nCheck it out: $url');
+      await Share.share(
+          '${widget.name} - ₹${price.toStringAsFixed(0)}\nCheck it out: $url');
     } catch (e) {
       debugPrint('Share Error: $e');
     }
@@ -178,14 +182,18 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
                       right: 0,
                       child: Center(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
+                            // ignore: deprecated_member_use
                             color: Colors.black.withOpacity(0.6),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             '${galleryIndex + 1} / ${widget.images.length}',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
                           ),
                         ),
                       ),
@@ -202,6 +210,7 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // ignore: unused_local_variable
     final screenWidth = MediaQuery.of(context).size.width;
     final imageHeight = MediaQuery.of(context).size.height * 0.45;
 
@@ -218,7 +227,7 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
       children: [
         Container(
           height: imageHeight,
-          margin: const EdgeInsets.only(top: 8),
+          margin: EdgeInsets.zero,
           child: Stack(
             children: [
               // Slider list
@@ -231,7 +240,9 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
                 },
                 itemBuilder: (context, index) {
                   final imgUrl = widget.images[index];
-                  final fullUrl = imgUrl.startsWith('http') ? imgUrl : 'https://d1f02fefkbso7w.cloudfront.net/$imgUrl';
+                  final fullUrl = imgUrl.startsWith('http')
+                      ? imgUrl
+                      : 'https://d1f02fefkbso7w.cloudfront.net/$imgUrl';
 
                   return GestureDetector(
                     onTap: () => _openFullscreenGallery(index),
@@ -252,61 +263,69 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
 
               // Floating actions Share / Wishlist buttons
               if (widget.showFloatingActions)
-              Positioned(
-                top: 16,
-                right: 16,
-                child: Column(
-                  children: [
-                    // Wishlist action
-                    GestureDetector(
-                      onTap: _handleWishlistClick,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          _localWishlisted ? Icons.favorite : Icons.favorite_border,
-                          size: 22,
-                          color: _localWishlisted ? const Color(0xFFFB5404) : const Color(0xFF333333),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Share action
-                    GestureDetector(
-                      onTap: _onShare,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.share,
-                          size: 20,
-                          color: Color(0xFFFB5404),
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: Column(
+                    children: [
+                      // Wishlist action
+                      GestureDetector(
+                        onTap: _handleWishlistClick,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            // ignore: deprecated_member_use
+                            color: Colors.white.withOpacity(0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                // ignore: deprecated_member_use
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            _localWishlisted
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            size: 22,
+                            color: _localWishlisted
+                                ? const Color(0xFFFB5404)
+                                : const Color(0xFF333333),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      // Share action
+                      GestureDetector(
+                        onTap: _onShare,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            // ignore: deprecated_member_use
+                            color: Colors.white.withOpacity(0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                // ignore: deprecated_member_use
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.share,
+                            size: 20,
+                            color: Color(0xFFFB5404),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -316,12 +335,16 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
+              // ignore: deprecated_member_use
               color: Colors.black.withOpacity(0.6),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               '${_currentIndex + 1} / ${widget.images.length}',
-              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold),
             ),
           ),
         ),

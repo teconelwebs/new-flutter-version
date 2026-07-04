@@ -11,7 +11,10 @@ import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
 import '../../features/search/presentation/search_results_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
+import '../../features/checkout/presentation/confirm_address_screen.dart';
+import '../../features/checkout/presentation/payment_confirmation_screen.dart';
 import '../constants/app_routes.dart';
+
 
 class AppRouter {
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
@@ -63,8 +66,19 @@ class AppRouter {
           settings: settings,
           builder: (_) => const ProfileScreen(),
         );
+      case AppRoutes.confirmAddress:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const ConfirmAddressScreen(),
+        );
+      case AppRoutes.paymentConfirmation:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const PaymentConfirmationScreen(),
+        );
       default:
         return play.AppRoutes.onGenerateRoute(settings);
     }
   }
 }
+

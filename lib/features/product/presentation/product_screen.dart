@@ -13,6 +13,7 @@ import 'widgets/product_details_widget.dart';
 import 'widgets/product_other_details_widget.dart';
 import 'widgets/buy_product_widget.dart';
 import 'widgets/buy_product_btn_widget.dart';
+import 'widgets/customer_reviews_widget.dart';
 
 class ProductScreen extends StatefulWidget {
   const ProductScreen({super.key, this.item});
@@ -40,10 +41,30 @@ class _ProductScreenState extends State<ProductScreen> {
   bool _isWishlisted = false;
   bool _isTogglingWishlist = false;
 
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _reviewsKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToReviews() {
+    final context = _reviewsKey.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   Future<void> _load() async {
@@ -173,6 +194,7 @@ class _ProductScreenState extends State<ProductScreen> {
       setState(() {
         _isTogglingWishlist = false;
       });
+      // ignore: use_build_context_synchronously
       Navigator.of(context).pushNamed(AppRoutes.login);
     }
   }
@@ -237,7 +259,8 @@ class _ProductScreenState extends State<ProductScreen> {
               child: RefreshIndicator(
                 onRefresh: _load,
                 child: ListView(
-                  padding: const EdgeInsets.only(bottom: 24),
+                  controller: _scrollController,
+                  padding: const EdgeInsets.only(top: 0, bottom: 24),
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -256,6 +279,7 @@ class _ProductScreenState extends State<ProductScreen> {
                     ProductDetailsWidget(
                       data: detail.rawJson,
                       pincode: _pincode,
+                      onRatingTap: _scrollToReviews,
                     ),
                     const SizedBox(height: 4),
                     BuyProductWidget(
@@ -269,6 +293,11 @@ class _ProductScreenState extends State<ProductScreen> {
                     ),
                     const SizedBox(height: 4),
                     ProductOtherDetailsWidget(
+                      data: detail.rawJson,
+                    ),
+                    const SizedBox(height: 4),
+                    CustomerReviewsWidget(
+                      key: _reviewsKey,
                       data: detail.rawJson,
                     ),
                     const SizedBox(height: 12),
@@ -331,7 +360,7 @@ class _ProductScreenState extends State<ProductScreen> {
                 crossAxisCount: 2,
                 mainAxisSpacing: 8,
                 crossAxisSpacing: 8,
-                childAspectRatio: 0.65,
+                childAspectRatio: 0.71,
               ),
               itemBuilder: (context, index) =>
                   ProductCard(item: _related[index]),

@@ -96,7 +96,6 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
       if (raw != null) {
         final parsed = jsonDecode(raw);
         final List<dynamic> rawSlides = parsed['slides'] ?? [];
-        final int timestamp = parsed['ts'] ?? 0;
 
         if (rawSlides.isNotEmpty) {
           final loadedSlides = rawSlides.map((s) => BannerData.fromJson(s)).toList();
@@ -107,10 +106,7 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
           _precalculateAspectRatios();
           _startAutoCarousel();
           _startProgressAnimation();
-
-          // Check if cached version is older than 6 hours TTL
-          final isFresh = (DateTime.now().millisecondsSinceEpoch - timestamp) < (1000 * 60 * 60 * 6);
-          if (isFresh) return;
+          return;
         }
       }
     } catch (_) {}

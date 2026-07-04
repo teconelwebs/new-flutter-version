@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -35,7 +36,7 @@ class HomeApiService {
     final sections = _mapSections(catRes['data']);
     final todayDeals = _mapDealProducts(dealRes['products']);
 
-    return HomeBundle(
+    final bundle = HomeBundle(
       mobileSlider: mobileSlider,
       banner1: banner1,
       banner2: banner2,
@@ -44,6 +45,28 @@ class HomeApiService {
       city: city,
       pincode: pincode,
     );
+
+    try {
+      await prefs.setString('cached_home_bundle_v2', jsonEncode(bundle.toJson()));
+    } catch (e) {
+      debugPrint("Failed to cache home bundle: $e");
+    }
+
+    return bundle;
+  }
+
+  Future<HomeBundle?> getCachedHomeBundle() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedStr = prefs.getString('cached_home_bundle_v2');
+      if (cachedStr != null) {
+        final decoded = jsonDecode(cachedStr);
+        return HomeBundle.fromJson(decoded);
+      }
+    } catch (e) {
+      debugPrint("Failed to load cached home bundle: $e");
+    }
+    return null;
   }
 
   Future<Map<String, dynamic>> _getJson(String url) async {

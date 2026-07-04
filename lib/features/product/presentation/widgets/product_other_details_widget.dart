@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 class ProductOtherDetailsWidget extends StatefulWidget {
   final Map<String, dynamic> data;
 
+  // ignore: use_super_parameters
   const ProductOtherDetailsWidget({
     Key? key,
     required this.data,
@@ -539,6 +540,7 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
               border: Border.all(color: const Color(0xFFE5E7EB)),
               boxShadow: [
                 BoxShadow(
+                  // ignore: deprecated_member_use
                   color: Colors.black.withOpacity(0.02),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
@@ -659,7 +661,9 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
+                                // ignore: deprecated_member_use
                                 Colors.white.withOpacity(0.0),
+                                // ignore: deprecated_member_use
                                 Colors.white.withOpacity(0.8),
                                 Colors.white,
                               ],

@@ -58,7 +58,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _bundleFuture = _homeApi.fetchHomeBundle();
+    _bundleFuture = _homeApi.getCachedHomeBundle().then((cached) {
+      if (cached != null) {
+        return cached;
+      } else {
+        return _homeApi.fetchHomeBundle();
+      }
+    });
 
     // Offline toast slide-up animation setup
     _offlineAnimController = AnimationController(

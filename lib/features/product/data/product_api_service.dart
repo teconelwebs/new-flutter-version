@@ -20,11 +20,7 @@ class ProductApiService {
     final lng = prefs.getString('longitude') ?? '0';
 
     final uri = Uri.parse('$_secondApi/product_details/$slugOrId').replace(
-      queryParameters: {
-        'pro_id': productId,
-        'latitude': lat,
-        'longitude': lng,
-      },
+      queryParameters: {'pro_id': productId, 'latitude': lat, 'longitude': lng},
     );
 
     final response = await http.get(uri);
@@ -57,44 +53,53 @@ class ProductApiService {
     final token = prefs.getString('access_token') ?? '';
 
     final uri = Uri.parse('$_mainApi/products/related/$productId').replace(
-      queryParameters: {
-        'id': productId,
-        'latitude': lat,
-        'longitude': lng,
-      },
+      queryParameters: {'id': productId, 'latitude': lat, 'longitude': lng},
     );
 
     final response = await http.get(
       uri,
       headers: token.isEmpty ? null : {'Authorization': 'Bearer $token'},
     );
-    if (response.statusCode < 200 || response.statusCode >= 300) return const [];
+    if (response.statusCode < 200 || response.statusCode >= 300)
+      // ignore: curly_braces_in_flow_control_structures
+      return const [];
     final decoded = jsonDecode(response.body);
     final data = decoded is Map<String, dynamic> ? decoded['data'] : null;
     if (data is! List) return const [];
 
-    return data.whereType<Map>().map((raw) {
-      final id = (raw['id'] ?? '').toString();
-      final name = (raw['name'] ?? '').toString();
-      final brand = (raw['brand'] ?? raw['data']?['brand'] ?? '').toString();
-      final price = _toDouble(raw['main_price'] ?? raw['new_price'] ?? raw['price']);
-      final image = _asAbsolute(
-        (raw['thumbnail_image'] ?? raw['thumbnail_img'] ?? raw['image'] ?? '')
-            .toString(),
-      );
-      return ProductItem(
-        id: id,
-        title: name,
-        subtitle: brand.isEmpty ? 'Fast delivery' : brand,
-        price: price,
-        rating: _toDouble(raw['rating'] ?? 0),
-        color: const Color(0xFFF8FAFC),
-        imageUrl: image,
-        slug: (raw['slug'] ?? '').toString(),
-        brand: brand,
-        durationMinutes: int.tryParse((raw['duration'] ?? '0').toString()) ?? 0,
-      );
-    }).where((item) => item.id.isNotEmpty && item.title.isNotEmpty).toList();
+    return data
+        .whereType<Map>()
+        .map((raw) {
+          final id = (raw['id'] ?? '').toString();
+          final name = (raw['name'] ?? '').toString();
+          final brand = (raw['brand'] ?? raw['data']?['brand'] ?? '')
+              .toString();
+          final price = _toDouble(
+            raw['main_price'] ?? raw['new_price'] ?? raw['price'],
+          );
+          final image = _asAbsolute(
+            (raw['thumbnail_image'] ??
+                    raw['thumbnail_img'] ??
+                    raw['image'] ??
+                    '')
+                .toString(),
+          );
+          return ProductItem(
+            id: id,
+            title: name,
+            subtitle: brand.isEmpty ? 'Fast delivery' : brand,
+            price: price,
+            rating: _toDouble(raw['rating'] ?? 0),
+            color: const Color(0xFFF8FAFC),
+            imageUrl: image,
+            slug: (raw['slug'] ?? '').toString(),
+            brand: brand,
+            durationMinutes:
+                int.tryParse((raw['duration'] ?? '0').toString()) ?? 0,
+          );
+        })
+        .where((item) => item.id.isNotEmpty && item.title.isNotEmpty)
+        .toList();
   }
 
   String _asAbsolute(String raw) {
@@ -195,12 +200,13 @@ class ProductDetailData {
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       slug: (json['slug'] ?? '').toString(),
-      brand: (json['brand_name'] ??
-              json['brandName'] ??
-              json['brand'] ??
-              json['product']?['brand'] ??
-              '')
-          .toString(),
+      brand:
+          (json['brand_name'] ??
+                  json['brandName'] ??
+                  json['brand'] ??
+                  json['product']?['brand'] ??
+                  '')
+              .toString(),
       sellPrice: sell,
       mrpPrice: mrp <= 0 ? sell : mrp,
       discountPercent: discount < 0 ? 0 : discount,
@@ -209,7 +215,11 @@ class ProductDetailData {
       shortDescription: (json['sdescription'] ?? '').toString(),
       images: images,
       features: featureMap,
-      stock: int.tryParse((json['stock'] ?? json['stocks']?[0]?['qty'] ?? '0').toString()) ?? 0,
+      stock:
+          int.tryParse(
+            (json['stock'] ?? json['stocks']?[0]?['qty'] ?? '0').toString(),
+          ) ??
+          0,
       rawJson: json,
     );
   }
@@ -229,11 +239,11 @@ class ProductReviewBundle {
   final List<ProductReview> reviews;
 
   factory ProductReviewBundle.empty() => const ProductReviewBundle(
-        totalReviews: 0,
-        averageRating: 0,
-        percentages: <int, int>{},
-        reviews: <ProductReview>[],
-      );
+    totalReviews: 0,
+    averageRating: 0,
+    percentages: <int, int>{},
+    reviews: <ProductReview>[],
+  );
 
   factory ProductReviewBundle.fromJson(Map<String, dynamic> json) {
     final rp = json['review_percentages'] is Map<String, dynamic>
@@ -251,9 +261,9 @@ class ProductReviewBundle {
     final reviewsRaw = json['reviews'];
     final reviews = reviewsRaw is List
         ? reviewsRaw
-            .whereType<Map>()
-            .map((e) => ProductReview.fromJson(Map<String, dynamic>.from(e)))
-            .toList()
+              .whereType<Map>()
+              .map((e) => ProductReview.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
         : <ProductReview>[];
 
     return ProductReviewBundle(
