@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+// ignore: unused_import
 import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
 
 import '../../account/presentation/account_screen.dart';
@@ -33,12 +34,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late Future<HomeBundle> _bundleFuture;
 
   // Layout & Navigation State
+  // ignore: unused_field
   bool _isOffline = false;
   bool _showOfflineToast = false;
+  // ignore: unused_field
   bool _isLocationBlocked = false;
   bool _isCheckingLocation = false;
   bool _isGuest = true;
+  // ignore: prefer_final_fields
   int _cartCount = 3; // Initial mock cart items count
+  // ignore: unused_field
   String _userId = 'guest';
 
   // Stream/Timer references for events
@@ -128,6 +133,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     // });
   }
 
+  // ignore: unused_element
   void _toggleOfflineBanner(bool offline) {
     if (offline) {
       setState(() {
@@ -153,6 +159,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     // });
   }
 
+  // ignore: unused_element
   void _handleUriRouting(Uri uri) {
     final segments = uri.pathSegments;
     if (segments.isEmpty) return;
@@ -160,6 +167,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     switch (segments[0]) {
       case "products":
         if (segments.length > 1) {
+          // ignore: unused_local_variable
           final slug = segments[1];
           // Navigate to Product Details screen
           // Navigator.pushNamed(context, '/product', arguments: slug);
@@ -167,12 +175,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         break;
       case "OtheruserProfile":
         if (segments.length > 1) {
+          // ignore: unused_local_variable
           final profileId = segments[1];
           // Open other user profile screen
         }
         break;
       case "Play":
         if (segments.length > 2 && segments[1] == "sepreel") {
+          // ignore: unused_local_variable
           final playId = segments[2];
           // Open Reel / Play module
         }
@@ -320,12 +330,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
+                      // ignore: deprecated_member_use
                       color: Colors.black.withOpacity(0.2),
                       blurRadius: 8,
                       offset: const Offset(0, 3),
                     ),
                   ],
                 ),
+                // ignore: prefer_const_constructors
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: const [

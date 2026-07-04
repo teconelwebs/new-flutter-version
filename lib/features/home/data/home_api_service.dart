@@ -17,13 +17,16 @@ class HomeApiService {
     final city = prefs.getString('city_name') ?? 'Jaipur';
     final pincode = prefs.getString('postal_code') ?? '302001';
 
-    final bannerRes = await _getJson('$_mainApi/bannerdata/');
-    final catRes = await _getJson(
-      'https://welfogapi.welfog.com/api/cat_wise_product_show?latitude=$lat&longitude=$lng&page=1',
-    );
-    final dealRes = await _getJson(
-      '$_secondApi/today_deal?latitude=$lat&longitude=$lng&page=1&limit=10',
-    );
+    // Fetch all three endpoints in parallel
+    final results = await Future.wait([
+      _getJson('$_mainApi/bannerdata/'),
+      _getJson('https://welfogapi.welfog.com/api/cat_wise_product_show?latitude=$lat&longitude=$lng&page=1'),
+      _getJson('$_secondApi/today_deal?latitude=$lat&longitude=$lng&page=1&limit=10'),
+    ]);
+
+    final bannerRes = results[0];
+    final catRes = results[1];
+    final dealRes = results[2];
 
     final mobileSlider = _mapBannerList(bannerRes['mobile_slider']);
     final banner1 = _mapBannerList(bannerRes['banner1']);

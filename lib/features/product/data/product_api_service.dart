@@ -125,6 +125,7 @@ class ProductDetailData {
     required this.images,
     required this.features,
     required this.stock,
+    this.rawJson = const {},
   });
 
   final String id;
@@ -140,6 +141,7 @@ class ProductDetailData {
   final List<String> images;
   final Map<String, String> features;
   final int stock;
+  final Map<String, dynamic> rawJson;
 
   factory ProductDetailData.fromJson(
     Map<String, dynamic> json, {
@@ -208,6 +210,7 @@ class ProductDetailData {
       images: images,
       features: featureMap,
       stock: int.tryParse((json['stock'] ?? json['stocks']?[0]?['qty'] ?? '0').toString()) ?? 0,
+      rawJson: json,
     );
   }
 }

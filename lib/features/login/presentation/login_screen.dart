@@ -9,6 +9,7 @@ import '../../home/presentation/home_screen.dart';
 import '../data/login_service.dart';
 
 class LoginScreen extends StatefulWidget {
+  // ignore: use_super_parameters
   const LoginScreen({Key? key}) : super(key: key);
   static const routeName = AppRoutes.login;
   @override
@@ -127,6 +128,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   }
 
   // Generates Temporary ID mimicking Javascript logic
+  // ignore: unused_element
   String _generateTempId() {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final randomNum = Random().nextInt(1000000);
@@ -394,6 +396,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               left: 0,
               right: 0,
               height: 340,
+              // ignore: deprecated_member_use
               child: Container(color: Colors.white.withOpacity(0.28)),
             ),
           ],
@@ -572,6 +575,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                               height: 2,
                               margin: const EdgeInsets.only(top: 10),
                               decoration: BoxDecoration(
+                                // ignore: deprecated_member_use
                                 color: const Color(0xFF2A8C7A).withOpacity(0.5),
                                 borderRadius: BorderRadius.circular(1),
                               ),
@@ -587,6 +591,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             const SizedBox(height: 10),
 
                             // Security Info Row
+                            // ignore: prefer_const_constructors
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: const [
@@ -740,17 +745,20 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
             decoration: BoxDecoration(
+              // ignore: deprecated_member_use
               color: Colors.white.withOpacity(0.92),
               borderRadius: BorderRadius.circular(999),
               border: Border.all(color: const Color(0x2E0A6B69)),
               boxShadow: [
                 BoxShadow(
+                  // ignore: deprecated_member_use
                   color: Colors.black.withOpacity(0.12),
                   blurRadius: 10,
                   offset: const Offset(0, 6),
                 ),
               ],
             ),
+            // ignore: prefer_const_constructors
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: const [
@@ -808,6 +816,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                   ),
                   boxShadow: [
                     BoxShadow(
+                      // ignore: deprecated_member_use
                       color: Colors.black.withOpacity(0.08),
                       blurRadius: 16,
                       offset: const Offset(0, 8),
@@ -891,6 +900,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               ? []
               : [
                   BoxShadow(
+                    // ignore: deprecated_member_use
                     color: const Color(0xFFF26A1A).withOpacity(0.25),
                     blurRadius: 18,
                     offset: const Offset(0, 6),

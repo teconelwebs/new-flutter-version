@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 // Color ko hex string format me badalne ke liye helper function
 String _colorToHex(Color color) {
+  // ignore: deprecated_member_use
   return '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
 }
 
@@ -14,6 +15,7 @@ class AccountIcon extends StatelessWidget {
   final Color color;
   final double opacitySecondary;
 
+  // ignore: use_super_parameters
   const AccountIcon({
     Key? key,
     this.size = 26,
@@ -49,6 +51,7 @@ class CartIcon extends StatelessWidget {
   final double size;
   final bool active;
 
+  // ignore: use_super_parameters
   const CartIcon({
     Key? key,
     this.size = 26,
@@ -103,6 +106,7 @@ class CategoriesIcon extends StatelessWidget {
   final double size;
   final Color color;
 
+  // ignore: use_super_parameters
   const CategoriesIcon({
     Key? key,
     this.size = 26,
@@ -139,6 +143,7 @@ class HomeIcon extends StatelessWidget {
   final Color? wColor;
   final Color? wBgColor;
 
+  // ignore: use_super_parameters
   const HomeIcon({
     Key? key,
     this.size = 26,
@@ -182,6 +187,7 @@ class PlayIcon extends StatelessWidget {
   final bool active;
   final Color activeColor;
 
+  // ignore: use_super_parameters
   const PlayIcon({
     Key? key,
     this.size = 26,

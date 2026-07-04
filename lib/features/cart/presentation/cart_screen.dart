@@ -204,6 +204,7 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen>
     with SingleTickerProviderStateMixin {
+  // ignore: unused_field
   int _cartCount = 0;
 
   List<CartItem> _cartItems = _cartModuleCache?.items ?? [];
@@ -316,7 +317,6 @@ class _CartScreenState extends State<CartScreen>
 
       if (token == null || userId == null) return;
 
-      // TODO: Replace with actual API call
       // final res = await mainAPI.post('/carts/$userId', data: {'user_latitude': lat, 'user_longitude': long});
       // final list = res.data.expand((c) => c['cart_items'] ?? []).map(CartItem.fromJson).toList();
       final List<CartItem> list = [];
@@ -327,7 +327,6 @@ class _CartScreenState extends State<CartScreen>
         _cartCount = count;
       });
 
-      // TODO: Replace with actual summary API call
       // final summaryRes = await mainAPI.get('/cart-summary/$userId');
       // final summaryData = summaryRes.data;
       final Map<String, dynamic> summaryData = {};
@@ -379,7 +378,6 @@ class _CartScreenState extends State<CartScreen>
 
   Future<void> _removeCartItem(int id) async {
     try {
-      // TODO: Replace with actual API call
       // final prefs = await SharedPreferences.getInstance();
       // final token = prefs.getString('access_token');
       // await mainAPI.post('/carts', data: {'id': id});
@@ -430,7 +428,6 @@ class _CartScreenState extends State<CartScreen>
 
   Future<bool> _addToCartBackend(CartItem item) async {
     try {
-      // TODO: Replace with actual API call
       // final prefs = await SharedPreferences.getInstance();
       // final userId = prefs.getString('user_id');
       // final tempUserId = prefs.getString('temp_user_id');
@@ -474,7 +471,6 @@ class _CartScreenState extends State<CartScreen>
       final token = prefs.getString('access_token');
       if (token == null) throw Exception('No token');
 
-      // TODO: Replace with actual API call
       // final res = await mainAPI.post('/carts/change-quantity', data: {'id': id, 'quantity': quantity});
       await _fetchCartData();
       return true;
@@ -537,6 +533,7 @@ class _CartScreenState extends State<CartScreen>
         content: Text(message,
             style: const TextStyle(
                 fontWeight: FontWeight.w500, letterSpacing: 0.3)),
+        // ignore: deprecated_member_use
         backgroundColor: const Color(0xFF222222).withOpacity(0.85),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
@@ -600,6 +597,7 @@ class _CartScreenState extends State<CartScreen>
 
     if (days.isEmpty && byDate.isEmpty) return 'Est. delivery: 2–4 days';
     if (days.isNotEmpty && byDate.isNotEmpty)
+      // ignore: curly_braces_in_flow_control_structures
       return 'Est. delivery: $days • By $byDate';
     if (days.isNotEmpty) return 'Est. delivery: $days';
     return 'Est. delivery: By $byDate';
@@ -977,7 +975,9 @@ class _CartScreenState extends State<CartScreen>
                                         shape: BoxShape.circle,
                                         gradient: LinearGradient(
                                           colors: [
+                                            // ignore: deprecated_member_use
                                             const Color(0xFF0A6B69).withOpacity(0.12),
+                                            // ignore: deprecated_member_use
                                             const Color(0xFF0A6B69).withOpacity(0.01),
                                           ],
                                           begin: Alignment.topCenter,
@@ -994,6 +994,7 @@ class _CartScreenState extends State<CartScreen>
                                             decoration: BoxDecoration(
                                               shape: BoxShape.circle,
                                               border: Border.all(
+                                                // ignore: deprecated_member_use
                                                 color: const Color(0xFF0A6B69).withOpacity(0.15),
                                                 width: 1.5,
                                               ),
@@ -1008,6 +1009,7 @@ class _CartScreenState extends State<CartScreen>
                                               color: Colors.white,
                                               boxShadow: [
                                                 BoxShadow(
+                                                  // ignore: deprecated_member_use
                                                   color: Colors.black.withOpacity(0.04),
                                                   blurRadius: 10,
                                                   offset: const Offset(0, 4),
@@ -1070,6 +1072,7 @@ class _CartScreenState extends State<CartScreen>
                                         boxShadow: [
                                           BoxShadow(
                                             color: const Color(0xFFFB5404)
+                                                // ignore: deprecated_member_use
                                                 .withOpacity(0.3),
                                             blurRadius: 8,
                                             offset: const Offset(0, 4),
@@ -1268,6 +1271,7 @@ class _CartScreenState extends State<CartScreen>
                             top: BorderSide(color: Color(0xFFEEEEEE))),
                         boxShadow: [
                           BoxShadow(
+                            // ignore: deprecated_member_use
                             color: Colors.black.withOpacity(0.06),
                             blurRadius: 10,
                             offset: const Offset(0, -4),

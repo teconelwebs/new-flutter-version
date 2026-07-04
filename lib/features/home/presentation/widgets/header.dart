@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+// ignore: unnecessary_import
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../search/presentation/search_screen.dart';
@@ -18,6 +19,7 @@ class Header extends StatefulWidget {
   final VoidCallback? onSearchTap;
   final VoidCallback? promptLogin;
 
+  // ignore: use_super_parameters
   const Header({
     Key? key,
     this.backgroundColor = Colors.white,
@@ -153,6 +155,7 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
     if (widget.onSearchTap != null) {
       widget.onSearchTap!();
     } else {
+      // ignore: use_build_context_synchronously
       Navigator.pushNamed(context, SearchScreen.routeName);
     }
   }

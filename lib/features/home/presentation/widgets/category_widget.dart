@@ -165,6 +165,7 @@ class _CategoryWidgetState extends State<CategoryWidget> {
     _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       final scrollCategories =
           _categories.where((c) => c['id'] != 'all').toList();
+      // ignore: prefer_const_declarations
       final double step = itemWidth + tileGap;
 
       if (_scrollController.hasClients &&

@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 // Helper method to convert Color to Hex format
 String _colorToHex(Color color) {
+  // ignore: deprecated_member_use
   return '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
 }
 

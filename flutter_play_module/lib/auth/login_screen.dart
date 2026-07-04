@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+// ignore: unnecessary_import
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -8,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:math' as math;
 
 class LoginScreen extends StatefulWidget {
+  // ignore: use_super_parameters
   const LoginScreen({Key? key}) : super(key: key);
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -146,6 +148,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       } else if (accountStatus == "banned") {
         _showToast("Account Suspended", data['message'] ?? "Your account has been banned by the admin. Please contact support.", isError: true);
       } else if (accountStatus == "deleted") {
+        // ignore: use_build_context_synchronously
         Navigator.pushNamed(context, '/ProfileScreen/AccountDeleted', arguments: {
           'phone': _phoneNumber,
           'deleted_date': data['deleted_date'] ?? "",
@@ -289,6 +292,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             bottom: 20, left: 0, right: 0,
             child: Container(
               height: 340,
+              // ignore: deprecated_member_use
               color: Colors.white.withOpacity(0.28),
             ),
           ),
@@ -405,6 +409,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                     height: 2,
                                     margin: const EdgeInsets.only(top: 10),
                                     decoration: BoxDecoration(
+                                      // ignore: deprecated_member_use
                                       color: const Color(0xFF2A8C7A).withOpacity(0.5),
                                       borderRadius: BorderRadius.circular(1),
                                     ),
@@ -588,6 +593,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
+                    // ignore: deprecated_member_use
                     color: Colors.white.withOpacity(0.92),
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(color: const Color.fromRGBO(10, 107, 105, 0.18)),

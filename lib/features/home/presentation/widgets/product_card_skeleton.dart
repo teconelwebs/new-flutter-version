@@ -29,11 +29,11 @@ class ProductCardSkeleton extends StatelessWidget {
         ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Image skeleton container
-          const ShimmerPlaceholder(
+          ShimmerPlaceholder(
             height: 160,
             width: double.infinity,
             shimmerColors: shimmerColors,
@@ -45,34 +45,34 @@ class ProductCardSkeleton extends StatelessWidget {
 
           // Content section skeletons
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Brand Skeleton
-                const ShimmerPlaceholder(
+                ShimmerPlaceholder(
                   height: 12,
                   width: 50,
                   shimmerColors: shimmerColors,
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
 
                 // Title Skeleton (Line 1 & Line 2)
-                const ShimmerPlaceholder(
+                ShimmerPlaceholder(
                   height: 14,
                   width: double.infinity,
                   shimmerColors: shimmerColors,
                 ),
-                const SizedBox(height: 4),
-                const ShimmerPlaceholder(
+                SizedBox(height: 4),
+                ShimmerPlaceholder(
                   height: 14,
                   width: 100, // 75% representation
                   shimmerColors: shimmerColors,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
 
                 // Price Skeletons
-                const Row(
+                Row(
                   children: [
                     ShimmerPlaceholder(
                       height: 16,
@@ -87,10 +87,10 @@ class ProductCardSkeleton extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
 
                 // Delivery estimate skeleton
-                const ShimmerPlaceholder(
+                ShimmerPlaceholder(
                   height: 12,
                   width: 110, // 80% representation
                   shimmerColors: shimmerColors,
