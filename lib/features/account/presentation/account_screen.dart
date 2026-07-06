@@ -113,6 +113,8 @@ class _AccountScreenState extends State<AccountScreen> {
         _openPlayRoute(play.AppRoutes.myProfile);
         return;
       case 'addresses':
+        Navigator.of(context).pushNamed(AppRoutes.address);
+        return;
       case 'orders':
       case 'wishlist':
       case 'help':

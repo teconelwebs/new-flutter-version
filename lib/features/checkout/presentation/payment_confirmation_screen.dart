@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/constants/app_routes.dart';
+import '../../../core/state/cart_state.dart';
+import 'cashfree_webview_page.dart';
 
 class PaymentConfirmationScreen extends StatefulWidget {
   static const routeName = AppRoutes.paymentConfirmation;
@@ -27,7 +29,6 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
   // ignore: unused_field
   List<dynamic> _paymentTypes = [];
   String? _selectedPayment;
-  String _walletBalance = '0';
   String _latitude = '0';
   String _longitude = '0';
 
@@ -105,7 +106,6 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
         final userData = jsonDecode(userResponse.body);
         if (mounted) {
           setState(() {
-            _walletBalance = userData['balance']?.toString() ?? '0';
             _latitude = userData['addressData']?['latitude']?.toString() ?? '0';
             _longitude =
                 userData['addressData']?['longitude']?.toString() ?? '0';
@@ -262,11 +262,11 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
     final userId = prefs.getString('user_id');
 
     if (_buyNowProductId == null) {
-      await prefs.setString('cart_count', '0');
+      await CartState.updateCartCount(0);
     } else {
       try {
         final cartUri =
-            Uri.parse('https://welfogapi.welfog.com/api/carts/$userId');
+            Uri.parse('https://welfogapi.welfog.com/api/v2/carts/$userId');
         final cartResponse = await http.post(
           cartUri,
           headers: {
@@ -289,7 +289,7 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
           for (var it in list) {
             remaining += int.tryParse(it['quantity']?.toString() ?? '') ?? 0;
           }
-          await prefs.setString('cart_count', remaining.toString());
+          await CartState.updateCartCount(remaining);
         }
       } catch (err) {
         debugPrint('Failed to sync cart: $err');
@@ -351,16 +351,7 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
               0.0) -
           _discount;
 
-      if (_selectedPayment == 'wallet') {
-        final bal = double.tryParse(_walletBalance) ?? 0.0;
-        if (bal < payableValue) {
-          setState(() {
-            _errorMessage = 'Insufficient wallet balance.';
-            _isPlacingOrder = false;
-          });
-          return;
-        }
-      }
+
 
       final payload = {
         'user_id': int.tryParse(userId ?? '') ?? 0,
@@ -392,14 +383,14 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
       if (response.statusCode == 200) {
         final resData = jsonDecode(response.body);
 
-        if (_selectedPayment == 'cod' || _selectedPayment == 'wallet') {
+        if (_selectedPayment == 'cod') {
           await _updateCartAfterOrder();
           final String cashOrderId = resData['order_id']?.toString() ?? '';
 
           if (mounted) {
             Navigator.of(context).pushReplacementNamed(
-              '/profile/order-detail',
-              arguments: {'id': cashOrderId, 'status': 'PAID'},
+              AppRoutes.orderSuccess,
+              arguments: cashOrderId,
             );
           }
         } else if (_selectedPayment == 'pay_online') {
@@ -419,33 +410,87 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
     }
   }
 
-  void _launchCashfreeWebViewFlow(String sessionId, String orderId) {
-    // REDIRECTS to web checkout simulation
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text('Online checkout simulated'),
-          content: Text(
-              'Simulating Cashfree Online order processing for Order ID: $orderId'),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await _updateCartAfterOrder();
-                if (mounted) {
-                  Navigator.of(context).pushReplacementNamed(
-                    '/profile/order-detail',
-                    arguments: {'id': orderId, 'status': 'PAID'},
-                  );
-                }
-              },
-              child: const Text('Simulate Success'),
-            ),
-          ],
-        );
-      },
+  Future<void> _launchCashfreeWebViewFlow(String sessionId, String orderId) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CashfreeWebViewPage(
+          sessionId: sessionId,
+          orderId: orderId,
+        ),
+        fullscreenDialog: true,
+      ),
     );
+
+    // If the webview closed, check payment status
+    setState(() {
+      _isPlacingOrder = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      if (token == null) return;
+
+      final verifyUri = Uri.parse(
+          'https://welfogapi.welfog.com/api/payment/status?order_id=$orderId');
+      final verifyResponse = await http.get(verifyUri);
+
+      debugPrint(
+          '[PaymentConfirmation] Verification status code: ${verifyResponse.statusCode}');
+      debugPrint(
+          '[PaymentConfirmation] Verification response body: ${verifyResponse.body}');
+
+      if (verifyResponse.statusCode == 200) {
+        final verifyData = jsonDecode(verifyResponse.body);
+        final status =
+            verifyData['order_status']?.toString().toUpperCase() ?? 'UNKNOWN';
+        final paymentStatus =
+            verifyData['payment_status']?.toString().toLowerCase() ?? 'unknown';
+
+        if (status == 'PAID' || paymentStatus == 'paid') {
+          // Success backend API call
+          final successUri =
+              Uri.parse('https://welfogapi.welfog.com/api/payment/success');
+          await http.post(
+            successUri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({'order_id': orderId}),
+          );
+
+          await _updateCartAfterOrder();
+
+          if (mounted) {
+            Navigator.of(context).pushReplacementNamed(
+              AppRoutes.orderSuccess,
+              arguments: orderId,
+            );
+          }
+        } else {
+          setState(() {
+            _errorMessage = 'Payment unsuccessful. Please try another method.';
+          });
+        }
+      } else {
+        setState(() {
+          _errorMessage = 'Unable to verify payment. Please try again.';
+        });
+      }
+    } catch (e) {
+      debugPrint('Payment verification error: $e');
+      setState(() {
+        _errorMessage = 'Unable to verify payment. Please try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPlacingOrder = false;
+        });
+      }
+    }
   }
 
   Widget _buildPaymentOption({
@@ -455,6 +500,7 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
     required IconData icon,
   }) {
     final isSelected = _selectedPayment == value;
+    final isSmallScreen = MediaQuery.of(context).size.height < 700;
 
     return GestureDetector(
       onTap: () => setState(() {
@@ -463,8 +509,10 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
       }),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        margin: EdgeInsets.only(bottom: isSmallScreen ? 8 : 12),
+        padding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 12 : 16,
+            vertical: isSmallScreen ? 10 : 14),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFF0FDFA) : Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -570,6 +618,11 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
             0.0) -
         _discount;
 
+    final mediaQuery = MediaQuery.of(context);
+    final screenHeight = mediaQuery.size.height;
+    final isSmallScreen = screenHeight < 700;
+    final bottomOffset = 64.0 + mediaQuery.padding.bottom + (isSmallScreen ? 12.0 : 24.0);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F6F6),
       appBar: AppBar(
@@ -592,12 +645,12 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
           : Stack(
               children: [
                 ListView(
-                  padding: const EdgeInsets.only(bottom: 100, top: 4),
+                  padding: EdgeInsets.only(bottom: bottomOffset, top: 4),
                   children: [
                     // Step layout bar
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 16, vertical: isSmallScreen ? 4 : 8),
                       child: Row(
                         children: [
                           Row(
@@ -656,23 +709,25 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
 
                     // Order summary panel
                     Container(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      padding: const EdgeInsets.all(12),
+                      margin: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 10 : 14,
+                          vertical: isSmallScreen ? 5 : 8),
+                      padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
                       decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12)),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Order Items',
+                          Text('Order Items',
                               style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Color(0xFF0F766E))),
-                          const SizedBox(height: 12),
+                                  fontSize: isSmallScreen ? 15 : 16,
+                                  color: const Color(0xFF0F766E))),
+                          SizedBox(height: isSmallScreen ? 8 : 12),
                           ListView.builder(
                             shrinkWrap: true,
+                            padding: EdgeInsets.zero,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: _cartItems.length,
                             itemBuilder: (context, idx) {
@@ -695,12 +750,12 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
                                   mrp > 0 ? ((saved / mrp) * 100).round() : 0;
 
                               return Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
+                                padding: EdgeInsets.only(bottom: isSmallScreen ? 6 : 8),
                                 child: Row(
                                   children: [
                                     Container(
-                                      width: 44,
-                                      height: 44,
+                                      width: isSmallScreen ? 36 : 44,
+                                      height: isSmallScreen ? 36 : 44,
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(6),
                                         border: Border.all(
@@ -726,18 +781,18 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
                                         children: [
                                           Text(
                                             productName,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                                 fontWeight: FontWeight.w600,
-                                                fontSize: 14),
+                                                fontSize: isSmallScreen ? 13 : 14),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
                                             'Qty: ${item['quantity']} × ₹${item['price'] ?? 0}',
-                                            style: const TextStyle(
-                                                color: Color(0xFF666666),
-                                                fontSize: 12),
+                                            style: TextStyle(
+                                                color: const Color(0xFF666666),
+                                                fontSize: isSmallScreen ? 11 : 12),
                                           ),
                                           if (saved > 0)
                                             Padding(
@@ -745,9 +800,9 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
                                                   const EdgeInsets.only(top: 2),
                                               child: Text(
                                                 'You save ₹${saved.toStringAsFixed(0)} ($pct%)',
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                     color: Colors.green,
-                                                    fontSize: 11,
+                                                    fontSize: isSmallScreen ? 10 : 11,
                                                     fontWeight:
                                                         FontWeight.w500),
                                               ),
@@ -757,7 +812,8 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
                                     ),
                                     const SizedBox(width: 8),
                                     Text('₹${item['price'] ?? 0}',
-                                        style: const TextStyle(
+                                        style: TextStyle(
+                                            fontSize: isSmallScreen ? 13 : 14,
                                             fontWeight: FontWeight.bold)),
                                   ],
                                 ),
@@ -770,9 +826,10 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
 
                     // Apply Coupon Container
                     Container(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      padding: const EdgeInsets.all(12),
+                      margin: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 10 : 14,
+                          vertical: isSmallScreen ? 5 : 8),
+                      padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
                       decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12)),
@@ -857,9 +914,10 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
 
                     // Payment selection list
                     Container(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      padding: const EdgeInsets.all(16),
+                      margin: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 10 : 14,
+                          vertical: isSmallScreen ? 5 : 8),
+                      padding: EdgeInsets.all(isSmallScreen ? 10 : 16),
                       decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
@@ -882,14 +940,6 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
                             icon: Icons.payment_rounded,
                           ),
 
-                          // Wallet
-                          _buildPaymentOption(
-                            value: 'wallet',
-                            title: 'Wallet',
-                            subtitle: 'Available Balance: ₹$_walletBalance',
-                            icon: Icons.account_balance_wallet_rounded,
-                          ),
-
                           // Cash on delivery
                           _buildPaymentOption(
                             value: 'cod',
@@ -901,8 +951,8 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
                           // CAPTCHA check for COD selection
                           if (_selectedPayment == 'cod')
                             Container(
-                              padding: const EdgeInsets.all(12),
-                              margin: const EdgeInsets.only(top: 8),
+                              padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
+                              margin: EdgeInsets.only(top: isSmallScreen ? 6 : 8),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFAFAFA),
                                 borderRadius: BorderRadius.circular(12),
@@ -985,9 +1035,10 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
 
                     // Pricing summary panel
                     Container(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      padding: const EdgeInsets.all(16),
+                      margin: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 10 : 14,
+                          vertical: isSmallScreen ? 5 : 8),
+                      padding: EdgeInsets.all(isSmallScreen ? 10 : 16),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
@@ -1064,8 +1115,9 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
 
                     // Terms and Conditions checkbox
                     Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 10 : 14,
+                          vertical: isSmallScreen ? 4 : 8),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

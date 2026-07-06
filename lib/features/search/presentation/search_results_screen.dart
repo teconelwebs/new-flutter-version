@@ -78,7 +78,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     crossAxisCount: 2,
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio: 0.72,
+                    childAspectRatio: 0.67,
                   ),
                   itemCount: _products.length,
                   itemBuilder: (_, i) => ProductCard(item: _products[i]),

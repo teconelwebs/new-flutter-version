@@ -7,6 +7,7 @@ import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
 import '../../account/presentation/account_screen.dart';
 import '../../../core/storage/session_store.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/state/cart_state.dart';
 import '../../category/presentation/category_screen.dart';
 import '../../cart/presentation/cart_screen.dart';
 import '../../product/data/models/product_item.dart';
@@ -41,8 +42,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   bool _isLocationBlocked = false;
   bool _isCheckingLocation = false;
   bool _isGuest = true;
-  // ignore: prefer_final_fields
-  int _cartCount = 3; // Initial mock cart items count
   // ignore: unused_field
   String _userId = 'guest';
 
@@ -77,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     // Initial checkups
     _checkGuestStatus();
+    CartState.loadCartCount();
     _initConnectivityListener();
     _initDeepLinkListener();
     _checkLocationStatus();
@@ -363,26 +363,34 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
 
       // Custom Bottom Tab Bar Navigation equivalent to RN's CustomBottomTabBar
-      bottomNavigationBar: CustomBottomTabBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          _updateStatusBarColor();
-        },
-        isGuest: _isGuest,
-        cartCount: _cartCount,
-        promptLogin: () {
-          Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
-            _checkGuestStatus(); // Check guest status again when returning from Login
-          });
-        },
-        clearGuestMode: () async {
-          // Clear guest mode status if needed
-        },
-        dismissLoginModal: () {
-          // Dismiss modal if showing
+      bottomNavigationBar: ValueListenableBuilder<int>(
+        valueListenable: CartState.cartCountNotifier,
+        builder: (context, cartCount, _) {
+          return CustomBottomTabBar(
+            currentIndex: _currentIndex,
+            onTap: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+              _updateStatusBarColor();
+              if (index == 2) {
+                CartScreen.emitRefreshTabAction();
+              }
+            },
+            isGuest: _isGuest,
+            cartCount: cartCount,
+            promptLogin: () {
+              Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
+                _checkGuestStatus(); // Check guest status again when returning from Login
+              });
+            },
+            clearGuestMode: () async {
+              // Clear guest mode status if needed
+            },
+            dismissLoginModal: () {
+              // Dismiss modal if showing
+            },
+          );
         },
       ),
     );

@@ -149,11 +149,11 @@ class _RelatedProductsWidgetState extends State<RelatedProductsWidget> {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
-              childAspectRatio: 0.65,
+              childAspectRatio: MediaQuery.of(context).size.width < 380 ? 0.52 : 0.57,
             ),
             itemCount: _products.length,
             itemBuilder: (context, index) {
@@ -225,10 +225,12 @@ class _RelatedProductsWidgetState extends State<RelatedProductsWidget> {
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                             ),
                             const SizedBox(height: 4),
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 6,
+                              runSpacing: 2,
                               children: [
                                 Text('₹${price.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                const SizedBox(width: 6),
                                 if (oldPrice > price)
                                   Text(
                                     '₹${oldPrice.toStringAsFixed(0)}',

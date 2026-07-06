@@ -7,7 +7,9 @@ import 'package:flutter/material.dart';
 // ignore: unnecessary_import
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 import '../../../core/constants/app_routes.dart';
+import '../../../core/state/cart_state.dart';
 
 // ---------------------------------------------------------------------------
 // CartItem Model
@@ -198,6 +200,13 @@ class CartScreen extends StatefulWidget {
   // ignore: use_super_parameters
   const CartScreen({Key? key, this.embedded = false}) : super(key: key);
 
+  static final StreamController<void> refreshTabStream =
+      StreamController.broadcast();
+
+  static void emitRefreshTabAction() {
+    refreshTabStream.add(null);
+  }
+
   @override
   State<CartScreen> createState() => _CartScreenState();
 }
@@ -238,17 +247,9 @@ class _CartScreenState extends State<CartScreen>
       CurvedAnimation(parent: _bounceController, curve: Curves.easeInOut),
     );
 
-    _refreshTabSub = _refreshTabStream.stream.listen((_) {
+    _refreshTabSub = CartScreen.refreshTabStream.stream.listen((_) {
       _onRefresh();
     });
-  }
-
-  static final StreamController<void> _refreshTabStream =
-      StreamController.broadcast();
-
-  // ignore: unused_element
-  static void emitRefreshTabAction() {
-    _refreshTabStream.add(null);
   }
 
   @override
@@ -310,16 +311,34 @@ class _CartScreenState extends State<CartScreen>
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
       final userId = prefs.getString('user_id');
-      // ignore: unused_local_variable
-      final lat = prefs.getString('latitude');
-      // ignore: unused_local_variable
-      final long = prefs.getString('longitude');
+      final lat = prefs.getString('latitude') ?? '0';
+      final long = prefs.getString('longitude') ?? '0';
 
       if (token == null || userId == null) return;
 
-      // final res = await mainAPI.post('/carts/$userId', data: {'user_latitude': lat, 'user_longitude': long});
-      // final list = res.data.expand((c) => c['cart_items'] ?? []).map(CartItem.fromJson).toList();
-      final List<CartItem> list = [];
+      final cartUri = Uri.parse('https://welfogapi.welfog.com/api/v2/carts/$userId');
+      final cartResponse = await http.post(
+        cartUri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'user_latitude': lat,
+          'user_longitude': long,
+        }),
+      );
+
+      List<CartItem> list = [];
+      if (cartResponse.statusCode == 200) {
+        final cartData = jsonDecode(cartResponse.body) as List?;
+        list = cartData
+                ?.expand((c) => c['cart_items'] as List? ?? [])
+                .map((e) => CartItem.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [];
+      }
+
       final int count = list.fold(0, (t, i) => t + i.quantity);
 
       setState(() {
@@ -327,9 +346,18 @@ class _CartScreenState extends State<CartScreen>
         _cartCount = count;
       });
 
-      // final summaryRes = await mainAPI.get('/cart-summary/$userId');
-      // final summaryData = summaryRes.data;
-      final Map<String, dynamic> summaryData = {};
+      Map<String, dynamic> summaryData = {};
+      final summaryUri = Uri.parse('https://welfogapi.welfog.com/api/v2/cart-summary/$userId');
+      final summaryResponse = await http.get(
+        summaryUri,
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (summaryResponse.statusCode == 200) {
+        summaryData = jsonDecode(summaryResponse.body) as Map<String, dynamic>;
+      }
 
       setState(() {
         _cartSummary = summaryData;
@@ -342,6 +370,8 @@ class _CartScreenState extends State<CartScreen>
         items: list,
         summary: summaryData,
       );
+
+      CartState.updateCartCount(count);
 
       _updateBounceAnimation();
     } catch (err) {
@@ -378,9 +408,19 @@ class _CartScreenState extends State<CartScreen>
 
   Future<void> _removeCartItem(int id) async {
     try {
-      // final prefs = await SharedPreferences.getInstance();
-      // final token = prefs.getString('access_token');
-      // await mainAPI.post('/carts', data: {'id': id});
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      if (token != null) {
+        final uri = Uri.parse('https://welfogapi.welfog.com/api/v2/carts');
+        await http.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({'id': id}),
+        );
+      }
       setState(() {
         _cartItems = _cartItems.where((x) => x.id != id).toList();
       });
@@ -428,12 +468,35 @@ class _CartScreenState extends State<CartScreen>
 
   Future<bool> _addToCartBackend(CartItem item) async {
     try {
-      // final prefs = await SharedPreferences.getInstance();
-      // final userId = prefs.getString('user_id');
-      // final tempUserId = prefs.getString('temp_user_id');
-      // final res = await secondAPI.post('/crux/addcart', data: { ... });
-      // return res.statusCode == 200 && res.data['result'] == true;
-      return true;
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      final accessToken = prefs.getString('access_token');
+      if (userId == null || accessToken == null) return false;
+
+      final payload = {
+        'product_id': item.productId,
+        'quantity': item.quantity > 0 ? item.quantity : 1,
+        'stockId': item.stockId,
+        'temp_userId': '',
+        'user_id': int.tryParse(userId) ?? 0,
+        'buy_now': false,
+      };
+
+      final uri = Uri.parse('https://welfogapi.welfog.com/api/crux/addcart');
+      final res = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (res.statusCode == 200) {
+        final resData = jsonDecode(res.body);
+        return resData['result'] == true;
+      }
+      return false;
     } catch (e) {
       debugPrint('addToCartBackend error: $e');
       return false;
@@ -471,9 +534,21 @@ class _CartScreenState extends State<CartScreen>
       final token = prefs.getString('access_token');
       if (token == null) throw Exception('No token');
 
-      // final res = await mainAPI.post('/carts/change-quantity', data: {'id': id, 'quantity': quantity});
-      await _fetchCartData();
-      return true;
+      final uri = Uri.parse('https://welfogapi.welfog.com/api/v2/carts/change-quantity');
+      final res = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'id': id, 'quantity': quantity}),
+      );
+
+      if (res.statusCode == 200) {
+        await _fetchCartData();
+        return true;
+      }
+      return false;
     } catch (err) {
       debugPrint('updateCart error: $err');
       return false;
@@ -570,6 +645,7 @@ class _CartScreenState extends State<CartScreen>
 
     final recalculatedCount = _cartItems.fold(0, (t, i) => t + i.quantity);
     setState(() => _cartCount = recalculatedCount);
+    CartState.updateCartCount(recalculatedCount);
 
     final ok = await _updateCart(item.id, safeQty);
     if (!ok) {
@@ -1055,14 +1131,7 @@ class _CartScreenState extends State<CartScreen>
                                   ),
                                   const SizedBox(height: 20),
                                   GestureDetector(
-                                    onTap: () =>
-                                        Navigator.of(context).pushNamed(
-                                      '/Category',
-                                      arguments: {
-                                        'id': 'all',
-                                        'name': 'All Categories'
-                                      },
-                                    ),
+                                    onTap: () {},
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                           vertical: 14, horizontal: 32),

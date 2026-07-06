@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/state/cart_state.dart';
 
 
 class BuyProductBtnWidget extends StatefulWidget {
@@ -126,7 +127,7 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
           try {
             final lat = prefs.getString('latitude') ?? '0';
             final long = prefs.getString('longitude') ?? '0';
-            final cartUri = Uri.parse('https://welfogapi.welfog.com/api/carts/$userId');
+            final cartUri = Uri.parse('https://welfogapi.welfog.com/api/v2/carts/$userId');
             final cartRes = await http.post(
               cartUri,
               headers: {
@@ -143,7 +144,7 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
               for (var it in cartList) {
                 count += int.tryParse(it['quantity']?.toString() ?? '0') ?? 0;
               }
-              await prefs.setString('cart_count', count.toString());
+              await CartState.updateCartCount(count);
             }
           } catch (err) {
             debugPrint('Failed to sync cart count: $err');

@@ -8,7 +8,7 @@ class TabModel {
   final String label;
   final String screen;
   final String route;
-  
+
   const TabModel({
     required this.label,
     required this.screen,
@@ -146,8 +146,11 @@ class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
                         tab.label,
                         style: TextStyle(
                           fontSize: 12,
-                          color: isFocused ? const Color(0xFFFB5404) : const Color(0xFF666666),
-                          fontWeight: isFocused ? FontWeight.bold : FontWeight.normal,
+                          color: isFocused
+                              ? const Color(0xFFFB5404)
+                              : const Color(0xFF666666),
+                          fontWeight:
+                              isFocused ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -157,7 +160,6 @@ class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
             }),
           ),
         ),
-
         if (_flutterOpening)
           Positioned.fill(
             child: Container(
