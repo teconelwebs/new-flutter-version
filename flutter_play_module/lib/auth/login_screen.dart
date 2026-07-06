@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+// ignore: unnecessary_import
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -8,8 +9,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:math' as math;
 
 class LoginScreen extends StatefulWidget {
+  // ignore: use_super_parameters
   const LoginScreen({Key? key}) : super(key: key);
-
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -147,6 +148,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
       } else if (accountStatus == "banned") {
         _showToast("Account Suspended", data['message'] ?? "Your account has been banned by the admin. Please contact support.", isError: true);
       } else if (accountStatus == "deleted") {
+        // ignore: use_build_context_synchronously
         Navigator.pushNamed(context, '/ProfileScreen/AccountDeleted', arguments: {
           'phone': _phoneNumber,
           'deleted_date': data['deleted_date'] ?? "",
@@ -252,6 +254,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           // Background Effects (Absolute Positioning like React Native)
@@ -289,36 +292,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             bottom: 20, left: 0, right: 0,
             child: Container(
               height: 340,
+              // ignore: deprecated_member_use
               color: Colors.white.withOpacity(0.28),
-            ),
-          ),
-
-          // Skip Button
-          Positioned(
-            top: insets.top + 12,
-            right: 20,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _handleGuestMode,
-                borderRadius: BorderRadius.circular(999),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.92),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: const Color.fromRGBO(10, 107, 105, 0.18)),
-                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 6))],
-                  ),
-                  child: Row(
-                    children: const [
-                      Text("Skip", style: TextStyle(color: Color(0xFF0A6B69), fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 0.2)),
-                      SizedBox(width: 6),
-                      Icon(Icons.arrow_forward, size: 16, color: Color(0xFF0A6B69)),
-                    ],
-                  ),
-                ),
-              ),
             ),
           ),
 
@@ -434,6 +409,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                     height: 2,
                                     margin: const EdgeInsets.only(top: 10),
                                     decoration: BoxDecoration(
+                                      // ignore: deprecated_member_use
                                       color: const Color(0xFF2A8C7A).withOpacity(0.5),
                                       borderRadius: BorderRadius.circular(1),
                                     ),
@@ -604,8 +580,42 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               ),
             ),
           ),
+
+          // Skip Button - Moved to the end of the Stack to ensure clickability
+          Positioned(
+            top: insets.top + 12,
+            right: 20,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _handleGuestMode,
+                borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    // ignore: deprecated_member_use
+                    color: Colors.white.withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: const Color.fromRGBO(10, 107, 105, 0.18)),
+                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 6))],
+                  ),
+                  child: Row(
+                    children: const [
+                      Text("Skip", style: TextStyle(color: Color(0xFF0A6B69), fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 0.2)),
+                      SizedBox(width: 6),
+                      Icon(Icons.arrow_forward, size: 16, color: Color(0xFF0A6B69)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
+
+
+
+

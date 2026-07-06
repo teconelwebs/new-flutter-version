@@ -19,7 +19,7 @@ class ProductCard extends StatelessWidget {
         );
       },
       child: Ink(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
@@ -34,7 +34,8 @@ class ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            AspectRatio(
+              aspectRatio: 1,
               child: Container(
                 width: double.infinity,
                 clipBehavior: Clip.antiAlias,
@@ -48,14 +49,14 @@ class ProductCard extends StatelessWidget {
                       )
                     : Image.network(
                         item.imageUrl,
-                        fit: BoxFit.cover,
+                        fit: BoxFit.contain,
                         errorBuilder: (_, __, ___) => const Center(
                           child: Icon(Icons.image_not_supported_outlined, size: 26),
                         ),
                       ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             Text(
               item.title,
               maxLines: 1,
@@ -69,7 +70,7 @@ class ProductCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: Color(0xFF6E7380), fontSize: 12),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Text(
@@ -80,10 +81,15 @@ class ProductCard extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+                const Icon(Icons.local_shipping_rounded, color: Color(0xFF6B7280), size: 13),
+                const SizedBox(width: 4),
                 Text(
-                  item.rating.toStringAsFixed(1),
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  _getDeliveryDaysText(item.durationMinutes),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF4B5563),
+                  ),
                 ),
               ],
             ),
@@ -91,5 +97,15 @@ class ProductCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _getDeliveryDaysText(int durationMinutes) {
+    if (durationMinutes <= 0) return '7-8 days';
+    final double daysDouble = durationMinutes / 1440.0;
+    final int days = daysDouble.ceil();
+    if (days <= 1) {
+      return '1-2 days';
+    }
+    return '$days-${days + 1} days';
   }
 }

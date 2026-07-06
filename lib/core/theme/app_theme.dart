@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class AppTheme {
   static const Color primary = Color(0xFF0A6B69);
-  static const Color background = Color(0xFFF7F8FB);
+  static const Color background = Colors.white;
   static const Color textMuted = Color(0xFF6E7380);
 
   static ThemeData get light {
@@ -18,7 +18,7 @@ class AppTheme {
         centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 0,
-        backgroundColor: background,
+        backgroundColor: Colors.white,
         foregroundColor: Colors.black,
       ),
       cardTheme: const CardThemeData(
