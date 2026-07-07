@@ -68,7 +68,8 @@ class _CheckoutAddressWidgetState extends State<CheckoutAddressWidget> {
       final userId = prefs.getString('user_id');
       if (userId == null) return;
 
-      final uri = Uri.parse('https://welfogapi.welfog.com/api/allAddress/$userId?id=$userId');
+      final uri = Uri.parse(
+          'https://welfogapi.welfog.com/api/v2/allAddress/$userId?id=$userId');
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
@@ -98,10 +99,15 @@ class _CheckoutAddressWidgetState extends State<CheckoutAddressWidget> {
 
             _checkProductPincode(postalCode);
 
-            if (widget.onAddressChange != null) widget.onAddressChange!(postalCode);
-            if (widget.onAddressIdChange != null) widget.onAddressIdChange!(addrId);
+            if (widget.onAddressChange != null)
+              // ignore: curly_braces_in_flow_control_structures
+              widget.onAddressChange!(postalCode);
+            if (widget.onAddressIdChange != null)
+              // ignore: curly_braces_in_flow_control_structures
+              widget.onAddressIdChange!(addrId);
             if (widget.onAddressDataChange != null) {
-              widget.onAddressDataChange!(Map<String, dynamic>.from(defaultAddress));
+              widget.onAddressDataChange!(
+                  Map<String, dynamic>.from(defaultAddress));
             }
           } else if (addData.isNotEmpty) {
             final firstAddr = addData[0];
@@ -114,8 +120,12 @@ class _CheckoutAddressWidgetState extends State<CheckoutAddressWidget> {
               });
             }
 
-            if (widget.onAddressChange != null) widget.onAddressChange!(postalCode);
-            if (widget.onAddressIdChange != null) widget.onAddressIdChange!(addrId);
+            if (widget.onAddressChange != null)
+              // ignore: curly_braces_in_flow_control_structures
+              widget.onAddressChange!(postalCode);
+            if (widget.onAddressIdChange != null)
+              // ignore: curly_braces_in_flow_control_structures
+              widget.onAddressIdChange!(addrId);
             if (widget.onAddressDataChange != null) {
               widget.onAddressDataChange!(Map<String, dynamic>.from(firstAddr));
             }
@@ -174,7 +184,8 @@ class _CheckoutAddressWidgetState extends State<CheckoutAddressWidget> {
     if (_loading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 20),
-        child: Center(child: CircularProgressIndicator(color: Color(0xFF008083))),
+        child:
+            Center(child: CircularProgressIndicator(color: Color(0xFF008083))),
       );
     }
 
@@ -188,9 +199,11 @@ class _CheckoutAddressWidgetState extends State<CheckoutAddressWidget> {
     }
 
     final String addrName = currentAddress['name'] ?? '';
-    final String displayName = (addrName.toLowerCase() == 'user' || addrName.isEmpty) && _realName.isNotEmpty
-        ? _realName
-        : addrName;
+    final String displayName =
+        (addrName.toLowerCase() == 'user' || addrName.isEmpty) &&
+                _realName.isNotEmpty
+            ? _realName
+            : addrName;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,7 +222,8 @@ class _CheckoutAddressWidgetState extends State<CheckoutAddressWidget> {
                 top: 14,
                 right: 14,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFFECFEF4),
                     borderRadius: BorderRadius.circular(30),
@@ -276,9 +290,15 @@ class _CheckoutAddressWidgetState extends State<CheckoutAddressWidget> {
                 'id': currentAddress['id'],
                 'latitude': currentAddress['latitude'],
                 'longitude': currentAddress['longitude'],
-                'phone': currentAddress['phone'] != 'null' ? currentAddress['phone'] : '',
-                'name': currentAddress['name'] != 'null' ? currentAddress['name'] : '',
-                'addressDetails': currentAddress['address_details'] != 'null' ? currentAddress['address_details'] : '',
+                'phone': currentAddress['phone'] != 'null'
+                    ? currentAddress['phone']
+                    : '',
+                'name': currentAddress['name'] != 'null'
+                    ? currentAddress['name']
+                    : '',
+                'addressDetails': currentAddress['address_details'] != 'null'
+                    ? currentAddress['address_details']
+                    : '',
               },
             );
           },

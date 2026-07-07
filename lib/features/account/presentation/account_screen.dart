@@ -116,6 +116,8 @@ class _AccountScreenState extends State<AccountScreen> {
         Navigator.of(context).pushNamed(AppRoutes.address);
         return;
       case 'orders':
+        Navigator.of(context).pushNamed(AppRoutes.orders);
+        return;
       case 'wishlist':
       case 'help':
       case 'settings':

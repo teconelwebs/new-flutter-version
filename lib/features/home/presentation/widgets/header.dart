@@ -18,6 +18,7 @@ class Header extends StatefulWidget {
   final bool isGuest;
   final VoidCallback? onSearchTap;
   final VoidCallback? promptLogin;
+  final VoidCallback? onLocationTap;
 
   // ignore: use_super_parameters
   const Header({
@@ -32,6 +33,7 @@ class Header extends StatefulWidget {
     required this.isGuest,
     this.onSearchTap,
     this.promptLogin,
+    this.onLocationTap,
   }) : super(key: key);
 
   @override
@@ -186,29 +188,32 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
           children: [
             // 1. Top Location Address bar (if enabled)
             if (!widget.hideLocation)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  border: const Border(bottom: BorderSide(color: Color(0xFFE9ECEF))),
-                  color: widget.backgroundColor,
-                ),
-                child: Row(
-                  children: [
-                    const DeliveryIcon(size: 16, color: Color(0xFFFB5404)),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        'Deliver to ${widget.city} - ${widget.pincode}',
-                        style: const TextStyle(
-                          color: Color(0xFF0B7E7B),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
+              GestureDetector(
+                onTap: widget.onLocationTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    border: const Border(bottom: BorderSide(color: Color(0xFFE9ECEF))),
+                    color: widget.backgroundColor,
+                  ),
+                  child: Row(
+                    children: [
+                      const DeliveryIcon(size: 16, color: Color(0xFFFB5404)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          'Deliver to ${widget.city} - ${widget.pincode}',
+                          style: const TextStyle(
+                            color: Color(0xFF0B7E7B),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const Icon(Icons.chevron_right, size: 16, color: Color(0xFF0B7E7B)),
-                  ],
+                      const Icon(Icons.chevron_right, size: 16, color: Color(0xFF0B7E7B)),
+                    ],
+                  ),
                 ),
               ),
 

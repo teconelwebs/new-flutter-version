@@ -51,7 +51,8 @@ class _AddressScreenState extends State<AddressScreen> {
       }
 
       final uri = Uri.parse(
-          'https://welfogapi.welfog.com/api/v2/allAddress/$userId?id=$userId');
+        'https://welfogapi.welfog.com/api/v2/allAddress/$userId?id=$userId',
+      );
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
@@ -74,48 +75,82 @@ class _AddressScreenState extends State<AddressScreen> {
   }
 
   Future<void> _handleSelectAddress(String id) async {
+    final previousAddresses = List.from(_addresses);
+    Map<String, dynamic>? selectedAddr;
+
+    // Update local state instantly (Optimistic UI)
+    if (mounted) {
+      setState(() {
+        _addresses = _addresses.map((addr) {
+          final addrId = addr['id']?.toString();
+          final mutableAddr = Map<String, dynamic>.from(addr as Map);
+          if (addrId == id) {
+            mutableAddr['using_this'] = 1;
+            selectedAddr = mutableAddr;
+          } else {
+            mutableAddr['using_this'] = 0;
+          }
+          return mutableAddr;
+        }).toList();
+      });
+    }
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id');
       if (userId == null) return;
 
+      // Instantly save coordinate changes locally so subsequent screens use them immediately
+      if (selectedAddr != null) {
+        await prefs.setString(
+          'latitude',
+          selectedAddr!['latitude']?.toString() ?? '0',
+        );
+        await prefs.setString(
+          'longitude',
+          selectedAddr!['longitude']?.toString() ?? '0',
+        );
+        await prefs.setString(
+          'city_name',
+          selectedAddr!['city_name']?.toString() ?? '',
+        );
+        await prefs.setString(
+          'postal_code',
+          selectedAddr!['postal_code']?.toString() ?? '',
+        );
+      }
+
       final uri = Uri.parse(
-          'https://welfogapi.welfog.com/api/v2/selectAnAddress/$id?id=$id&user_id=$userId');
+        'https://welfogapi.welfog.com/api/v2/selectAnAddress/$id?id=$id&user_id=$userId',
+      );
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['result'] == true) {
-          Map<String, dynamic>? selectedAddr;
-          for (var addr in _addresses) {
-            if (addr is Map && addr['id']?.toString() == id) {
-              selectedAddr = Map<String, dynamic>.from(addr);
-              break;
-            }
-          }
           if (selectedAddr != null) {
-            await prefs.setString(
-                'latitude', selectedAddr['latitude']?.toString() ?? '0');
-            await prefs.setString(
-                'longitude', selectedAddr['longitude']?.toString() ?? '0');
-
-            await _checkProductPincode(selectedAddr['postal_code']?.toString() ?? '');
-
-            setState(() {
-              _addresses = _addresses.map((addr) {
-                final addrId = addr['id']?.toString();
-                final mutableAddr = Map<String, dynamic>.from(addr as Map);
-                mutableAddr['using_this'] = addrId == id ? 1 : 0;
-                return mutableAddr;
-              }).toList();
-            });
-
-            // Address selection updated, no popups shown
+            await _checkProductPincode(
+              selectedAddr!['postal_code']?.toString() ?? '',
+            );
           }
+          return; // Success
         }
       }
+
+      // If server failed or responded incorrectly, rollback
+      _rollbackAddressSelection(previousAddresses);
     } catch (e) {
       debugPrint('Error selecting address: $e');
+      _rollbackAddressSelection(previousAddresses);
+    }
+  }
+
+  void _rollbackAddressSelection(List<dynamic> previous) {
+    if (mounted) {
+      setState(() {
+        _addresses = previous;
+      });
+      _showCustomPopup('Failed to select address. Please try again.');
     }
   }
 
@@ -127,7 +162,8 @@ class _AddressScreenState extends State<AddressScreen> {
       if (userId == null || accessToken == null) return false;
 
       final userUri = Uri.parse(
-          'https://welfogapi.welfog.com/api/v2/get-user-by-access_token');
+        'https://welfogapi.welfog.com/api/v2/get-user-by-access_token',
+      );
       final response = await http.post(
         userUri,
         headers: {'Content-Type': 'application/json'},
@@ -167,14 +203,11 @@ class _AddressScreenState extends State<AddressScreen> {
             letterSpacing: 0.3,
           ),
         ),
+        // ignore: deprecated_member_use
         backgroundColor: const Color(0xFF1F2937).withOpacity(0.95),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        margin: const EdgeInsets.only(
-          bottom: 12,
-          left: 24,
-          right: 24,
-        ),
+        margin: const EdgeInsets.only(bottom: 12, left: 24, right: 24),
         duration: const Duration(seconds: 1),
       ),
     );
@@ -202,7 +235,8 @@ class _AddressScreenState extends State<AddressScreen> {
       if (userId == null) return;
 
       final uri = Uri.parse(
-          'https://welfogapi.welfog.com/api/v2/DeleteAddress/$addressId?id=$addressId&user_id=$userId');
+        'https://welfogapi.welfog.com/api/v2/DeleteAddress/$addressId?id=$addressId&user_id=$userId',
+      );
       final response = await http.delete(uri);
 
       if (response.statusCode == 200) {
@@ -231,9 +265,9 @@ class _AddressScreenState extends State<AddressScreen> {
         final String addrName = address['name'] ?? '';
         final String displayName =
             (addrName.toLowerCase() == 'user' || addrName.isEmpty) &&
-                    _realName.isNotEmpty
-                ? _realName
-                : addrName;
+                _realName.isNotEmpty
+            ? _realName
+            : addrName;
 
         return SafeArea(
           child: Padding(
@@ -245,7 +279,9 @@ class _AddressScreenState extends State<AddressScreen> {
                 Text(
                   displayName,
                   style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -256,30 +292,41 @@ class _AddressScreenState extends State<AddressScreen> {
                 ),
                 const SizedBox(height: 20),
                 ListTile(
-                  leading:
-                      const Icon(Icons.edit_outlined, color: Color(0xFF0F766E)),
+                  leading: const Icon(
+                    Icons.edit_outlined,
+                    color: Color(0xFF0F766E),
+                  ),
                   title: const Text('Edit Address'),
                   onTap: () {
                     Navigator.pop(ctx);
-                    Navigator.of(context).pushNamed(
-                      AppRoutes.editLocation,
-                      arguments: {
-                        'id': address['id']?.toString(),
-                        'latitude': address['latitude']?.toString(),
-                        'longitude': address['longitude']?.toString(),
-                        'phone': address['phone'] != 'null' ? address['phone'] : '',
-                        'name': address['name'] != 'null' ? address['name'] : '',
-                        'addressDetails': address['address_details'] != 'null'
-                            ? address['address_details']
-                            : '',
-                      },
-                    ).then((_) => _fetchAddresses());
+                    Navigator.of(context)
+                        .pushNamed(
+                          AppRoutes.editLocation,
+                          arguments: {
+                            'id': address['id']?.toString(),
+                            'latitude': address['latitude']?.toString(),
+                            'longitude': address['longitude']?.toString(),
+                            'phone': address['phone'] != 'null'
+                                ? address['phone']
+                                : '',
+                            'name': address['name'] != 'null'
+                                ? address['name']
+                                : '',
+                            'addressDetails':
+                                address['address_details'] != 'null'
+                                ? address['address_details']
+                                : '',
+                          },
+                        )
+                        .then((_) => _fetchAddresses());
                   },
                 ),
                 ListTile(
                   leading: const Icon(Icons.delete_outline, color: Colors.red),
-                  title: const Text('Delete Address',
-                      style: TextStyle(color: Colors.red)),
+                  title: const Text(
+                    'Delete Address',
+                    style: TextStyle(color: Colors.red),
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
                     _handleDeleteAddress(address['id']?.toString() ?? '');
@@ -316,137 +363,151 @@ class _AddressScreenState extends State<AddressScreen> {
       ),
       body: _loading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF0F766E),
-              ),
+              child: CircularProgressIndicator(color: Color(0xFF0F766E)),
             )
           : _addresses.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.location_off_outlined,
-                        size: 64,
-                        color: Colors.grey.shade400,
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'No addresses found.',
-                        style: TextStyle(color: Colors.grey, fontSize: 16),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.location_off_outlined,
+                    size: 64,
+                    color: Colors.grey.shade400,
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _addresses.length,
-                  itemBuilder: (ctx, index) {
-                    final item = _addresses[index];
-                    final String addrName = item['name'] ?? '';
-                    final String displayName = (addrName.toLowerCase() ==
-                                    'user' ||
-                                addrName.isEmpty) &&
-                            _realName.isNotEmpty
-                        ? _realName
-                        : addrName;
-                    final bool isDefault = item['using_this'] == 1;
+                  const SizedBox(height: 12),
+                  const Text(
+                    'No addresses found.',
+                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                  ),
+                ],
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _addresses.length,
+              itemBuilder: (ctx, index) {
+                final item = _addresses[index];
+                final String addrName = item['name'] ?? '';
+                final String displayName =
+                    (addrName.toLowerCase() == 'user' || addrName.isEmpty) &&
+                        _realName.isNotEmpty
+                    ? _realName
+                    : addrName;
+                final bool isDefault = item['using_this'] == 1;
 
-                    return Card(
-                      color: Colors.white,
-                      elevation: isDefault ? 2 : 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(
-                          color: isDefault
-                              ? const Color(0xFF0F766E)
-                              : const Color(0xFFE5E7EB),
-                          width: isDefault ? 1.5 : 1,
-                        ),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: GestureDetector(
-                        onTap: () => _handleSelectAddress(
-                            item['id']?.toString() ?? ''),
-                        child: Stack(
-                          children: [
-                            if (isDefault)
-                              Positioned(
-                                top: 0,
-                                left: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF0F766E),
-                                    borderRadius: BorderRadius.only(
-                                      topLeft: Radius.circular(10),
-                                      bottomRight: Radius.circular(10),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Selected',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                return Card(
+                  color: Colors.white,
+                  elevation: isDefault ? 2 : 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: isDefault
+                          ? const Color(0xFF0F766E)
+                          : const Color(0xFFE5E7EB),
+                      width: isDefault ? 1.5 : 1,
+                    ),
+                  ),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () =>
+                        _handleSelectAddress(item['id']?.toString() ?? ''),
+                    child: Stack(
+                      children: [
+                        if (isDefault)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF0F766E),
+                                borderRadius: BorderRadius.only(
+                                  topLeft: Radius.circular(10),
+                                  bottomRight: Radius.circular(10),
                                 ),
                               ),
-                            Padding(
-                              padding: EdgeInsets.only(
-                                left: 16,
-                                right: 48,
-                                top: isDefault ? 28 : 16,
-                                bottom: 16,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    displayName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    '${item['address_details'] ?? ''}, ${item['address'] ?? ''}, ${item['city_name'] ?? ''}, ${item['state_name'] ?? ''} - ${item['postal_code'] ?? ''}',
-                                    style: const TextStyle(
-                                      color: Color(0xFF4B5563),
-                                      fontSize: 13,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Phone: ${item['phone'] ?? ''}',
-                                    style: const TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
+                              child: const Text(
+                                'Selected',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: IconButton(
-                                icon: const Icon(Icons.more_vert,
-                                    color: Colors.grey),
-                                onPressed: () =>
-                                    _showAddressActions(context, item),
+                          ),
+                        Padding(
+                          padding: EdgeInsets.only(
+                            left: 16,
+                            right: 48,
+                            top: isDefault ? 28 : 16,
+                            bottom: 16,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                displayName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 6),
+                              Text(
+                                '${item['address'] ?? ''}${item['city_name'] != null && item['city_name'].toString().isNotEmpty ? ', ${item['city_name']}' : ''}',
+                                style: const TextStyle(
+                                  color: Color(0xFF4B5563),
+                                  fontSize: 13,
+                                  height: 1.4,
+                                ),
+                              ),
+                              if (item['address_details'] != null &&
+                                  item['address_details'].toString().trim().isNotEmpty &&
+                                  item['address_details'].toString().toLowerCase() != 'null') ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  item['address_details'].toString(),
+                                  style: const TextStyle(
+                                    color: Color(0xFF4B5563),
+                                    fontSize: 13,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                              Text(
+                                'Phone: ${item['phone'] ?? ''}',
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.more_vert,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () => _showAddressActions(context, item),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
       bottomNavigationBar: SafeArea(
         child: Container(
           decoration: BoxDecoration(
@@ -481,7 +542,11 @@ class _AddressScreenState extends State<AddressScreen> {
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.search_rounded, color: Color(0xFF475569), size: 20),
+                        Icon(
+                          Icons.search_rounded,
+                          color: Color(0xFF475569),
+                          size: 20,
+                        ),
                         SizedBox(width: 8),
                         Text(
                           'Search Location',
@@ -501,7 +566,10 @@ class _AddressScreenState extends State<AddressScreen> {
                 child: InkWell(
                   onTap: () {
                     Navigator.of(context)
-                        .pushNamed(AppRoutes.locationPicker)
+                        .pushNamed(
+                          AppRoutes.locationPicker,
+                          arguments: {'forceGPS': true},
+                        )
                         .then((_) => _fetchAddresses());
                   },
                   borderRadius: BorderRadius.circular(16),
@@ -526,7 +594,11 @@ class _AddressScreenState extends State<AddressScreen> {
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.my_location_rounded, color: Colors.white, size: 20),
+                        Icon(
+                          Icons.my_location_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                         SizedBox(width: 8),
                         Text(
                           'Detect Location',
@@ -545,6 +617,6 @@ class _AddressScreenState extends State<AddressScreen> {
           ),
         ),
       ),
-  );
-}
+    );
+  }
 }

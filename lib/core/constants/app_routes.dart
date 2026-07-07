@@ -15,5 +15,7 @@ class AppRoutes {
   static const locationPicker = '/page/location';
   static const editLocation = '/page/EditLocation';
   static const addAddressDetails = '/page/AddAddressDetails';
+  static const orders = '/profile/orders';
+  static const orderDetails = '/profile/order-details';
+  static const trackOrder = '/profile/track-order';
 }
-

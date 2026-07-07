@@ -482,8 +482,13 @@ class _ConfirmAddressScreenState extends State<ConfirmAddressScreen>
                                           color: Color(0xFF0F766E)),
                                     ),
                                     GestureDetector(
-                                      onTap: () => Navigator.of(context)
-                                          .pushNamed(AppRoutes.address),
+                                      onTap: () {
+                                        Navigator.of(context)
+                                            .pushNamed(AppRoutes.address)
+                                            .then((_) {
+                                          _fetchCartData();
+                                        });
+                                      },
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 10, vertical: 5),

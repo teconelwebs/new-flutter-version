@@ -15,6 +15,7 @@ class LocationPickerScreen extends StatefulWidget {
   final String editName;
   final String editPhone;
   final String editAddressDetails;
+  final bool forceGPS;
 
   const LocationPickerScreen({
     super.key,
@@ -25,6 +26,7 @@ class LocationPickerScreen extends StatefulWidget {
     this.editName = '',
     this.editPhone = '',
     this.editAddressDetails = '',
+    this.forceGPS = false,
   });
 
   @override
@@ -45,14 +47,21 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
   String _formattedAddress = "Loading address...";
   Map<String, String> _addressDetails = {};
+  double? _lastGeocodedLat;
+  double? _lastGeocodedLng;
+  bool _isFetchingGPS = false;
+  bool _isMapMoving = false;
 
   @override
   void initState() {
     super.initState();
-    _detectCurrentLocation();
+    _detectCurrentLocation(forceGPS: widget.forceGPS);
   }
 
-  Future<void> _detectCurrentLocation() async {
+  Future<void> _detectCurrentLocation({bool forceGPS = false}) async {
+    if (forceGPS) {
+      setState(() => _isFetchingGPS = true);
+    }
     try {
       if (widget.isEdit) {
         final lat = double.tryParse(widget.editLatitude);
@@ -65,21 +74,6 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           _reverseGeocode(lat, lng);
           return;
         }
-      }
-
-      final prefs = await SharedPreferences.getInstance();
-      final savedLat = prefs.getString('latitude');
-      final savedLng = prefs.getString('longitude');
-
-      if (savedLat != null && savedLng != null) {
-        final lat = double.tryParse(savedLat) ?? 22.7196;
-        final lng = double.tryParse(savedLng) ?? 75.8577;
-        setState(() {
-          _currentPosition = LatLng(lat, lng);
-          _mapLoading = false;
-        });
-        _reverseGeocode(lat, lng);
-        return;
       }
 
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -102,15 +96,25 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         return;
       }
 
+      // Try to get last known location first for instant response
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) {
+        _updateMapPosition(lastKnown.latitude, lastKnown.longitude);
+      }
+
       final position = await Geolocator.getCurrentPosition(
         // ignore: deprecated_member_use
-        desiredAccuracy: LocationAccuracy.high,
+        desiredAccuracy: LocationAccuracy.best,
       );
 
       _updateMapPosition(position.latitude, position.longitude);
     } catch (e) {
       debugPrint('Error detecting location: $e');
       setState(() => _mapLoading = false);
+    } finally {
+      if (forceGPS) {
+        setState(() => _isFetchingGPS = false);
+      }
     }
   }
 
@@ -122,7 +126,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
     _mapController?.animateCamera(
       CameraUpdate.newCameraPosition(
-        CameraPosition(target: LatLng(lat, lng), zoom: 16),
+        CameraPosition(target: LatLng(lat, lng), zoom: 17),
       ),
     );
 
@@ -130,24 +134,45 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   }
 
   Future<void> _reverseGeocode(double lat, double lng) async {
+    if (_lastGeocodedLat != null && _lastGeocodedLng != null) {
+      final double diffLat = (lat - _lastGeocodedLat!).abs();
+      final double diffLng = (lng - _lastGeocodedLng!).abs();
+      if (diffLat < 0.00001 && diffLng < 0.00001) {
+        return;
+      }
+    }
+
     setState(() => _isGeocoding = true);
 
     try {
       final uri = Uri.parse(
-          "https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=$_googleApiKey");
+        "https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&key=$_googleApiKey",
+      );
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['results'] != null && (data['results'] as List).isNotEmpty) {
           final firstResult = data['results'][0];
-          final String address = firstResult['formatted_address'] ?? '';
           final addressComponents = firstResult['address_components'] as List;
 
           final components = _extractAddressComponents(addressComponents);
+          final displayArea = components['area']!.isNotEmpty
+              ? components['area']!
+              : components['city']!;
+          final cleanDisplayAddress = [
+            displayArea,
+            components['city'],
+            components['state'],
+            components['pincode']
+          ].where((s) => s != null && s.isNotEmpty).join(", ");
+
           setState(() {
-            _formattedAddress = address;
+            _formattedAddress = cleanDisplayAddress;
             _addressDetails = components;
+            _searchController.text = cleanDisplayAddress;
+            _lastGeocodedLat = lat;
+            _lastGeocodedLng = lng;
           });
         }
       }
@@ -171,16 +196,30 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     final country = getComponent('country');
     final state = getComponent('administrative_area_level_1');
     final locality = getComponent('locality');
+    final tehsil = getComponent('administrative_area_level_3');
+    final division = getComponent('administrative_area_level_2');
+
+    final district = division
+        .replaceAll(RegExp(r'\s*Division', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s*District', caseSensitive: false), '')
+        .trim();
+
+    final city = locality.isNotEmpty
+        ? locality
+        : (district.isNotEmpty ? district : tehsil);
+
     final sublocality = getComponent('sublocality_level_1');
     final sublocality2 = getComponent('sublocality');
+    final neighborhood = getComponent('neighborhood');
     final route = getComponent('route');
 
-    final city = locality.isNotEmpty ? locality : getComponent('administrative_area_level_2');
     final area = sublocality.isNotEmpty
         ? sublocality
         : (sublocality2.isNotEmpty
             ? sublocality2
-            : (route.isNotEmpty ? route : locality));
+            : (neighborhood.isNotEmpty
+                ? neighborhood
+                : (route.isNotEmpty ? route : locality)));
 
     return {
       'pincode': pincode,
@@ -199,7 +238,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
     try {
       final uri = Uri.parse(
-          "https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(input)}&types=geocode&components=country:in&key=$_googleApiKey");
+        "https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(input)}&types=geocode&components=country:in&key=$_googleApiKey",
+      );
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
@@ -223,12 +263,14 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
     try {
       final uri = Uri.parse(
-          "https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$_googleApiKey");
+        "https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$_googleApiKey",
+      );
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['status'] == 'OK' && data['result']?['geometry']?['location'] != null) {
+        if (data['status'] == 'OK' &&
+            data['result']?['geometry']?['location'] != null) {
           final location = data['result']['geometry']['location'];
           final double lat = location['lat'] as double;
           final double lng = location['lng'] as double;
@@ -244,7 +286,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     final pincode = _addressDetails['pincode'];
     if (pincode == null || pincode.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pincode is missing. Please select a valid location.')),
+        const SnackBar(
+          content: Text('Pincode is missing. Please select a valid location.'),
+        ),
       );
       return;
     }
@@ -256,7 +300,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       await prefs.setString('latitude', _currentPosition.latitude.toString());
       await prefs.setString('longitude', _currentPosition.longitude.toString());
 
-      final uri = Uri.parse("https://welfogapi.welfog.com/api/v2/pincode/info?pincode=$pincode");
+      final uri = Uri.parse(
+        "https://welfogapi.welfog.com/api/v2/pincode/info?pincode=$pincode",
+      );
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
@@ -274,10 +320,14 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 'phone': widget.editPhone,
                 'addressDetails': widget.editAddressDetails,
                 'address': _formattedAddress,
-                'city': resData['data']?['city'] ?? _addressDetails['city'] ?? '',
-                'state': resData['data']?['state'] ?? _addressDetails['state'] ?? '',
+                'city':
+                    resData['data']?['city'] ?? _addressDetails['city'] ?? '',
+                'state':
+                    resData['data']?['state'] ?? _addressDetails['state'] ?? '',
                 'pincode': pincode,
-                'country': resData['data']?['country'] ?? _addressDetails['country'] ?? '',
+                'country': resData['data']?['country'] ??
+                    _addressDetails['country'] ??
+                    '',
               },
             );
           }
@@ -288,7 +338,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
               context: context,
               builder: (ctx) => AlertDialog(
                 title: const Text('Service Unavailable 📍'),
-                content: const Text('Sorry, we do not deliver to this location currently.'),
+                content: const Text(
+                  'Sorry, we do not deliver to this location currently.',
+                ),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx),
@@ -320,13 +372,22 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 child: GoogleMap(
                   initialCameraPosition: CameraPosition(
                     target: _currentPosition,
-                    zoom: 15,
+                    zoom: 17,
                   ),
+                  minMaxZoomPreference: const MinMaxZoomPreference(15, 20),
                   onMapCreated: (controller) => _mapController = controller,
                   myLocationEnabled: true,
                   myLocationButtonEnabled: false,
                   zoomControlsEnabled: false,
+                  onCameraMoveStarted: () {
+                    setState(() {
+                      _isMapMoving = true;
+                    });
+                  },
                   onCameraIdle: () {
+                    setState(() {
+                      _isMapMoving = false;
+                    });
                     _reverseGeocode(
                       _currentPosition.latitude,
                       _currentPosition.longitude,
@@ -334,15 +395,18 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                   },
                   onCameraMove: (position) {
                     _currentPosition = position.target;
+                    if (!_isMapMoving) {
+                      setState(() {
+                        _isMapMoving = true;
+                      });
+                    }
                   },
                 ),
               )
             else
               const Positioned.fill(
                 child: Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF0F766E),
-                  ),
+                  child: CircularProgressIndicator(color: Color(0xFF0F766E)),
                 ),
               ),
 
@@ -386,12 +450,18 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                       decoration: InputDecoration(
                         hintText: "Search for locality, street...",
                         prefixIcon: IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.black87,
+                          ),
                           onPressed: () => Navigator.pop(context),
                         ),
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.close, color: Colors.grey),
+                                icon: const Icon(
+                                  Icons.close,
+                                  color: Colors.grey,
+                                ),
                                 onPressed: () {
                                   _searchController.clear();
                                   _fetchSuggestions("");
@@ -399,7 +469,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                               )
                             : const Icon(Icons.search, color: Colors.grey),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                       ),
                     ),
                   ),
@@ -427,12 +500,16 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                         itemBuilder: (ctx, index) {
                           final suggestion = _suggestions[index];
                           return ListTile(
-                            leading: const Icon(Icons.location_on_outlined, color: Color(0xFF0F766E)),
+                            leading: const Icon(
+                              Icons.location_on_outlined,
+                              color: Color(0xFF0F766E),
+                            ),
                             title: Text(
                               suggestion['description'] ?? '',
                               style: const TextStyle(fontSize: 14),
                             ),
-                            onTap: () => _selectSuggestion(suggestion['place_id'] ?? ''),
+                            onTap: () =>
+                                _selectSuggestion(suggestion['place_id'] ?? ''),
                           );
                         },
                       ),
@@ -450,7 +527,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                   mini: true,
                   backgroundColor: Colors.white,
                   foregroundColor: const Color(0xFF0F766E),
-                  onPressed: _detectCurrentLocation,
+                  onPressed: () => _detectCurrentLocation(forceGPS: true),
                   child: const Icon(Icons.my_location),
                 ),
               ),
@@ -480,7 +557,11 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.location_pin, color: Color(0xFF0F766E), size: 22),
+                        const Icon(
+                          Icons.location_pin,
+                          color: Color(0xFF0F766E),
+                          size: 22,
+                        ),
                         const SizedBox(width: 8),
                         const Text(
                           "Select Location",
@@ -490,11 +571,14 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                           ),
                         ),
                         const Spacer(),
-                        if (_isGeocoding)
+                        if (_isMapMoving || _isGeocoding || _isFetchingGPS)
                           const SizedBox(
                             width: 14,
                             height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0F766E)),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF0F766E),
+                            ),
                           ),
                       ],
                     ),
@@ -521,11 +605,15 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                           ),
                           elevation: 1,
                         ),
-                        onPressed: _isCheckingService || _isGeocoding
+                        onPressed: (_isMapMoving ||
+                                _isGeocoding ||
+                                _isFetchingGPS ||
+                                _isCheckingService)
                             ? null
                             : _handleConfirmLocation,
                         child: _isCheckingService
-                            ? const CircularProgressIndicator(color: Colors.white)
+                            ? const CircularProgressIndicator(
+                                color: Colors.white)
                             : const Text(
                                 "Confirm Location",
                                 style: TextStyle(

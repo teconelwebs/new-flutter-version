@@ -39,6 +39,12 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
     );
 
     _animController.forward();
+
+    Future.delayed(const Duration(milliseconds: 2500), () {
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed(AppRoutes.orders);
+      }
+    });
   }
 
   @override
@@ -196,12 +202,11 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
                           ),
                           onPressed: () {
                             Navigator.of(context).pushReplacementNamed(
-                              '/profile/order-detail',
-                              arguments: {'id': widget.orderId, 'status': 'PAID'},
+                              AppRoutes.orders,
                             );
                           },
                           child: const Text(
-                            'Track Order',
+                            'View Order Details',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,

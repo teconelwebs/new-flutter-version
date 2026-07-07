@@ -173,7 +173,9 @@ class _AddAddressDetailsScreenState extends State<AddAddressDetailsScreen> {
         },
         body: jsonEncode(payload),
       );
-      debugPrint('Save address response code: ${response.statusCode}, body: ${response.body}');
+      debugPrint(
+        'Save address response code: ${response.statusCode}, body: ${response.body}',
+      );
 
       if (response.statusCode == 200) {
         // Run serviceability check
@@ -191,7 +193,9 @@ class _AddAddressDetailsScreenState extends State<AddAddressDetailsScreen> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to save address: ${response.statusCode}')),
+            SnackBar(
+              content: Text('Failed to save address: ${response.statusCode}'),
+            ),
           );
         }
       }
@@ -210,7 +214,8 @@ class _AddAddressDetailsScreenState extends State<AddAddressDetailsScreen> {
       if (userId == null || accessToken == null) return;
 
       final userUri = Uri.parse(
-          'https://welfogapi.welfog.com/api/v2/get-user-by-access_token');
+        'https://welfogapi.welfog.com/api/v2/get-user-by-access_token',
+      );
       final response = await http.post(
         userUri,
         headers: {'Content-Type': 'application/json'},
@@ -243,7 +248,9 @@ class _AddAddressDetailsScreenState extends State<AddAddressDetailsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          widget.mode == 'edit' ? 'Edit Address Details' : 'Enter Address Details',
+          widget.mode == 'edit'
+              ? 'Edit Address Details'
+              : 'Enter Address Details',
           style: const TextStyle(
             color: Colors.black,
             fontSize: 16,
@@ -252,129 +259,216 @@ class _AddAddressDetailsScreenState extends State<AddAddressDetailsScreen> {
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Address Details Field
-            const Text(
-              'Address Details',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _addressDetailsController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Eg: Plot No., Street, Colony',
-                errorText: _addressError,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding: const EdgeInsets.all(12),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Name Field
-            const Text(
-              'Full Name',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                hintText: 'Enter your name',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding: const EdgeInsets.all(12),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Phone Field
-            const Text(
-              'Phone Number',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              maxLength: 10,
-              decoration: InputDecoration(
-                hintText: 'Enter phone number',
-                errorText: _phoneError,
-                counterText: '',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding: const EdgeInsets.all(12),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            const Divider(),
-            const SizedBox(height: 12),
-            _buildReadOnlyField('Address', _addressText),
-            _buildReadOnlyField('City', _cityText),
-            _buildReadOnlyField('State', _stateText),
-            _buildReadOnlyField('Pincode', _pincodeText),
-            _buildReadOnlyField('Country', _countryText),
-
-            const SizedBox(height: 32),
-
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F766E),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Address Details Field
+                  _buildInputLabel('Address Details'),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _addressDetailsController,
+                    maxLines: 3,
+                    decoration: _buildInputDecoration(
+                      hint: 'Eg: Plot No., Street, Colony',
+                      error: _addressError,
+                    ),
                   ),
-                ),
-                onPressed: _isSaving ? null : _saveAddress,
-                child: _isSaving
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        'Save Address',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                  const SizedBox(height: 16),
+
+                  // 2. Full Name & Phone Number row
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildInputLabel('Full Name'),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _nameController,
+                              decoration: _buildInputDecoration(hint: 'Enter name'),
+                            ),
+                          ],
                         ),
                       ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildInputLabel('Phone Number'),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: _phoneController,
+                              keyboardType: TextInputType.phone,
+                              maxLength: 10,
+                              decoration: _buildInputDecoration(
+                                hint: 'Phone number',
+                                error: _phoneError,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 3. Address read-only field
+                  _buildInputLabel('Address'),
+                  const SizedBox(height: 8),
+                  _buildReadOnlyContainer(_addressText),
+                  const SizedBox(height: 16),
+
+                  // 4. City & State row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildInputLabel('City'),
+                            const SizedBox(height: 8),
+                            _buildReadOnlyContainer(_cityText),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildInputLabel('State'),
+                            const SizedBox(height: 8),
+                            _buildReadOnlyContainer(_stateText),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 5. Pincode & Country row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildInputLabel('Pincode'),
+                            const SizedBox(height: 8),
+                            _buildReadOnlyContainer(_pincodeText),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildInputLabel('Country'),
+                            const SizedBox(height: 8),
+                            _buildReadOnlyContainer(_countryText),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+
+          // 6. Fixed Sticky Bottom Button Area
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+              child: SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F766E), // Classic Teal
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: _isSaving ? null : _saveAddress,
+                  child: _isSaving
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'Save Address',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildReadOnlyField(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.grey),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF3F4F6),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: Text(
-              value,
-              style: const TextStyle(color: Colors.black54, fontSize: 14),
-            ),
-          ),
-        ],
+  Widget _buildInputLabel(String label) {
+    return Text(
+      label,
+      style: const TextStyle(
+        fontWeight: FontWeight.w600,
+        fontSize: 14,
+        color: Color(0xFF1F2937), // Cool gray 800
+      ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration({required String hint, String? error}) {
+    return InputDecoration(
+      hintText: hint,
+      errorText: error,
+      counterText: '',
+      hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14), // Cool gray 400
+      filled: true,
+      fillColor: const Color(0xFFF9FAFB), // Cool gray 50
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFE5E7EB)), // Cool gray 200
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFF0F766E), width: 1.5), // Teal focus
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyContainer(String value) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6), // Cool gray 100
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Text(
+        value,
+        style: const TextStyle(color: Color(0xFF4B5563), fontSize: 14), // Cool gray 600
       ),
     );
   }

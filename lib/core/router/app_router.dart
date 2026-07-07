@@ -16,6 +16,9 @@ import '../../features/splash/presentation/splash_screen.dart';
 import '../../features/checkout/presentation/confirm_address_screen.dart';
 import '../../features/checkout/presentation/payment_confirmation_screen.dart';
 import '../../features/checkout/presentation/order_success_screen.dart';
+import '../../features/profile/presentation/orders_screen.dart';
+import '../../features/profile/presentation/order_details_screen.dart';
+import '../../features/profile/presentation/track_order_screen.dart';
 import '../constants/app_routes.dart';
 
 
@@ -86,9 +89,11 @@ class AppRouter {
           builder: (_) => OrderSuccessScreen(orderId: orderId),
         );
       case AppRoutes.locationPicker:
+        final args = settings.arguments as Map<String, dynamic>? ?? {};
+        final forceGPS = args['forceGPS'] as bool? ?? false;
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => const LocationPickerScreen(),
+          builder: (_) => LocationPickerScreen(forceGPS: forceGPS),
         );
       case AppRoutes.editLocation:
         final args = settings.arguments as Map<String, dynamic>? ?? {};
@@ -102,6 +107,28 @@ class AppRouter {
             editName: args['name']?.toString() ?? '',
             editPhone: args['phone']?.toString() ?? '',
             editAddressDetails: args['addressDetails']?.toString() ?? '',
+          ),
+        );
+      case AppRoutes.orders:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const OrdersScreen(),
+        );
+      case AppRoutes.orderDetails:
+        final args = settings.arguments as Map<String, dynamic>? ?? {};
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => OrderDetailsScreen(
+            oid: args['oid']?.toString() ?? '',
+            initialRefundStatus: args['initialRefundStatus']?.toString(),
+          ),
+        );
+      case AppRoutes.trackOrder:
+        final args = settings.arguments as Map<String, dynamic>? ?? {};
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => TrackOrderScreen(
+            oid: args['oid']?.toString() ?? '',
           ),
         );
       case AppRoutes.addAddressDetails:

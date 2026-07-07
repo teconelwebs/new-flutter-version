@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 // ignore: unused_import
 import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
 
@@ -33,6 +34,31 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   int _currentIndex = 0;
   final HomeApiService _homeApi = HomeApiService();
   late Future<HomeBundle> _bundleFuture;
+  String? _loadedPincode;
+  String? _displayCity;
+  String? _displayPincode;
+
+  Future<void> _loadActiveAddressFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedCity = prefs.getString('city_name') ?? 'Jaipur';
+    final savedPincode = prefs.getString('postal_code') ?? '302001';
+    if (mounted) {
+      setState(() {
+        _displayCity = savedCity;
+        _displayPincode = savedPincode;
+      });
+    }
+  }
+
+  Future<HomeBundle> _fetchBundleWithPincodeTracking() async {
+    final bundle = await _homeApi.fetchHomeBundle();
+    if (mounted) {
+      setState(() {
+        _loadedPincode = bundle.pincode;
+      });
+    }
+    return bundle;
+  }
 
   // Layout & Navigation State
   // ignore: unused_field
@@ -57,11 +83,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
+    _loadActiveAddressFromPrefs();
     _bundleFuture = _homeApi.getCachedHomeBundle().then((cached) {
       if (cached != null) {
+        if (mounted) {
+          setState(() {
+            _loadedPincode = cached.pincode;
+          });
+        }
         return cached;
       } else {
-        return _homeApi.fetchHomeBundle();
+        return _fetchBundleWithPincodeTracking();
       }
     });
 
@@ -282,9 +314,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children: [
               _HomeTab(
                 bundleFuture: _bundleFuture,
+                displayCity: _displayCity,
+                displayPincode: _displayPincode,
+                onLocationTap: () {
+                  Navigator.of(context).pushNamed(AppRoutes.address).then((_) async {
+                    await _loadActiveAddressFromPrefs();
+                    setState(() {
+                      _bundleFuture = _fetchBundleWithPincodeTracking();
+                    });
+                  });
+                },
                 onRefresh: () async {
+                  await _loadActiveAddressFromPrefs();
                   setState(() {
-                    _bundleFuture = _homeApi.fetchHomeBundle();
+                    _bundleFuture = _fetchBundleWithPincodeTracking();
                   });
                   await _bundleFuture;
                 },
@@ -297,11 +340,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     _checkGuestStatus();
                   });
                 },
-                onTabChange: (index) {
+                onTabChange: (index) async {
                   setState(() {
                     _currentIndex = index;
                   });
                   _updateStatusBarColor();
+
+                  if (index == 0) {
+                    await _loadActiveAddressFromPrefs();
+                    final prefs = await SharedPreferences.getInstance();
+                    final savedPincode = prefs.getString('postal_code') ?? '302001';
+                    if (savedPincode != _loadedPincode) {
+                      setState(() {
+                        _bundleFuture = _fetchBundleWithPincodeTracking();
+                      });
+                    }
+                  }
                 },
               ),
               const CategoryScreen(embedded: true),
@@ -368,13 +422,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         builder: (context, cartCount, _) {
           return CustomBottomTabBar(
             currentIndex: _currentIndex,
-            onTap: (index) {
+            onTap: (index) async {
               setState(() {
                 _currentIndex = index;
               });
               _updateStatusBarColor();
               if (index == 2) {
                 CartScreen.emitRefreshTabAction();
+              }
+              if (index == 0) {
+                final prefs = await SharedPreferences.getInstance();
+                final savedPincode = prefs.getString('postal_code') ?? '302001';
+                if (savedPincode != _loadedPincode) {
+                  setState(() {
+                    _bundleFuture = _fetchBundleWithPincodeTracking();
+                  });
+                }
               }
             },
             isGuest: _isGuest,
@@ -404,6 +467,9 @@ class _HomeTab extends StatefulWidget {
   final bool isGuest;
   final VoidCallback promptLogin;
   final ValueChanged<int>? onTabChange;
+  final String? displayCity;
+  final String? displayPincode;
+  final VoidCallback? onLocationTap;
 
   const _HomeTab({
     required this.onSearch,
@@ -412,6 +478,9 @@ class _HomeTab extends StatefulWidget {
     required this.isGuest,
     required this.promptLogin,
     this.onTabChange,
+    this.displayCity,
+    this.displayPincode,
+    this.onLocationTap,
   });
 
   @override
@@ -461,8 +530,12 @@ class _HomeTabState extends State<_HomeTab> {
     return FutureBuilder<HomeBundle>(
       future: widget.bundleFuture,
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(
+              color: Color(0xFFFB5404),
+            ),
+          );
         }
         if (snap.hasError || !snap.hasData) {
           return Center(
@@ -569,11 +642,12 @@ class _HomeTabState extends State<_HomeTab> {
             Header(
               isHome: true,
               scrollController: _scrollController,
-              city: bundle.city,
-              pincode: bundle.pincode,
+              city: widget.displayCity ?? bundle.city,
+              pincode: widget.displayPincode ?? bundle.pincode,
               isGuest: widget.isGuest,
               onSearchTap: widget.onSearch,
               promptLogin: widget.promptLogin,
+              onLocationTap: widget.onLocationTap,
             ),
           ],
         );
