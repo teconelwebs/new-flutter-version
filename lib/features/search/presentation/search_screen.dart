@@ -4,13 +4,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../data/search_api_service.dart';
+import 'widgets/app_search_bar.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key, this.embedded = false});
+  const SearchScreen({super.key, this.embedded = false, this.initialQuery});
 
   static const routeName = AppRoutes.search;
 
   final bool embedded;
+  final String? initialQuery;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -19,6 +21,7 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final _searchApi = SearchApiService();
   final _queryCtrl = TextEditingController();
+  final _focusNode = FocusNode();
   List<String> _suggestions = const [];
   List<String> _recent = const [];
   List<SearchCategory> _categories = const [];
@@ -29,12 +32,31 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialQuery != null && widget.initialQuery!.trim().isNotEmpty) {
+      _queryCtrl.text = widget.initialQuery!.trim();
+    }
+    _queryCtrl.addListener(_onTextChanged);
     _loadInitial();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
   }
 
+  void _onTextChanged() => setState(() {});
+
   Future<void> _loadInitial() async {
+    if (_queryCtrl.text.isEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('last_search_keyword');
+      if (saved != null && saved.trim().isNotEmpty && mounted) {
+        _queryCtrl.text = saved.trim();
+      }
+    }
     await _loadRecent();
     await _loadCategories();
+    if (_queryCtrl.text.trim().isNotEmpty) {
+      _onQueryChanged(_queryCtrl.text);
+    }
   }
 
   Future<void> _loadRecent() async {
@@ -66,9 +88,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void _onQueryChanged(String value) {
     _debounce?.cancel();
     if (value.trim().isEmpty) {
-      setState(() {
-        _suggestions = const [];
-      });
+      setState(() => _suggestions = const []);
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 320), () async {
@@ -90,6 +110,8 @@ class _SearchScreenState extends State<SearchScreen> {
     FocusScope.of(context).unfocus();
     _queryCtrl.text = query;
     await _saveRecent(query);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('last_search_keyword', query);
     if (!mounted) return;
     Navigator.of(context).pushNamed(
       AppRoutes.searchResults,
@@ -100,59 +122,38 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _queryCtrl.removeListener(_onTextChanged);
     _queryCtrl.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Column(
         children: [
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    if (!widget.embedded)
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.chevron_left, color: Color(0xFF333333)),
-                      ),
-                    Expanded(
-                      child: TextField(
-                        controller: _queryCtrl,
-                        onChanged: _onQueryChanged,
-                        onSubmitted: _performSearch,
-                        decoration: const InputDecoration(
-                          hintText: 'Search products',
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(vertical: 14),
-                        ),
-                      ),
-                    ),
-                    if (_queryCtrl.text.isNotEmpty)
-                      IconButton(
-                        onPressed: () {
-                          _queryCtrl.clear();
-                          _onQueryChanged('');
-                          setState(() {});
-                        },
-                        icon: const Icon(Icons.cancel, color: Color(0xFF999999)),
-                      ),
-                    IconButton(
-                      onPressed: () => _performSearch(),
-                      icon: const Icon(Icons.search, color: Color(0xFF666666)),
-                    ),
-                  ],
-                ),
+              padding: EdgeInsets.only(
+                top: 8,
+                bottom: MediaQuery.sizeOf(context).width < 360 ? 8 : 10,
+              ),
+              child: AppSearchBar.editable(
+                controller: _queryCtrl,
+                focusNode: _focusNode,
+                autofocus: !widget.embedded,
+                hintText: 'Search products',
+                showBackButton: !widget.embedded,
+                onBack: () => Navigator.of(context).pop(),
+                onChanged: _onQueryChanged,
+                onSubmitted: _performSearch,
+                onClear: () {
+                  _queryCtrl.clear();
+                  _onQueryChanged('');
+                },
               ),
             ),
           ),
@@ -166,18 +167,42 @@ class _SearchScreenState extends State<SearchScreen> {
     final q = _queryCtrl.text.trim();
     if (q.isNotEmpty) {
       if (_suggestionLoading) {
-        return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+        return const Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Color(0xFFFB5404),
+          ),
+        );
       }
       if (_suggestions.isEmpty) {
-        return const Center(child: Text('No suggestions'));
+        return Center(
+          child: Text(
+            'No suggestions for "$q"',
+            style: const TextStyle(color: Color(0xFF6B7280), fontSize: 14),
+          ),
+        );
       }
-      return ListView.builder(
+      return ListView.separated(
+        padding: const EdgeInsets.symmetric(vertical: 4),
         itemCount: _suggestions.length,
+        separatorBuilder: (_, __) => const Divider(height: 1, indent: 52, color: Color(0xFFF3F4F6)),
         itemBuilder: (_, i) {
           final s = _suggestions[i];
           return ListTile(
-            leading: const Icon(Icons.search, size: 18, color: Color(0xFF666666)),
-            title: Text(s),
+            leading: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF6B7280)),
+            ),
+            title: Text(
+              s,
+              style: const TextStyle(fontSize: 14, color: Color(0xFF111827)),
+            ),
+            trailing: const Icon(Icons.north_west_rounded, size: 16, color: Color(0xFF9CA3AF)),
             onTap: () => _performSearch(s),
           );
         },
@@ -185,7 +210,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       children: [
         if (_recent.isNotEmpty) ...[
           Row(
@@ -193,7 +218,11 @@ class _SearchScreenState extends State<SearchScreen> {
               const Expanded(
                 child: Text(
                   'Recent Searches',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: Color(0xFF111827),
+                  ),
                 ),
               ),
               TextButton(
@@ -203,6 +232,10 @@ class _SearchScreenState extends State<SearchScreen> {
                   if (!mounted) return;
                   setState(() => _recent = const []);
                 },
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFFB5404),
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
                 child: const Text('Clear All'),
               ),
             ],
@@ -213,52 +246,67 @@ class _SearchScreenState extends State<SearchScreen> {
             children: _recent
                 .map(
                   (r) => ActionChip(
-                    avatar: const Icon(Icons.search, size: 14),
-                    label: Text(r),
+                    backgroundColor: const Color(0xFFF9FAFB),
+                    side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    avatar: const Icon(Icons.history_rounded, size: 14, color: Color(0xFF6B7280)),
+                    label: Text(
+                      r,
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
+                    ),
                     onPressed: () => _performSearch(r),
                   ),
                 )
                 .toList(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
         ],
-        const Row(
-          children: [
-            Expanded(
-              child: Text(
-                'Categories',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-              ),
-            ),
-          ],
+        const Text(
+          'Browse Categories',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+            color: Color(0xFF111827),
+          ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         if (_categoriesLoading)
           const Padding(
             padding: EdgeInsets.all(20),
-            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            child: Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFFFB5404),
+              ),
+            ),
           )
         else
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _categories.length.clamp(0, 9),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 1.05,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: MediaQuery.sizeOf(context).width < 360 ? 3 : 3,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: MediaQuery.sizeOf(context).width < 360 ? 0.95 : 1.05,
             ),
             itemBuilder: (_, i) {
               final c = _categories[i];
               return InkWell(
                 borderRadius: BorderRadius.circular(14),
                 onTap: () => _performSearch(c.name),
-                child: Container(
+                child: Ink(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFEEF2FF)),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
                     color: Colors.white,
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x06000000),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
                   ),
                   padding: const EdgeInsets.all(8),
                   child: Column(
@@ -269,17 +317,20 @@ class _SearchScreenState extends State<SearchScreen> {
                           c.iconUrl,
                           fit: BoxFit.contain,
                           errorBuilder: (_, __, ___) =>
-                              const Icon(Icons.category_outlined),
+                              const Icon(Icons.category_outlined, color: Color(0xFF9CA3AF)),
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         c.name,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.w600,
+                          color: Color(0xFF374151),
+                          height: 1.15,
                         ),
                       ),
                     ],

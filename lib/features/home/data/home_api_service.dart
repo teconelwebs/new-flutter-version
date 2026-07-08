@@ -47,7 +47,7 @@ class HomeApiService {
     );
 
     try {
-      await prefs.setString('cached_home_bundle_v2', jsonEncode(bundle.toJson()));
+      await prefs.setString('cached_home_bundle_v3', jsonEncode(bundle.toJson()));
     } catch (e) {
       debugPrint("Failed to cache home bundle: $e");
     }
@@ -67,7 +67,7 @@ class HomeApiService {
   Future<HomeBundle?> getCachedHomeBundle() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cachedStr = prefs.getString('cached_home_bundle_v2');
+      final cachedStr = prefs.getString('cached_home_bundle_v3');
       if (cachedStr != null) {
         final decoded = jsonDecode(cachedStr);
         return HomeBundle.fromJson(decoded);
@@ -107,6 +107,23 @@ class HomeApiService {
         .toList();
   }
 
+  List<HomeBanner> _mapCategoryBanners(dynamic rawList) {
+    if (rawList is! List) return const [];
+    return rawList
+        .whereType<Map>()
+        .map((e) {
+          final imageRaw = (e['banner_img'] ?? e['image'] ?? '').toString();
+          if (imageRaw.isEmpty) return null;
+          final link = (e['banner_url'] ?? e['link'] ?? '').toString().trim();
+          return HomeBanner(
+            image: _asAbsoluteImage(imageRaw),
+            link: link.isEmpty || link == '#' ? null : link,
+          );
+        })
+        .whereType<HomeBanner>()
+        .toList();
+  }
+
   List<HomeCategorySection> _mapSections(dynamic rawRows) {
     if (rawRows is! List) return const [];
     return rawRows.whereType<Map>().map((row) {
@@ -115,7 +132,10 @@ class HomeApiService {
       final name =
           category is Map ? (category['name'] ?? 'Category').toString() : 'Category';
       final products = _mapCategoryProducts(row['products']);
-      return HomeCategorySection(id: id, name: name, products: products);
+      // Parse banner_data from category
+      final rawBannerData = category is Map ? category['banner_data'] : null;
+      final bannerData = _mapCategoryBanners(rawBannerData);
+      return HomeCategorySection(id: id, name: name, products: products, bannerData: bannerData);
     }).where((s) => s.products.isNotEmpty).toList();
   }
 
@@ -126,14 +146,15 @@ class HomeApiService {
       final name = (p['name'] ?? '').toString();
       final slug = (p['link'] ?? p['slug'] ?? '').toString();
       final image = _asAbsoluteImage((p['image'] ?? p['thumbnail_img'] ?? '').toString());
-      final price = _toDouble(p['price']);
+      final price = _toDouble(p['price'] ?? p['main_price'] ?? p['sell_price'] ?? p['unit_price'] ?? p['discount_price']);
+      final mrp = _toDouble(p['orignalprice'] ?? p['stroked_price'] ?? p['mrp'] ?? price);
       final duration = int.tryParse((p['duration'] ?? '0').toString()) ?? 0;
       final brand = (p['brand'] ?? '').toString();
       return HomeProduct(
         id: id,
         name: name,
         price: price,
-        mrp: price,
+        mrp: mrp,
         image: image,
         slug: slug,
         duration: duration,

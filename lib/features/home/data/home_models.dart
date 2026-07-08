@@ -71,25 +71,40 @@ class HomeCategorySection {
     required this.id,
     required this.name,
     required this.products,
+    this.bannerData = const [],
   });
 
   final String id;
   final String name;
   final List<HomeProduct> products;
+  final List<HomeBanner> bannerData;
 
-  factory HomeCategorySection.fromJson(Map<String, dynamic> json) =>
-      HomeCategorySection(
-        id: json['id'] ?? '',
-        name: json['name'] ?? '',
-        products: (json['products'] as List? ?? [])
-            .map((e) => HomeProduct.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+  factory HomeCategorySection.fromJson(Map<String, dynamic> json) {
+    final rawBanners = json['bannerData'];
+    final List<HomeBanner> parsedBanners = (rawBanners is List)
+        ? rawBanners
+            .whereType<Map<String, dynamic>>()
+            .map((e) => HomeBanner.fromJson(e))
+            .toList()
+        : const <HomeBanner>[];
+    return HomeCategorySection(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      products: (json['products'] is List)
+          ? (json['products'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map((e) => HomeProduct.fromJson(e))
+              .toList()
+          : const <HomeProduct>[],
+      bannerData: parsedBanners,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
         'products': products.map((e) => e.toJson()).toList(),
+        'bannerData': bannerData.map((e) => e.toJson()).toList(),
       };
 }
 
@@ -112,22 +127,26 @@ class HomeBundle {
   final String city;
   final String pincode;
 
+  static List<HomeBanner> _parseBanners(dynamic raw) => (raw is List)
+      ? raw.whereType<Map<String, dynamic>>().map(HomeBanner.fromJson).toList()
+      : const <HomeBanner>[];
+
   factory HomeBundle.fromJson(Map<String, dynamic> json) => HomeBundle(
-        mobileSlider: (json['mobileSlider'] as List? ?? [])
-            .map((e) => HomeBanner.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        banner1: (json['banner1'] as List? ?? [])
-            .map((e) => HomeBanner.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        banner2: (json['banner2'] as List? ?? [])
-            .map((e) => HomeBanner.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        todayDeals: (json['todayDeals'] as List? ?? [])
-            .map((e) => HomeProduct.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        sections: (json['sections'] as List? ?? [])
-            .map((e) => HomeCategorySection.fromJson(e as Map<String, dynamic>))
-            .toList(),
+        mobileSlider: _parseBanners(json['mobileSlider']),
+        banner1: _parseBanners(json['banner1']),
+        banner2: _parseBanners(json['banner2']),
+        todayDeals: (json['todayDeals'] is List)
+            ? (json['todayDeals'] as List)
+                .whereType<Map<String, dynamic>>()
+                .map(HomeProduct.fromJson)
+                .toList()
+            : const <HomeProduct>[],
+        sections: (json['sections'] is List)
+            ? (json['sections'] as List)
+                .whereType<Map<String, dynamic>>()
+                .map(HomeCategorySection.fromJson)
+                .toList()
+            : const <HomeCategorySection>[],
         city: json['city'] ?? '',
         pincode: json['pincode'] ?? '',
       );

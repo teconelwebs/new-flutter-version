@@ -184,9 +184,8 @@ class _TodayDealsScreenState extends State<TodayDealsScreen> {
       );
     }
 
-    final double screenWidth = MediaQuery.of(context).size.width;
-    // Calculate aspect ratio dynamically based on screen width to prevent text truncation
-    final double childAspectRatio = screenWidth < 360 ? 0.65 : (screenWidth < 400 ? 0.70 : 0.73);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final childAspectRatio = homeProductGridAspectRatio(screenWidth);
 
     return GridView.builder(
       controller: _scrollController,

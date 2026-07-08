@@ -331,8 +331,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   });
                   await _bundleFuture;
                 },
-                onSearch: () {
-                  Navigator.of(context).pushNamed(SearchScreen.routeName);
+                onSearch: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  final keyword = prefs.getString('last_search_keyword');
+                  if (!context.mounted) return;
+                  Navigator.of(context).pushNamed(
+                    SearchScreen.routeName,
+                    arguments: keyword,
+                  );
                 },
                 isGuest: _isGuest,
                 promptLogin: () {
@@ -553,7 +559,10 @@ class _HomeTabState extends State<_HomeTab> {
         final bundle = snap.data!;
         final dealList = bundle.todayDeals.take(10).toList();
         final sections = bundle.sections.take(4).toList();
-        final promo = [...bundle.banner1, ...bundle.banner2].take(3).toList();
+        final promo = [...bundle.banner1, ...bundle.banner2]
+            .where((b) => b.image.trim().isNotEmpty)
+            .take(3)
+            .toList();
 
         return Stack(
           children: [
@@ -607,14 +616,7 @@ class _HomeTabState extends State<_HomeTab> {
                             .map(
                               (b) => Padding(
                                 padding: const EdgeInsets.only(bottom: 10),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Image.network(
-                                    b.image,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                                  ),
-                                ),
+                                child: PromoBannerImage(imageUrl: b.image),
                               ),
                             )
                             .toList(),
@@ -623,24 +625,33 @@ class _HomeTabState extends State<_HomeTab> {
                   ),
                   ...sections.map(
                     (s) => SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: ProductStrip(
-                          title: s.name,
-                          products: s.products.take(10).toList(),
-                          onProductTap: (p) {
-                            Navigator.of(context).pushNamed(
-                              AppRoutes.product,
-                              arguments: _toProductItem(p, s.products.indexOf(p)),
-                            );
-                          },
-                          onRightIconTap: () {
-                            Navigator.of(context).pushNamed(
-                              AppRoutes.searchResults,
-                              arguments: s.name,
-                            );
-                          },
-                        ),
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: ProductStrip(
+                              title: s.name,
+                              products: s.products.take(10).toList(),
+                              onProductTap: (p) {
+                                Navigator.of(context).pushNamed(
+                                  AppRoutes.product,
+                                  arguments: _toProductItem(p, s.products.indexOf(p)),
+                                );
+                              },
+                              onRightIconTap: () {
+                                Navigator.of(context).pushNamed(
+                                  AppRoutes.searchResults,
+                                  arguments: s.name,
+                                );
+                              },
+                            ),
+                          ),
+                          if (s.bannerData.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: BannerCarousel(items: s.bannerData),
+                            ),
+                        ],
                       ),
                     ),
                   ),

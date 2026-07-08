@@ -5,6 +5,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../../../account/data/account_api_service.dart';
 
+double _safeBannerAspectRatio(double? ratio, {double fallback = 3.0}) {
+  if (ratio == null || !ratio.isFinite || ratio <= 0) return fallback;
+  return ratio.clamp(1.2, 5.0);
+}
+
+/// Grid cell aspect ratio for [HomeProductCard] (square image + text block).
+double homeProductGridAspectRatio(
+  double screenWidth, {
+  double horizontalPadding = 12,
+  double crossAxisSpacing = 12,
+}) {
+  final cardWidth =
+      (screenWidth - horizontalPadding * 2 - crossAxisSpacing) / 2;
+  const contentHeight = 100.0;
+  return cardWidth / (cardWidth + contentHeight);
+}
+
 class HomeHeader extends StatelessWidget {
   const HomeHeader({
     super.key,
@@ -133,64 +150,290 @@ class BannerCarousel extends StatefulWidget {
   State<BannerCarousel> createState() => _BannerCarouselState();
 }
 
-class _BannerCarouselState extends State<BannerCarousel> {
+class _BannerCarouselState extends State<BannerCarousel> with TickerProviderStateMixin {
+  static const Duration _slideDuration = Duration(milliseconds: 3000);
+
   final _controller = PageController();
   int _index = 0;
+  bool _isManualSwipe = false;
+  bool _isAutoAdvancing = false;
+  int? _pageAtScrollStart;
+  final Map<int, double> _aspectRatios = {};
+
+  late AnimationController _progressController;
+  late Animation<double> _progressAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _progressController = AnimationController(
+      vsync: this,
+      duration: _slideDuration,
+    );
+    _progressAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_progressController);
+    _progressController.addStatusListener(_onProgressStatusChanged);
+    _precalculateAspectRatios();
+    _startProgressFill();
+  }
+
+  List<HomeBanner> get _validItems =>
+      widget.items.where((b) => b.image.trim().isNotEmpty).toList();
+
+  @override
+  void didUpdateWidget(covariant BannerCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.items != widget.items) {
+      _aspectRatios.clear();
+      _index = 0;
+      if (_controller.hasClients) {
+        _controller.jumpToPage(0);
+      }
+      _precalculateAspectRatios();
+      _startProgressFill();
+    }
+  }
 
   @override
   void dispose() {
+    _progressController.removeStatusListener(_onProgressStatusChanged);
+    _progressController.dispose();
     _controller.dispose();
     super.dispose();
   }
 
+  void _onProgressStatusChanged(AnimationStatus status) {
+    if (status != AnimationStatus.completed ||
+        _isManualSwipe ||
+        _isAutoAdvancing ||
+        _validItems.length <= 1 ||
+        !mounted) {
+      return;
+    }
+    _autoAdvance();
+  }
+
+  Future<void> _autoAdvance() async {
+    if (!_controller.hasClients || !mounted) return;
+    _isAutoAdvancing = true;
+    final nextPage = (_index + 1) % _validItems.length;
+    try {
+      await _controller.animateToPage(
+        nextPage,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } finally {
+      _isAutoAdvancing = false;
+      if (mounted) _startProgressFill();
+    }
+  }
+
+  void _startProgressFill() {
+    if (_validItems.length <= 1 || !mounted) return;
+    _progressController
+      ..stop()
+      ..value = 0;
+    _progressController.forward(from: 0);
+  }
+
+  void _onPageChanged(int i) {
+    if (!mounted) return;
+    _progressController
+      ..stop()
+      ..value = 0;
+    setState(() => _index = i);
+    if (!_isAutoAdvancing) {
+      _startProgressFill();
+    }
+  }
+
+  void _precalculateAspectRatios() {
+    final items = _validItems;
+    for (int i = 0; i < items.length; i++) {
+      final imgUrl = items[i].image;
+      final image = NetworkImage(imgUrl);
+      image.resolve(const ImageConfiguration()).addListener(
+        ImageStreamListener((ImageInfo info, bool _) {
+          final ratio = info.image.height > 0
+              ? info.image.width / info.image.height
+              : 3.0;
+          if (mounted) {
+            setState(() => _aspectRatios[i] = _safeBannerAspectRatio(ratio));
+          }
+        }),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (widget.items.isEmpty) return const SizedBox.shrink();
+    final items = _validItems;
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    final activeAspect = _safeBannerAspectRatio(_aspectRatios[_index]);
+
     return Column(
       children: [
-        SizedBox(
-          height: 125,
-          child: PageView.builder(
-            controller: _controller,
-            itemCount: widget.items.length,
-            onPageChanged: (i) => setState(() => _index = i),
-            itemBuilder: (context, i) {
-              final banner = widget.items[i];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    banner.image,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: const Color(0xFFECEFF3),
-                      child: const Center(child: Icon(Icons.image_not_supported)),
-                    ),
-                  ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: AspectRatio(
+              aspectRatio: activeAspect,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  if (notification is ScrollStartNotification) {
+                    _pageAtScrollStart = _index;
+                    _progressController.stop();
+                    setState(() => _isManualSwipe = true);
+                  } else if (notification is ScrollEndNotification) {
+                    setState(() => _isManualSwipe = false);
+                    if (_pageAtScrollStart == _index) {
+                      _startProgressFill();
+                    }
+                  }
+                  return false;
+                },
+                child: PageView.builder(
+                  controller: _controller,
+                  itemCount: items.length,
+                  onPageChanged: _onPageChanged,
+                  itemBuilder: (context, i) {
+                    final banner = items[i];
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        banner.image,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFFECEFF3),
+                          child: const Center(child: Icon(Icons.image_not_supported)),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(
-            widget.items.length,
-            (i) => AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: i == _index ? 24 : 8,
-              height: 5,
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                color: i == _index ? const Color(0xFF2B2B2B) : const Color(0xFFCBD4D4),
               ),
             ),
           ),
         ),
+        const SizedBox(height: 10),
+        AnimatedBuilder(
+          animation: _progressAnimation,
+          builder: (context, _) {
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(items.length, (i) {
+                final isActive = i == _index;
+                final fill = isActive
+                    ? _progressAnimation.value.clamp(0.0, 1.0)
+                    : 0.0;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeInOut,
+                  height: 5,
+                  width: isActive ? 30 : 15,
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD4D4),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      widthFactor: fill,
+                      child: Container(
+                        color: isActive
+                            ? const Color(0xFF2B2B2B)
+                            : Colors.transparent,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            );
+          },
+        ),
       ],
+    );
+  }
+}
+
+class PromoBannerImage extends StatefulWidget {
+  const PromoBannerImage({super.key, required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  State<PromoBannerImage> createState() => _PromoBannerImageState();
+}
+
+class _PromoBannerImageState extends State<PromoBannerImage> {
+  double _aspectRatio = 3.0;
+
+  double get _displayAspectRatio {
+    if (!_aspectRatio.isFinite || _aspectRatio <= 0) return 3.0;
+    return _aspectRatio;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAspectRatio();
+  }
+
+  @override
+  void didUpdateWidget(covariant PromoBannerImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _aspectRatio = 3.0;
+      _loadAspectRatio();
+    }
+  }
+
+  void _loadAspectRatio() {
+    if (widget.imageUrl.trim().isEmpty) return;
+    final image = NetworkImage(widget.imageUrl);
+    image.resolve(const ImageConfiguration()).addListener(
+      ImageStreamListener((ImageInfo info, bool _) {
+        if (info.image.height <= 0) return;
+        final ratio = info.image.width / info.image.height;
+        if (mounted && ratio.isFinite && ratio > 0) {
+          setState(() => _aspectRatio = ratio);
+        }
+      }),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.imageUrl.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      alignment: Alignment.topCenter,
+      child: AspectRatio(
+        aspectRatio: _displayAspectRatio,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.network(
+            widget.imageUrl,
+            width: double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              color: const Color(0xFFECEFF3),
+              alignment: Alignment.center,
+              child: const Icon(Icons.image_not_supported_outlined, size: 32),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -212,6 +455,10 @@ class ProductStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (products.isEmpty) return const SizedBox.shrink();
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final cardWidth = (screenWidth * 0.42).clamp(140.0, 175.0);
+    final stripHeight = cardWidth + 108;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -262,7 +509,7 @@ class ProductStrip extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 226,
+          height: stripHeight,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             scrollDirection: Axis.horizontal,
@@ -272,6 +519,7 @@ class ProductStrip extends StatelessWidget {
               final p = products[i];
               return HomeProductCard(
                 product: p,
+                cardWidth: cardWidth,
                 onTap: () => onProductTap(p),
               );
             },
@@ -284,11 +532,13 @@ class ProductStrip extends StatelessWidget {
 
 class HomeProductCard extends StatefulWidget {
   final HomeProduct product;
+  final double? cardWidth;
   final VoidCallback onTap;
 
   const HomeProductCard({
     super.key,
     required this.product,
+    this.cardWidth,
     required this.onTap,
   });
 
@@ -300,6 +550,17 @@ class _HomeProductCardState extends State<HomeProductCard> {
   final _apiService = AccountApiService();
   bool _isWishlisted = false;
   bool _toggling = false;
+
+  static String _calcDelivery(int durationMinutes) {
+    if (durationMinutes <= 0) return '2 - 4 days';
+    final days = durationMinutes ~/ 1440;
+    if (days > 0) return '$days - ${days + 1} days';
+    final hours = (durationMinutes % 1440) ~/ 60;
+    final mins = durationMinutes % 60;
+    if (hours > 0) return '$hours hr${hours > 1 ? 's' : ''}';
+    if (mins > 0) return '$mins min${mins > 1 ? 's' : ''}';
+    return '2 - 4 days';
+  }
 
   @override
   void initState() {
@@ -405,10 +666,81 @@ class _HomeProductCardState extends State<HomeProductCard> {
         ? (((p.mrp - p.price) / p.mrp) * 100).round()
         : 0;
 
+    final contentSection = Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 9),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            p.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              height: 1.2,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              Flexible(
+                child: Text(
+                  'Rs ${p.price.toStringAsFixed(0)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0B7E7B),
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+              if (p.mrp > p.price) ...[
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    'Rs ${p.mrp.toStringAsFixed(0)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      decoration: TextDecoration.lineThrough,
+                      color: Color(0xFF9AA0A6),
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              const Icon(Icons.local_shipping_outlined, size: 11, color: Color(0xFFFB5404)),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Est. delivery: ${_calcDelivery(p.duration)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF555555),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(
-        width: 158,
+        width: widget.cardWidth,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -417,18 +749,22 @@ class _HomeProductCardState extends State<HomeProductCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            AspectRatio(
+              aspectRatio: 1,
               child: Stack(
                 children: [
                   Positioned.fill(
                     child: ClipRRect(
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-                      child: Image.network(
-                        p.image,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFFF2F4F7),
-                          child: const Center(child: Icon(Icons.shopping_bag_outlined)),
+                      child: Container(
+                        color: const Color(0xFFF8F9FA),
+                        child: Image.network(
+                          p.image,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: const Color(0xFFF2F4F7),
+                            child: const Center(child: Icon(Icons.shopping_bag_outlined)),
+                          ),
                         ),
                       ),
                     ),
@@ -495,48 +831,10 @@ class _HomeProductCardState extends State<HomeProductCard> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 9),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    p.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                      height: 1.2,
-                      color: Color(0xFF1F2937),
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      Text(
-                        'Rs ${p.price.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF0B7E7B),
-                          fontSize: 12.5,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      if (p.mrp > p.price)
-                        Text(
-                          'Rs ${p.mrp.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            decoration: TextDecoration.lineThrough,
-                            color: Color(0xFF9AA0A6),
-                            fontSize: 11,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            if (widget.cardWidth == null)
+              Expanded(child: contentSection)
+            else
+              contentSection,
           ],
         ),
       ),

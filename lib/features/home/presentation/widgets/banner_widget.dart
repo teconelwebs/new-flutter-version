@@ -5,6 +5,11 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_routes.dart';
 
+double _safeBannerAspectRatio(double? ratio, {double fallback = 3.0}) {
+  if (ratio == null || !ratio.isFinite || ratio <= 0) return fallback;
+  return ratio.clamp(1.2, 5.0);
+}
+
 class BannerData {
   final String image;
   final String? link;
@@ -38,17 +43,18 @@ class BannerWidget extends StatefulWidget {
 
 class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMixin {
   final PageController _pageController = PageController();
-  
+
+  static const Duration _slideDuration = Duration(milliseconds: 3000);
+
   // Local States
   List<BannerData> _slides = [];
   bool _loading = true;
   bool _error = false;
   int _activePage = 0;
   bool _isManualSwipe = false;
+  bool _isAutoAdvancing = false;
+  int? _pageAtScrollStart;
 
-  // Active timers and listeners
-  Timer? _autoScrollTimer;
-  Timer? _userSwipeResetTimer;
   final Map<int, double> _aspectRatios = {};
 
   // Progress indicators animations references
@@ -63,9 +69,10 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
 
     _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2800),
+      duration: _slideDuration,
     );
     _progressAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_progressController);
+    _progressController.addStatusListener(_onProgressStatusChanged);
 
     _initBannersData();
   }
@@ -80,8 +87,7 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
 
   @override
   void dispose() {
-    _autoScrollTimer?.cancel();
-    _userSwipeResetTimer?.cancel();
+    _progressController.removeStatusListener(_onProgressStatusChanged);
     _pageController.dispose();
     _progressController.dispose();
     super.dispose();
@@ -105,7 +111,6 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
           });
           _precalculateAspectRatios();
           _startAutoCarousel();
-          _startProgressAnimation();
           return;
         }
       }
@@ -168,7 +173,6 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
               });
               _precalculateAspectRatios();
               _startAutoCarousel();
-              _startProgressAnimation();
             }
             return;
           }
@@ -194,10 +198,12 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
       
       image.image.resolve(const ImageConfiguration()).addListener(
         ImageStreamListener((ImageInfo info, bool _) {
-          final double ratio = info.image.width / info.image.height;
-          if (mounted && ratio > 0) {
+          final double ratio = info.image.height > 0
+              ? info.image.width / info.image.height
+              : 3.0;
+          if (mounted) {
             setState(() {
-              _aspectRatios[i] = ratio;
+              _aspectRatios[i] = _safeBannerAspectRatio(ratio);
             });
           }
         }),
@@ -205,38 +211,55 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
     }
   }
 
-  // Start periodic pages auto rotation
-  void _startAutoCarousel() {
-    _autoScrollTimer?.cancel();
-    if (_slides.length <= 1) return;
-
-    _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (_isManualSwipe) {
-        if (mounted) {
-          setState(() {
-            _isManualSwipe = false;
-          });
-        }
-        return;
-      }
-
-      int nextPage = _activePage + 1;
-      if (nextPage >= _slides.length) nextPage = 0;
-
-      if (_pageController.hasClients) {
-        _pageController.animateToPage(
-          nextPage,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      }
-    });
+  void _onProgressStatusChanged(AnimationStatus status) {
+    if (status != AnimationStatus.completed ||
+        _isManualSwipe ||
+        _isAutoAdvancing ||
+        _slides.length <= 1 ||
+        !mounted) {
+      return;
+    }
+    _autoAdvance();
   }
 
-  // Slide progress bar indicator transition
-  void _startProgressAnimation() {
-    _progressController.reset();
-    _progressController.forward();
+  Future<void> _autoAdvance() async {
+    if (!_pageController.hasClients || !mounted) return;
+    _isAutoAdvancing = true;
+    final nextPage = (_activePage + 1) % _slides.length;
+    try {
+      await _pageController.animateToPage(
+        nextPage,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } finally {
+      _isAutoAdvancing = false;
+      if (mounted) _startProgressFill();
+    }
+  }
+
+  void _startProgressFill() {
+    if (_slides.length <= 1 || !mounted) return;
+    _progressController
+      ..stop()
+      ..value = 0;
+    _progressController.forward(from: 0);
+  }
+
+  void _startAutoCarousel() {
+    if (_slides.length <= 1) return;
+    _startProgressFill();
+  }
+
+  void _onPageChanged(int index) {
+    if (!mounted) return;
+    _progressController
+      ..stop()
+      ..value = 0;
+    setState(() => _activePage = index);
+    if (!_isAutoAdvancing) {
+      _startProgressFill();
+    }
   }
 
   // Navigation triggers on slide clicks
@@ -283,98 +306,103 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
       );
     }
 
-    final double activeAspect = _aspectRatios[_activePage] ?? 3.0;
+    final double activeAspect = _safeBannerAspectRatio(_aspectRatios[_activePage]);
 
     return Padding(
       padding: const EdgeInsets.only(top: 12, left: 12, right: 12, bottom: 4),
       child: Column(
         children: [
-          // Dynamic heights PageView Carousel container
-          AspectRatio(
-            aspectRatio: activeAspect,
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (ScrollNotification notification) {
-                if (notification is ScrollStartNotification) {
-                  setState(() {
-                    _isManualSwipe = true;
-                  });
-                  _userSwipeResetTimer?.cancel();
-                } else if (notification is ScrollEndNotification) {
-                  _userSwipeResetTimer = Timer(const Duration(seconds: 5), () {
-                    if (mounted) {
-                      setState(() {
-                        _isManualSwipe = false;
-                      });
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: AspectRatio(
+              aspectRatio: activeAspect,
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (ScrollNotification notification) {
+                  if (notification is ScrollStartNotification) {
+                    _pageAtScrollStart = _activePage;
+                    _progressController.stop();
+                    setState(() => _isManualSwipe = true);
+                  } else if (notification is ScrollEndNotification) {
+                    setState(() => _isManualSwipe = false);
+                    if (_pageAtScrollStart == _activePage) {
+                      _startProgressFill();
                     }
-                  });
-                }
-                return true;
-              },
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: _slides.length,
-                onPageChanged: (index) {
-                  setState(() {
-                    _activePage = index;
-                  });
-                  _startProgressAnimation();
+                  }
+                  return false;
                 },
-                itemBuilder: (context, index) {
-                  final slide = _slides[index];
-                  return GestureDetector(
-                    onTap: () => _handleBannerPress(slide),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        slide.image,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: Colors.grey.shade300,
-                          alignment: Alignment.center,
-                          child: const Icon(Icons.image, size: 40),
-                        ),
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: _slides.length,
+                  onPageChanged: _onPageChanged,
+                  itemBuilder: (context, index) {
+                    final slide = _slides[index];
+                    return GestureDetector(
+                      onTap: () => _handleBannerPress(slide),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: slide.image.trim().isEmpty
+                            ? Container(
+                                color: Colors.grey.shade300,
+                                alignment: Alignment.center,
+                                child: const Icon(Icons.image, size: 40),
+                              )
+                            : Image.network(
+                                slide.image,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  color: Colors.grey.shade300,
+                                  alignment: Alignment.center,
+                                  child: const Icon(Icons.image, size: 40),
+                                ),
+                              ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
           ),
           const SizedBox(height: 10),
 
           // Custom indicator pill progress bar
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(_slides.length, (index) {
-              final bool isActive = index == _activePage;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                height: 5,
-                width: isActive ? 30 : 15,
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFCBD4D4),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: isActive
-                    ? AnimatedBuilder(
-                        animation: _progressAnimation,
-                        builder: (context, child) {
-                          return Align(
-                            alignment: Alignment.centerLeft,
-                            child: FractionallySizedBox(
-                              widthFactor: _progressAnimation.value,
-                              child: Container(
-                                color: const Color(0xFF2B2B2B),
-                              ),
-                            ),
-                          );
-                        },
-                      )
-                    : null,
+          AnimatedBuilder(
+            animation: _progressAnimation,
+            builder: (context, _) {
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(_slides.length, (index) {
+                  final isActive = index == _activePage;
+                  final fill = isActive
+                      ? _progressAnimation.value.clamp(0.0, 1.0)
+                      : 0.0;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    height: 5,
+                    width: isActive ? 30 : 15,
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD4D4),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FractionallySizedBox(
+                        widthFactor: fill,
+                        child: Container(
+                          color: isActive
+                              ? const Color(0xFF2B2B2B)
+                              : Colors.transparent,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
               );
-            }),
+            },
           ),
         ],
       ),

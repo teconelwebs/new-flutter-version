@@ -30,5 +30,6 @@ class AppRoutes {
   static const contactSupport = '/profile/help/contact';
   static const becomeSupplier = '/profile/help/become-supplier';
   static const policy = '/profile/help/policy';
+  static const shop = '/shop';
 }
 

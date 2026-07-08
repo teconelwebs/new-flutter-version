@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../../../../core/constants/app_routes.dart';
 
 class ProductOtherDetailsWidget extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -472,7 +473,7 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
                         ),
                         onPressed: () {
                           Navigator.of(context).pushNamed(
-                            '/Shop',
+                            AppRoutes.shop,
                             arguments: {
                               'id': shop['id'],
                               'slug': shop['slug'],

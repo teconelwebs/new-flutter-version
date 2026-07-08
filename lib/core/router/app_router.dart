@@ -32,6 +32,7 @@ import '../../features/account/presentation/contact_support_screen.dart';
 import '../../features/account/presentation/become_supplier_screen.dart';
 import '../../features/account/presentation/policy_screen.dart';
 import '../constants/app_routes.dart';
+import '../../features/shop/presentation/shop_screen.dart';
 
 
 class AppRouter {
@@ -63,9 +64,10 @@ class AppRouter {
           builder: (_) => const TodayDealsScreen(),
         );
       case AppRoutes.search:
+        final initialQuery = settings.arguments as String?;
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => const SearchScreen(),
+          builder: (_) => SearchScreen(initialQuery: initialQuery),
         );
       case AppRoutes.searchResults:
         final query = (settings.arguments as String?) ?? '';
@@ -230,6 +232,14 @@ class AppRouter {
         return MaterialPageRoute(
           settings: settings,
           builder: (_) => PolicyScreen(slug: slug),
+        );
+      case AppRoutes.shop:
+        final shopArgs = settings.arguments as Map<String, dynamic>? ?? {};
+        final shopId = (shopArgs['shop_id'] ?? shopArgs['id'] ?? '').toString();
+        final shopSlug = (shopArgs['slug'] ?? '').toString();
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => ShopScreen(shopId: shopId, slug: shopSlug),
         );
       default:
         return play.AppRoutes.onGenerateRoute(settings);

@@ -5,177 +5,227 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_routes.dart';
 
-class CategoryWidget extends StatefulWidget {
-  final int pullRefreshKey;
-  final ValueChanged<int>? onTabChange;
+class BannerData {
+  final String image;
+  final String? link;
 
-  const CategoryWidget({
+  BannerData({required this.image, this.link});
+
+  factory BannerData.fromJson(Map<String, dynamic> json) {
+    return BannerData(
+      image: json['image'] ?? "",
+      link: json['link'],
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'image': image,
+        'link': link,
+      };
+}
+
+class BannerWidget extends StatefulWidget {
+  final int pullRefreshKey;
+
+  const BannerWidget({
     super.key,
     this.pullRefreshKey = 0,
-    this.onTabChange,
   });
 
   @override
-  State<CategoryWidget> createState() => _CategoryWidgetState();
+  State<BannerWidget> createState() => _BannerWidgetState();
 }
 
-class _CategoryWidgetState extends State<CategoryWidget> {
-  final ScrollController _scrollController = ScrollController();
-
-  // Layout Constants matching original styling
-  static const double iconBoxSize = 56.0;
-  static const double tileGap = 5.0;
-  static const double itemWidth = 68.0;
-
-  final List<String> pastelColors = [
-    "#fde3d2",
-    "#e8f5e9",
-    "#fff0e6",
-    "#fce4ec",
-    "#e8eaf6",
-    "#e0f7fa",
-    "#f3e5f5",
-    "#fff8e1",
-  ];
-
-  // Static 'All' Category item
-  final Map<String, dynamic> allCategory = {
-    "id": "all",
-    "name": "All",
-    "icon_url": "",
-    "isStatic": true,
-  };
-
-  // State Variables
-  List<dynamic> _categories = [];
+class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMixin {
+  final PageController _pageController = PageController();
+  
+  // Local States
+  List<BannerData> _slides = [];
   bool _loading = true;
-  bool _isUserScrolling = false;
+  bool _error = false;
+  int _activePage = 0;
+  bool _isManualSwipe = false;
+
+  // Active timers and listeners
   Timer? _autoScrollTimer;
-  Timer? _scrollDebounceTimer;
-  double _scrollPosition = 0.0;
+  Timer? _userSwipeResetTimer;
+  final Map<int, double> _aspectRatios = {};
+
+  // Progress indicators animations references
+  late AnimationController _progressController;
+  late Animation<double> _progressAnimation;
+
+  static const String cacheKey = "home_mobile_slider_v3";
 
   @override
   void initState() {
     super.initState();
-    _categories = [allCategory];
 
-    _initCategoriesData();
-    _startAutoScroll();
+    _progressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    );
+    _progressAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_progressController);
+
+    _initBannersData();
   }
 
   @override
-  void didUpdateWidget(covariant CategoryWidget oldWidget) {
+  void didUpdateWidget(covariant BannerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.pullRefreshKey > 0 &&
-        widget.pullRefreshKey != oldWidget.pullRefreshKey) {
-      _fetchCategories(fromRefresh: true);
+    if (widget.pullRefreshKey > 0 && widget.pullRefreshKey != oldWidget.pullRefreshKey) {
+      _fetchBanners(force: true);
     }
   }
 
   @override
   void dispose() {
     _autoScrollTimer?.cancel();
-    _scrollDebounceTimer?.cancel();
-    _scrollController.dispose();
+    _userSwipeResetTimer?.cancel();
+    _pageController.dispose();
+    _progressController.dispose();
     super.dispose();
   }
 
-  // Converts hex string (like #fde3d2) to Flutter Color
-  Color _parseHexColor(String hex) {
-    final cleanHex = hex.replaceAll("#", "");
-    return Color(int.parse("FF$cleanHex", radix: 16));
-  }
-
-  // Load from local Cache first or load default
-  Future<void> _initCategoriesData() async {
+  // Cache loading logic
+  Future<void> _initBannersData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString("home_nav_cat_strip_v3");
+      final raw = prefs.getString(cacheKey);
 
       if (raw != null) {
-        final List<dynamic> parsed = jsonDecode(raw);
-        if (parsed.isNotEmpty) {
+        final parsed = jsonDecode(raw);
+        final List<dynamic> rawSlides = parsed['slides'] ?? [];
+
+        if (rawSlides.isNotEmpty) {
+          final loadedSlides = rawSlides.map((s) => BannerData.fromJson(s)).toList();
           setState(() {
-            _categories = parsed;
+            _slides = loadedSlides;
             _loading = false;
           });
+          _precalculateAspectRatios();
+          _startAutoCarousel();
+          _startProgressAnimation();
           return;
         }
       }
     } catch (_) {}
 
-    await _fetchCategories(cacheMiss: true);
+    await _fetchBanners();
   }
 
-  // HTTP API Call equivalent
-  Future<void> _fetchCategories(
-      {bool fromRefresh = false, bool cacheMiss = false}) async {
-    if (mounted && _categories.length <= 1) {
+  // Fetch slider items from network with retry fallback
+  Future<void> _fetchBanners({bool force = false}) async {
+    if (!force && _slides.isNotEmpty) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+      return;
+    }
+
+    if (mounted) {
       setState(() {
-        _loading = true;
+        _loading = _slides.isEmpty;
+        _error = false;
       });
     }
 
-    const String apiUrl = "https://welfogapi.welfog.com/api/nav_cat_data/";
+    const String apiUrl = "https://welfogapi.welfog.com/api/v2/bannerdata/";
     const String cdnBase = "https://d1f02fefkbso7w.cloudfront.net/";
 
-    try {
-      final response = await http.get(Uri.parse(apiUrl));
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final decoded = jsonDecode(response.body);
-        final rawList = decoded['categories'] as List? ?? [];
+    int attempts = 3;
+    for (int i = 1; i <= attempts; i++) {
+      try {
+        final response = await http.get(Uri.parse(apiUrl));
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final decoded = jsonDecode(response.body);
+          final rawSlides = decoded['mobile_slider'] as List? ?? [];
+          
+          final List<BannerData> parsedSlides = rawSlides.whereType<Map>().map((e) {
+            final String img = (e['image'] ?? "").toString();
+            final String fullImg = img.startsWith("http") ? img : "$cdnBase$img";
+            return BannerData(
+              image: fullImg,
+              link: (e['link'] ?? "").toString(),
+            );
+          }).toList();
 
-        final List<dynamic> apiCategories = rawList.whereType<Map>().map((e) {
-          final String img = (e['icon_url'] ?? "").toString();
-          final String fullImg = img.isEmpty
-              ? ""
-              : (img.startsWith("http")
-                  ? img
-                  : "$cdnBase${img.startsWith('/') ? img.substring(1) : img}");
-          return {
-            "id": (e['id'] ?? "").toString(),
-            "name": (e['name'] ?? "").toString(),
-            "icon_url": fullImg,
-          };
-        }).toList();
+          if (parsedSlides.isNotEmpty) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString(
+              cacheKey,
+              jsonEncode({
+                'ts': DateTime.now().millisecondsSinceEpoch,
+                'slides': parsedSlides.map((s) => s.toJson()).toList(),
+              }),
+            );
 
-        final next = [allCategory, ...apiCategories];
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString("home_nav_cat_strip_v3", jsonEncode(next));
-
-        if (mounted) {
+            if (mounted) {
+              setState(() {
+                _slides = parsedSlides;
+                _loading = false;
+                _error = false;
+              });
+              _precalculateAspectRatios();
+              _startAutoCarousel();
+              _startProgressAnimation();
+            }
+            return;
+          }
+        }
+      } catch (err) {
+        debugPrint("Error fetching banners attempt $i: $err");
+        if (i == attempts && mounted) {
           setState(() {
-            _categories = next;
+            _error = _slides.isEmpty;
+            _loading = false;
           });
         }
       }
-    } catch (e) {
-      debugPrint("Error fetching categories: $e");
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
+      await Future.delayed(Duration(milliseconds: 300 * i));
     }
   }
 
-  // Automatically scroll horizontal strip at regular intervals
-  void _startAutoScroll() {
-    _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      final scrollCategories =
-          _categories.where((c) => c['id'] != 'all').toList();
-      final double step = itemWidth + tileGap;
+  // Dynamic Image resolution/aspect ratio calculations
+  void _precalculateAspectRatios() {
+    for (int i = 0; i < _slides.length; i++) {
+      final imgUrl = _slides[i].image;
+      final Image image = Image.network(imgUrl);
+      
+      image.image.resolve(const ImageConfiguration()).addListener(
+        ImageStreamListener((ImageInfo info, bool _) {
+          final double ratio = info.image.width / info.image.height;
+          if (mounted && ratio > 0) {
+            setState(() {
+              _aspectRatios[i] = ratio;
+            });
+          }
+        }),
+      );
+    }
+  }
 
-      if (_scrollController.hasClients &&
-          !_isUserScrolling &&
-          scrollCategories.length > 1) {
-        _scrollPosition += step;
-        if (_scrollPosition >= scrollCategories.length * step) {
-          _scrollPosition = 0;
+  // Start periodic pages auto rotation
+  void _startAutoCarousel() {
+    _autoScrollTimer?.cancel();
+    if (_slides.length <= 1) return;
+
+    _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (_isManualSwipe) {
+        if (mounted) {
+          setState(() {
+            _isManualSwipe = false;
+          });
         }
-        _scrollController.animateTo(
-          _scrollPosition,
+        return;
+      }
+
+      int nextPage = _activePage + 1;
+      if (nextPage >= _slides.length) nextPage = 0;
+
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          nextPage,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
         );
@@ -183,498 +233,728 @@ class _CategoryWidgetState extends State<CategoryWidget> {
     });
   }
 
-  // Listeners to disable auto-scrolling when manual user swipes happen
-  void _onScrollNotification(ScrollNotification notification) {
-    if (notification is ScrollStartNotification) {
-      setState(() {
-        _isUserScrolling = true;
-      });
-      _scrollDebounceTimer?.cancel();
-    } else if (notification is ScrollEndNotification) {
-      _scrollDebounceTimer = Timer(const Duration(seconds: 5), () {
-        if (mounted) {
-          setState(() {
-            _isUserScrolling = false;
-            // Align current offset to scroll position tracker
-            _scrollPosition = _scrollController.offset;
-          });
-        }
-      });
-    }
+  // Slide progress bar indicator transition
+  void _startProgressAnimation() {
+    _progressController.reset();
+    _progressController.forward();
   }
 
-  // Navigation action on item press
-  void _navigateToCategory(String id, String name) {
-    if (id == 'all') {
-      if (widget.onTabChange != null) {
-        widget.onTabChange!(1); // Switch to Categories tab (Index 1)
-      }
-      return;
+  // Navigation triggers on slide clicks
+  void _handleBannerPress(BannerData slide) {
+    if (slide.link == null || slide.link!.isEmpty) return;
+
+    final parts = slide.link!.replaceAll(RegExp(r'/$'), '').split('/');
+    final slug = parts.isNotEmpty ? parts.last : null;
+
+    if (slug != null) {
+      Navigator.of(context).pushNamed(
+        AppRoutes.searchResults,
+        arguments: slug,
+      );
     }
-    Navigator.of(context).pushNamed(
-      AppRoutes.searchResults,
-      arguments: name,
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return _buildSkeletonLoader();
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: AspectRatio(
+          aspectRatio: 3 / 1,
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F0F0),
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      );
     }
 
-    final scrollableCategories =
-        _categories.where((c) => c['id'] != 'all').toList();
-    final allItem = _categories.firstWhere((c) => c['id'] == 'all',
-        orElse: () => allCategory);
+    if (_error) {
+      return SizedBox(
+        height: 120,
+        child: Center(
+          child: Text(
+            "Failed to load banners",
+            style: TextStyle(color: Colors.red.shade700, fontSize: 16),
+          ),
+        ),
+      );
+    }
 
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final double activeAspect = _aspectRatios[_activePage] ?? 3.0;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, left: 12, right: 12, bottom: 4),
+      child: Column(
         children: [
-          const SizedBox(width: 14),
-          // Renders Static 'All' Category
-          _buildCategoryItem(allItem, 0, isAll: true),
-          const SizedBox(width: tileGap),
-
-          // Scrollable Categories list view
-          Expanded(
+          // Dynamic heights PageView Carousel container
+          AspectRatio(
+            aspectRatio: activeAspect,
             child: NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                _onScrollNotification(notification);
+              onNotification: (ScrollNotification notification) {
+                if (notification is ScrollStartNotification) {
+                  setState(() {
+                    _isManualSwipe = true;
+                  });
+                  _userSwipeResetTimer?.cancel();
+                } else if (notification is ScrollEndNotification) {
+                  _userSwipeResetTimer = Timer(const Duration(seconds: 5), () {
+                    if (mounted) {
+                      setState(() {
+                        _isManualSwipe = false;
+                      });
+                    }
+                  });
+                }
                 return true;
               },
-              child: SizedBox(
-                height: 80,
-                child: ListView.builder(
-                  controller: _scrollController,
-                  scrollDirection: Axis.horizontal,
-                  itemCount: scrollableCategories.length,
-                  padding: const EdgeInsets.only(right: 14),
-                  itemBuilder: (context, index) {
-                    final category = scrollableCategories[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(right: tileGap),
-                      child: _buildCategoryItem(category, index + 1),
-                    );
-                  },
-                ),
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: _slides.length,
+                onPageChanged: (index) {
+                  setState(() {
+                    _activePage = index;
+                  });
+                  _startProgressAnimation();
+                },
+                itemBuilder: (context, index) {
+                  final slide = _slides[index];
+                  return GestureDetector(
+                    onTap: () => _handleBannerPress(slide),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        slide.image,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: Colors.grey.shade300,
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.image, size: 40),
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
+          ),
+          const SizedBox(height: 10),
+
+          // Custom indicator pill progress bar
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_slides.length, (index) {
+              final bool isActive = index == _activePage;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                height: 5,
+                width: isActive ? 30 : 15,
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD4D4),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: isActive
+                    ? AnimatedBuilder(
+                        animation: _progressAnimation,
+                        builder: (context, child) {
+                          return Align(
+                            alignment: Alignment.centerLeft,
+                            child: FractionallySizedBox(
+                              widthFactor: _progressAnimation.value,
+                              child: Container(
+                                color: const Color(0xFF2B2B2B),
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    : null,
+              );
+            }),
           ),
         ],
       ),
     );
   }
-
-  // Category Item UI Builder
-  Widget _buildCategoryItem(dynamic category, int index, {bool isAll = false}) {
-    final bgColor = _parseHexColor(pastelColors[index % pastelColors.length]);
-    final String label = category['name'] ?? "";
-
-    return GestureDetector(
-      onTap: () => _navigateToCategory(
-        category['id'].toString(),
-        isAll ? "All Categories" : label,
-      ),
-      child: SizedBox(
-        width: itemWidth,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Styled Circular Icon container
-            Container(
-              width: iconBoxSize,
-              height: iconBoxSize,
-              decoration: BoxDecoration(
-                color: isAll ? _parseHexColor(pastelColors[0]) : bgColor,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              alignment: Alignment.center,
-              child: isAll
-                  ? _buildAllIconGrid()
-                  : Image.network(
-                      category['icon_url'] ?? "",
-                      width: 40,
-                      height: 40,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.category,
-                          color: Colors.grey, size: 24),
-                    ),
-            ),
-            const SizedBox(height: 6),
-
-            // Item label
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: isAll ? FontWeight.w600 : FontWeight.w500,
-                color:
-                    isAll ? const Color(0xFFF47405) : const Color(0xFF333333),
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            // Active indicator bar under 'All' tab
-            if (isAll) ...[
-              const SizedBox(height: 4),
-              Container(
-                width: 28,
-                height: 3,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF47405),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Dot Grid graphic inside 'All' button
-  Widget _buildAllIconGrid() {
-    return SizedBox(
-      width: 22,
-      height: 22,
-      child: Wrap(
-        spacing: 4,
-        runSpacing: 4,
-        alignment: WrapAlignment.center,
-        runAlignment: WrapAlignment.center,
-        children: List.generate(4, (index) {
-          return Container(
-            width: 9,
-            height: 9,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF47405),
-              borderRadius: BorderRadius.circular(2.5),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  // Pre-loading shimmer skeleton
-  Widget _buildSkeletonLoader() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(5, (index) {
-          return SizedBox(
-            width: itemWidth,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: iconBoxSize,
-                  height: iconBoxSize,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0F0F0),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  width: 48,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0F0F0),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }),
-      ),
-    );
-  }
 }
 
+
+home_widget.dart 
 
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_routes.dart';
-import '../../search/presentation/search_screen.dart';
-import '../data/category_api_service.dart';
 
-class CategoryScreen extends StatefulWidget {
-  const CategoryScreen({super.key, this.embedded = false});
+import '../../data/home_models.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import '../../../account/data/account_api_service.dart';
 
-  final bool embedded;
+class HomeHeader extends StatelessWidget {
+  const HomeHeader({
+    super.key,
+    required this.city,
+    required this.pincode,
+    required this.onSearchTap,
+  });
 
-  @override
-  State<CategoryScreen> createState() => _CategoryScreenState();
-}
-
-class _CategoryScreenState extends State<CategoryScreen> {
-  final _api = CategoryApiService();
-  bool _loading = true;
-  bool _innerLoading = false;
-  List<MainCategory> _categories = const [];
-  List<InnerSection> _sections = const [];
-  int _activeIndex = 0;
-  String _bannerImage = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadMain();
-  }
-
-  Future<void> _loadMain() async {
-    setState(() => _loading = true);
-    try {
-      final bundle = await _api.fetchMainCategories();
-      if (!mounted) return;
-      _categories = bundle.categories;
-      _bannerImage = bundle.bannerImage;
-      _activeIndex = 0;
-      setState(() {});
-      if (_categories.isNotEmpty) {
-        await _loadInner(_categories.first.id);
-      }
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _loadInner(String catId) async {
-    setState(() => _innerLoading = true);
-    try {
-      final sections = await _api.fetchInnerSections(catId);
-      if (!mounted) return;
-      setState(() => _sections = sections);
-    } finally {
-      if (mounted) setState(() => _innerLoading = false);
-    }
-  }
+  final String city;
+  final String pincode;
+  final VoidCallback onSearchTap;
+  static const _brandLogoUrl = 'https://welfog.com/assets/crux/welf.png';
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_categories.isEmpty) {
-      return const Center(child: Text('No categories found'));
-    }
-
-    return SafeArea(
-      top: true,
-      bottom: false,
-      child: Column(
-        children: [
-          if (!widget.embedded)
-            Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
-                color: Colors.white,
+    final topInset = MediaQuery.paddingOf(context).top;
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.fromLTRB(12, topInset > 0 ? 6 : 10, 12, 6),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Color(0xFFE9ECEF))),
+            color: Colors.white,
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.location_pin, size: 16, color: Color(0xFFFB5404)),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Deliver to $city - $pincode',
+                  style: const TextStyle(
+                    color: Color(0xFF0B7E7B),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Categories',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              const Icon(Icons.chevron_right, size: 16, color: Color(0xFF0B7E7B)),
+            ],
+          ),
+        ),
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 30,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Image.network(
+                      _brandLogoUrl,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Text(
+                        'Welfog',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF111827),
+                          letterSpacing: 0.3,
+                        ),
+                      ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () =>
-                        Navigator.of(context).pushNamed(SearchScreen.routeName),
-                    icon: const Icon(Icons.search),
+                ),
+              ),
+              IconButton(
+                onPressed: () {},
+                icon: const Icon(Icons.favorite_border_rounded,
+                    color: Color(0xFFFB5404)),
+              ),
+              IconButton(
+                onPressed: () {},
+                icon: const Icon(Icons.notifications_none_rounded,
+                    color: Color(0xFFFB5404)),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+          child: GestureDetector(
+            onTap: onSearchTap,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8F8F8),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE8E8E8)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: const Row(
+                children: [
+                  Icon(Icons.search, color: Color(0xFF666666), size: 20),
+                  SizedBox(width: 10),
+                  Text('Search for ', style: TextStyle(color: Color(0xFF999999))),
+                  Text(
+                    'Mobile',
+                    style: TextStyle(
+                      color: Color(0xFFF47405),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
             ),
-          Expanded(
-            child: Row(
-              children: [
-                Container(
-                  width: 86,
-                  color: const Color(0xFFF5F6F8),
-                  child: ListView.builder(
-                    itemCount: _categories.length,
-                    itemBuilder: (_, i) {
-                      final c = _categories[i];
-                      final active = i == _activeIndex;
-                      return InkWell(
-                        onTap: () async {
-                          if (_activeIndex == i) return;
-                          setState(() => _activeIndex = i);
-                          await _loadInner(c.id);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 12, horizontal: 4),
-                          decoration: BoxDecoration(
-                            color:
-                                active ? Colors.white : const Color(0xFFF5F6F8),
-                            border: const Border(
-                              bottom: BorderSide(color: Color(0xFFE5E7EB)),
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Container(
-                                width: 50,
-                                height: 50,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                                clipBehavior: Clip.antiAlias,
-                                child: Image.network(
-                                  c.iconUrl,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (_, __, ___) =>
-                                      const Icon(Icons.category_outlined),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                c.name,
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: active
-                                      ? const Color(0xFFF47405)
-                                      : const Color(0xFF4B5563),
-                                  fontWeight: active
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class BannerCarousel extends StatefulWidget {
+  const BannerCarousel({
+    super.key,
+    required this.items,
+  });
+
+  final List<HomeBanner> items;
+
+  @override
+  State<BannerCarousel> createState() => _BannerCarouselState();
+}
+
+class _BannerCarouselState extends State<BannerCarousel> {
+  final _controller = PageController();
+  int _index = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      children: [
+        SizedBox(
+          height: 125,
+          child: PageView.builder(
+            controller: _controller,
+            itemCount: widget.items.length,
+            onPageChanged: (i) => setState(() => _index = i),
+            itemBuilder: (context, i) {
+              final banner = widget.items[i];
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    banner.image,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: const Color(0xFFECEFF3),
+                      child: const Center(child: Icon(Icons.image_not_supported)),
+                    ),
                   ),
                 ),
-                Expanded(
-                  child: _innerLoading
-                      ? const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : ListView(
-                          padding: const EdgeInsets.all(12),
-                          children: [
-                            if (_bannerImage.isNotEmpty)
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  _bannerImage,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      const SizedBox.shrink(),
-                                ),
-                              ),
-                            if (_bannerImage.isNotEmpty)
-                              const SizedBox(height: 14),
-                            ..._sections.map(
-                              (s) => Padding(
-                                padding: const EdgeInsets.only(bottom: 18),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      s.name,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF333333),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Wrap(
-                                      spacing: 6,
-                                      runSpacing: 14,
-                                      children: s.children
-                                          .map(
-                                            (child) => SizedBox(
-                                              width: (MediaQuery.sizeOf(context)
-                                                          .width -
-                                                      130) /
-                                                  3,
-                                              child: InkWell(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                                onTap: () {
-                                                  Navigator.of(context)
-                                                      .pushNamed(
-                                                    AppRoutes.searchResults,
-                                                    arguments: child.name,
-                                                  );
-                                                },
-                                                child: Column(
-                                                  children: [
-                                                    Container(
-                                                      width: 65,
-                                                      height: 65,
-                                                      decoration:
-                                                          const BoxDecoration(
-                                                        color:
-                                                            Color(0xFFF5F6F8),
-                                                        shape: BoxShape.circle,
-                                                      ),
-                                                      clipBehavior:
-                                                          Clip.antiAlias,
-                                                      child: Image.network(
-                                                        child.imageUrl,
-                                                        fit: BoxFit.cover,
-                                                        errorBuilder: (_, __,
-                                                                ___) =>
-                                                            const Icon(Icons
-                                                                .image_outlined),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 6),
-                                                    Text(
-                                                      child.name,
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                      maxLines: 2,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: const TextStyle(
-                                                        fontSize: 11,
-                                                        color:
-                                                            Color(0xFF4B5563),
-                                                        height: 1.25,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          )
-                                          .toList(),
-                                    ),
-                                  ],
-                                ),
-                              ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            widget.items.length,
+            (i) => AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: i == _index ? 24 : 8,
+              height: 5,
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: i == _index ? const Color(0xFF2B2B2B) : const Color(0xFFCBD4D4),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class ProductStrip extends StatelessWidget {
+  const ProductStrip({
+    super.key,
+    required this.title,
+    required this.products,
+    required this.onProductTap,
+    this.onRightIconTap,
+  });
+
+  final String title;
+  final List<HomeProduct> products;
+  final void Function(HomeProduct product) onProductTap;
+  final VoidCallback? onRightIconTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (products.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                ),
+              ),
+              GestureDetector(
+                onTap: onRightIconTap,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFB5404),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x15FB5404),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'View All',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(Icons.arrow_forward, color: Colors.white, size: 14),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 226,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            scrollDirection: Axis.horizontal,
+            itemCount: products.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, i) {
+              final p = products[i];
+              return HomeProductCard(
+                product: p,
+                onTap: () => onProductTap(p),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class HomeProductCard extends StatefulWidget {
+  final HomeProduct product;
+  final VoidCallback onTap;
+
+  const HomeProductCard({
+    super.key,
+    required this.product,
+    required this.onTap,
+  });
+
+  @override
+  State<HomeProductCard> createState() => _HomeProductCardState();
+}
+
+class _HomeProductCardState extends State<HomeProductCard> {
+  final _apiService = AccountApiService();
+  bool _isWishlisted = false;
+  bool _toggling = false;
+
+  static String _calcDelivery(int durationMinutes) {
+    if (durationMinutes <= 0) return '2 - 4 days';
+    final days = durationMinutes ~/ 1440;
+    if (days > 0) return '$days - ${days + 1} days';
+    final hours = (durationMinutes % 1440) ~/ 60;
+    final mins = durationMinutes % 60;
+    if (hours > 0) return '$hours hr${hours > 1 ? 's' : ''}';
+    if (mins > 0) return '$mins min${mins > 1 ? 's' : ''}';
+    return '2 - 4 days';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _checkWishlistState();
+  }
+
+  @override
+  void didUpdateWidget(HomeProductCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.product.id != widget.product.id) {
+      _checkWishlistState();
+    }
+  }
+
+  Future<void> _checkWishlistState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final wishState = prefs.getString('wishlist_state_${widget.product.id}');
+    if (mounted) {
+      setState(() {
+        _isWishlisted = wishState == 'true';
+      });
+    }
+  }
+
+  Future<void> _toggleWishlist() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    if (token == null || token.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please login to add items to wishlist'),
+            backgroundColor: Color(0xFFFB5404),
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _toggling = true);
+
+    try {
+      if (_isWishlisted) {
+        final compareMapStr = prefs.getString('wishlist_compare_map') ?? '{}';
+        final compareMap = Map<String, dynamic>.from(jsonDecode(compareMapStr));
+        final compareIdStr = compareMap[widget.product.id.toString()];
+        final compareId = int.tryParse(compareIdStr ?? '') ?? 0;
+
+        final success = await _apiService.removeWishlistItem(widget.product.id, compareId);
+        if (success) {
+          setState(() {
+            _isWishlisted = false;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Item removed from wishlist'),
+                 // ignore: deprecated_member_use
+                backgroundColor: const Color(0xFF222222).withOpacity(0.85),
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.all(16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                duration: const Duration(milliseconds: 1000),
+              ),
+            );
+          }
+        }
+      } else {
+        final success = await _apiService.addWishlistItem(widget.product.id);
+        if (success) {
+          setState(() {
+            _isWishlisted = true;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Item added to wishlist'),
+                 // ignore: deprecated_member_use
+                backgroundColor: const Color(0xFF222222).withOpacity(0.85),
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.all(16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                duration: const Duration(milliseconds: 1000),
+              ),
+            );
+          }
+        }
+      }
+    } catch (_) {
+      // Ignore
+    } finally {
+      if (mounted) {
+        setState(() => _toggling = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.product;
+    final discount = p.mrp > p.price && p.price > 0
+        ? (((p.mrp - p.price) / p.mrp) * 100).round()
+        : 0;
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        width: 158,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFEDEDED)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                      child: Image.network(
+                        p.image,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFFF2F4F7),
+                          child: const Center(child: Icon(Icons.shopping_bag_outlined)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (discount > 0)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFB5404),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '$discount% OFF',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: GestureDetector(
+                      onTap: _toggling ? null : _toggleWishlist,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          // ignore: deprecated_member_use
+                          color: Colors.white.withOpacity(0.9),
+                          shape: BoxShape.circle,
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x10000000),
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
                             ),
                           ],
                         ),
-                ),
-              ],
+                        child: Center(
+                          child: _toggling
+                              ? const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 1.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFB5404)),
+                                  ),
+                                )
+                              : Icon(
+                                  _isWishlisted ? Icons.favorite : Icons.favorite_border,
+                                  color: _isWishlisted ? const Color(0xFFFB5404) : const Color(0xFF777777),
+                                  size: 16,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+    Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 9),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    p.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      height: 1.2,
+                      color: Color(0xFF1F2937),
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Text(
+                        'Rs ${p.price.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0B7E7B),
+                          fontSize: 12.5,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      if (p.mrp > p.price)
+                        Text(
+                          'Rs ${p.mrp.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            decoration: TextDecoration.lineThrough,
+                            color: Color(0xFF9AA0A6),
+                            fontSize: 11,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      const Icon(Icons.local_shipping_outlined, size: 11, color: Color(0xFFFB5404)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          'Est. delivery: ${_calcDelivery(p.duration)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF555555),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

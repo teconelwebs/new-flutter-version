@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../search/presentation/search_screen.dart';
+import '../../../search/presentation/widgets/app_search_bar.dart';
 import 'delivery_icon.dart';
 import 'wishlist_heart_icon.dart';
+import '../../../../core/constants/app_routes.dart';
 
 class Header extends StatefulWidget {
   final Color backgroundColor;
@@ -157,8 +159,12 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
     if (widget.onSearchTap != null) {
       widget.onSearchTap!();
     } else {
-      // ignore: use_build_context_synchronously
-      Navigator.pushNamed(context, SearchScreen.routeName);
+      if (!mounted) return;
+      Navigator.pushNamed(
+        context,
+        SearchScreen.routeName,
+        arguments: currentPlaceholder,
+      );
     }
   }
 
@@ -249,13 +255,7 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
                               // Wishlist click
                               GestureDetector(
                                 onTap: () {
-                                  if (widget.isGuest) {
-                                    if (widget.promptLogin != null) {
-                                      widget.promptLogin!();
-                                    }
-                                    return;
-                                  }
-                                  // Navigator.pushNamed(context, '/wishlist');
+                                  Navigator.of(context).pushNamed(AppRoutes.wishlist);
                                 },
                                 child: const Padding(
                                   padding: EdgeInsets.all(6.0),
@@ -322,45 +322,17 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
 
             // 3. Search Box Bar (if enabled)
             if (!widget.hideSearch)
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: GestureDetector(
+              Padding(
+                padding: EdgeInsets.only(
+                  top: 4,
+                  bottom: MediaQuery.sizeOf(context).width < 360 ? 8 : 10,
+                ),
+                child: AppSearchBar.readOnly(
                   onTap: _handleSearchPress,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8F8F8),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFE8E8E8)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.search, color: Color(0xFF666666), size: 20),
-                        const SizedBox(width: 12),
-                        const Text(
-                          "Search for ",
-                          style: TextStyle(color: Color(0xFF999999), fontSize: 15),
-                        ),
-                        AnimatedBuilder(
-                          animation: _fadeAnimation,
-                          builder: (context, child) {
-                            return Opacity(
-                              opacity: _fadeAnimation.value,
-                              child: Text(
-                                _placeholders[_placeholderIndex],
-                                style: TextStyle(
-                                  color: _placeholderColors[_colorIndex],
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
+                  prefixText: 'Search for ',
+                  highlightText: _placeholders[_placeholderIndex],
+                  highlightColor: _placeholderColors[_colorIndex],
+                  fadeAnimation: _fadeAnimation,
                 ),
               ),
           ],
