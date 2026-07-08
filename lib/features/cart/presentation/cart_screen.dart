@@ -316,7 +316,8 @@ class _CartScreenState extends State<CartScreen>
 
       if (token == null || userId == null) return;
 
-      final cartUri = Uri.parse('https://welfogapi.welfog.com/api/v2/carts/$userId');
+      final cartUri =
+          Uri.parse('https://welfogapi.welfog.com/api/v2/carts/$userId');
       final cartResponse = await http.post(
         cartUri,
         headers: {
@@ -347,7 +348,8 @@ class _CartScreenState extends State<CartScreen>
       });
 
       Map<String, dynamic> summaryData = {};
-      final summaryUri = Uri.parse('https://welfogapi.welfog.com/api/v2/cart-summary/$userId');
+      final summaryUri =
+          Uri.parse('https://welfogapi.welfog.com/api/v2/cart-summary/$userId');
       final summaryResponse = await http.get(
         summaryUri,
         headers: {
@@ -534,7 +536,8 @@ class _CartScreenState extends State<CartScreen>
       final token = prefs.getString('access_token');
       if (token == null) throw Exception('No token');
 
-      final uri = Uri.parse('https://welfogapi.welfog.com/api/v2/carts/change-quantity');
+      final uri = Uri.parse(
+          'https://welfogapi.welfog.com/api/v2/carts/change-quantity');
       final res = await http.post(
         uri,
         headers: {
@@ -992,14 +995,14 @@ class _CartScreenState extends State<CartScreen>
                       Container(
                         width: 40,
                         alignment: Alignment.center,
-                        child: Text(
-                          '${_cartItems.length}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF666666),
-                          ),
-                        ),
+                        // child: Text(
+                        //   '${_cartItems.length}',
+                        //   style: const TextStyle(
+                        //     fontSize: 13,
+                        //     fontWeight: FontWeight.w600,
+                        //     color: Color(0xFF666666),
+                        //   ),
+                        // ),
                       ),
                     ],
                   ),
@@ -1051,10 +1054,14 @@ class _CartScreenState extends State<CartScreen>
                                         shape: BoxShape.circle,
                                         gradient: LinearGradient(
                                           colors: [
-                                            // ignore: deprecated_member_use
-                                            const Color(0xFF0A6B69).withOpacity(0.12),
-                                            // ignore: deprecated_member_use
-                                            const Color(0xFF0A6B69).withOpacity(0.01),
+                                             // ignore: deprecated_member_use
+                                            const Color(0xFF0A6B69)
+                                                // ignore: deprecated_member_use
+                                                .withOpacity(0.12),
+                                             // ignore: deprecated_member_use
+                                            const Color(0xFF0A6B69)
+                                                // ignore: deprecated_member_use
+                                                .withOpacity(0.01),
                                           ],
                                           begin: Alignment.topCenter,
                                           end: Alignment.bottomCenter,
@@ -1071,7 +1078,9 @@ class _CartScreenState extends State<CartScreen>
                                               shape: BoxShape.circle,
                                               border: Border.all(
                                                 // ignore: deprecated_member_use
-                                                color: const Color(0xFF0A6B69).withOpacity(0.15),
+                                                color: const Color(0xFF0A6B69)
+                                                    // ignore: deprecated_member_use
+                                                    .withOpacity(0.15),
                                                 width: 1.5,
                                               ),
                                             ),
@@ -1086,7 +1095,9 @@ class _CartScreenState extends State<CartScreen>
                                               boxShadow: [
                                                 BoxShadow(
                                                   // ignore: deprecated_member_use
-                                                  color: Colors.black.withOpacity(0.04),
+                                                  color: Colors.black
+                                                   // ignore: deprecated_member_use
+                                                      .withOpacity(0.04),
                                                   blurRadius: 10,
                                                   offset: const Offset(0, 4),
                                                 ),
@@ -1131,7 +1142,12 @@ class _CartScreenState extends State<CartScreen>
                                   ),
                                   const SizedBox(height: 20),
                                   GestureDetector(
-                                    onTap: () {},
+                                    onTap: () {
+                                      Navigator.of(context).pushNamedAndRemoveUntil(
+                                        AppRoutes.home,
+                                        (route) => false,
+                                      );
+                                    },
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                           vertical: 14, horizontal: 32),

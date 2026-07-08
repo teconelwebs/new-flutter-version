@@ -55,6 +55,15 @@ class HomeApiService {
     return bundle;
   }
 
+  Future<List<HomeProduct>> fetchTodayDealsPaged(int page) async {
+    final prefs = await SharedPreferences.getInstance();
+    final lat = prefs.getString('latitude') ?? '0';
+    final lng = prefs.getString('longitude') ?? '0';
+
+    final response = await _getJson('$_secondApi/today_deal?latitude=$lat&longitude=$lng&page=$page&limit=10');
+    return _mapDealProducts(response['products']);
+  }
+
   Future<HomeBundle?> getCachedHomeBundle() async {
     try {
       final prefs = await SharedPreferences.getInstance();

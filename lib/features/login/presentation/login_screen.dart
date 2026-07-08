@@ -163,12 +163,28 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     FocusScope.of(context).unfocus(); // Keyboard hide logic
 
     try {
-      final error = await _loginService.sendOtp(phone);
+      final result = await _loginService.sendOtp(phone);
       if (!mounted) return;
-      if (error != null) {
+      if (result.accountStatus == 'deleted') {
+        setState(() {
+          _loading = false;
+        });
+        Navigator.of(context).pushNamed(
+          AppRoutes.accountDeleted,
+          arguments: {
+            'phone': phone,
+            'deleted_date': result.deletedDate ?? '',
+          },
+        );
+        return;
+      }
+      if (result.errorMessage != null) {
+        setState(() {
+          _loading = false;
+        });
         _showToast(
           title: "Failed to send OTP",
-          message: error,
+          message: result.errorMessage!,
           isError: true,
         );
         return;

@@ -593,6 +593,9 @@ class _HomeTabState extends State<_HomeTab> {
                             arguments: _toProductItem(p, 0),
                           );
                         },
+                        onRightIconTap: () {
+                          Navigator.of(context).pushNamed(AppRoutes.todayDeals);
+                        },
                       ),
                     ),
                   ),
@@ -629,6 +632,12 @@ class _HomeTabState extends State<_HomeTab> {
                             Navigator.of(context).pushNamed(
                               AppRoutes.product,
                               arguments: _toProductItem(p, s.products.indexOf(p)),
+                            );
+                          },
+                          onRightIconTap: () {
+                            Navigator.of(context).pushNamed(
+                              AppRoutes.searchResults,
+                              arguments: s.name,
                             );
                           },
                         ),

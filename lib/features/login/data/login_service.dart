@@ -5,32 +5,47 @@ import 'package:http/http.dart' as http;
 class LoginService {
   static const String _baseUrl = 'https://welfogapi.welfog.com/api/v2';
 
-  Future<String?> sendOtp(String phoneNumber) async {
+  Future<SendOtpResult> sendOtp(String phoneNumber) async {
     final uri = Uri.parse(
       '$_baseUrl/buyerverifynumber',
     ).replace(queryParameters: {'phone': phoneNumber});
 
-    final response = await http.get(uri);
-    if (response.statusCode != 200) {
-      return 'Unable to send OTP. Please try again.';
+    try {
+      final response = await http.get(uri);
+      if (response.statusCode != 200) {
+        return const SendOtpResult(errorMessage: 'Unable to send OTP. Please try again.');
+      }
+
+      final dynamic data = _decodeSafely(response.body);
+      final status = (data is Map<String, dynamic>)
+          ? (data['account_status']?.toString() ?? '')
+          : '';
+
+      if (status == 'banned') {
+        final msg = data is Map<String, dynamic>
+            ? (data['message']?.toString() ?? 'Your account is suspended.')
+            : 'Your account is suspended.';
+        return SendOtpResult(
+          errorMessage: msg,
+          accountStatus: 'banned',
+        );
+      }
+
+      if (status == 'deleted') {
+        final deletedDate = data is Map<String, dynamic>
+            ? (data['deleted_date']?.toString() ?? '')
+            : '';
+        return SendOtpResult(
+          errorMessage: 'Account was deleted. Please contact support.',
+          accountStatus: 'deleted',
+          deletedDate: deletedDate,
+        );
+      }
+
+      return const SendOtpResult(accountStatus: 'active');
+    } catch (_) {
+      return const SendOtpResult(errorMessage: 'Unable to send OTP. Please try again.');
     }
-
-    final dynamic data = _decodeSafely(response.body);
-    final status = (data is Map<String, dynamic>)
-        ? (data['account_status']?.toString() ?? '')
-        : '';
-
-    if (status == 'banned') {
-      return data is Map<String, dynamic>
-          ? (data['message']?.toString() ?? 'Your account is suspended.')
-          : 'Your account is suspended.';
-    }
-
-    if (status == 'deleted') {
-      return 'Account was deleted. Please contact support.';
-    }
-
-    return null;
   }
 
   Future<VerifyOtpResult> verifyOtp({
@@ -97,3 +112,16 @@ class VerifyOtpResult {
   final String userId;
   final String userName;
 }
+
+class SendOtpResult {
+  const SendOtpResult({
+    this.errorMessage,
+    this.accountStatus,
+    this.deletedDate,
+  });
+
+  final String? errorMessage;
+  final String? accountStatus;
+  final String? deletedDate;
+}
+

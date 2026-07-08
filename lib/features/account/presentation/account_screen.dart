@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
 
 import '../../../core/constants/app_routes.dart';
-import '../../../core/storage/session_store.dart';
 import '../data/account_api_service.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -96,13 +94,14 @@ class _AccountScreenState extends State<AccountScreen> {
     }
   }
 
-  Future<void> _logout() async {
-    await SessionStore.clearLogin();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
-  }
+  // Future<void> _logout() async {
+  //   await SessionStore.clearLogin();
+  //   final prefs = await SharedPreferences.getInstance();
+  //   await prefs.clear();
+  //   if (!mounted) return;
+  //   Navigator.of(context)
+  //       .pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
+  // }
 
   void _onMenuTap(_MenuItem item) {
     switch (item.keyName) {
@@ -118,9 +117,15 @@ class _AccountScreenState extends State<AccountScreen> {
       case 'orders':
         Navigator.of(context).pushNamed(AppRoutes.orders);
         return;
-      case 'wishlist':
-      case 'help':
       case 'settings':
+        Navigator.of(context).pushNamed(AppRoutes.settings);
+        return;
+      case 'wishlist':
+        Navigator.of(context).pushNamed(AppRoutes.wishlist);
+        return;
+      case 'help':
+        Navigator.of(context).pushNamed(AppRoutes.helpCenter);
+        return;
       default:
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${item.label} screen coming next')),
@@ -165,7 +170,8 @@ class _AccountScreenState extends State<AccountScreen> {
 
     final double screenWidth = MediaQuery.of(context).size.width;
     // Calculate aspect ratio dynamically based on screen size to prevent text truncation
-    final double childAspectRatio = screenWidth < 360 ? 2.3 : (screenWidth < 400 ? 2.65 : 2.9);
+    final double childAspectRatio =
+        screenWidth < 360 ? 2.3 : (screenWidth < 400 ? 2.65 : 2.9);
 
     return SafeArea(
       top: true,
@@ -250,7 +256,8 @@ class _AccountScreenState extends State<AccountScreen> {
                   borderRadius: BorderRadius.circular(8),
                   onTap: () => _onMenuTap(m),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
@@ -318,14 +325,14 @@ class _AccountScreenState extends State<AccountScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: _logout,
-              icon: const Icon(Icons.logout, color: Color(0xFFDC2626)),
-              label: const Text(
-                'Logout',
-                style: TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w700),
-              ),
-            ),
+            // TextButton.icon(
+            //   onPressed: _logout,
+            //   icon: const Icon(Icons.logout, color: Color(0xFFDC2626)),
+            //   label: const Text(
+            //     'Logout',
+            //     style: TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w700),
+            //   ),
+            // ),
           ],
         ),
       ),

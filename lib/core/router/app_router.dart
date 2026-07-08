@@ -6,6 +6,7 @@ import '../../features/address/presentation/location_picker_screen.dart';
 import '../../features/address/presentation/add_address_details_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/home/presentation/today_deals_screen.dart';
 import '../../features/login/presentation/login_screen.dart';
 import '../../features/product/data/models/product_item.dart';
 import '../../features/product/presentation/product_screen.dart';
@@ -19,6 +20,17 @@ import '../../features/checkout/presentation/order_success_screen.dart';
 import '../../features/profile/presentation/orders_screen.dart';
 import '../../features/profile/presentation/order_details_screen.dart';
 import '../../features/profile/presentation/track_order_screen.dart';
+import '../../features/account/presentation/settings_screen.dart';
+import '../../features/account/presentation/blocked_users_screen.dart';
+import '../../features/account/presentation/delete_account_help_screen.dart';
+import '../../features/account/presentation/delete_account_reason_screen.dart';
+import '../../features/account/presentation/account_deleted_screen.dart';
+import '../../features/account/presentation/wishlist_screen.dart';
+import '../../features/account/presentation/help_center_screen.dart';
+import '../../features/account/presentation/faq_screen.dart';
+import '../../features/account/presentation/contact_support_screen.dart';
+import '../../features/account/presentation/become_supplier_screen.dart';
+import '../../features/account/presentation/policy_screen.dart';
 import '../constants/app_routes.dart';
 
 
@@ -44,6 +56,11 @@ class AppRouter {
         return MaterialPageRoute(
           settings: settings,
           builder: (_) => const HomeScreen(),
+        );
+      case AppRoutes.todayDeals:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const TodayDealsScreen(),
         );
       case AppRoutes.search:
         return MaterialPageRoute(
@@ -147,6 +164,72 @@ class AppRouter {
             pincode: args['pincode']?.toString() ?? '',
             country: args['country']?.toString() ?? '',
           ),
+        );
+      case AppRoutes.settings:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const SettingsScreen(),
+        );
+      case AppRoutes.blockedUsers:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const BlockedUsersScreen(),
+        );
+      case AppRoutes.deleteAccountHelp:
+        final args = settings.arguments as Map<String, dynamic>? ?? {};
+        final phone = args['phone']?.toString() ?? '';
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => DeleteAccountHelpScreen(phone: phone),
+        );
+      case AppRoutes.deleteAccountReason:
+        final args = settings.arguments as Map<String, dynamic>? ?? {};
+        final phone = args['phone']?.toString() ?? '';
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => DeleteAccountReasonScreen(phone: phone),
+        );
+      case AppRoutes.accountDeleted:
+        final args = settings.arguments as Map<String, dynamic>? ?? {};
+        final phone = args['phone']?.toString() ?? '';
+        final deletedDate = args['deleted_date']?.toString();
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => AccountDeletedScreen(
+            phone: phone,
+            deletedDate: deletedDate,
+          ),
+        );
+      case AppRoutes.wishlist:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const WishlistScreen(),
+        );
+      case AppRoutes.helpCenter:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const HelpCenterScreen(),
+        );
+      case AppRoutes.faq:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const FaqScreen(),
+        );
+      case AppRoutes.contactSupport:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const ContactSupportScreen(),
+        );
+      case AppRoutes.becomeSupplier:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const BecomeSupplierScreen(),
+        );
+      case AppRoutes.policy:
+        final slug = settings.arguments as String? ?? '';
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => PolicyScreen(slug: slug),
         );
       default:
         return play.AppRoutes.onGenerateRoute(settings);

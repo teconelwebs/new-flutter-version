@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../data/home_models.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import '../../../account/data/account_api_service.dart';
 
 class HomeHeader extends StatelessWidget {
   const HomeHeader({
@@ -198,11 +201,13 @@ class ProductStrip extends StatelessWidget {
     required this.title,
     required this.products,
     required this.onProductTap,
+    this.onRightIconTap,
   });
 
   final String title;
   final List<HomeProduct> products;
   final void Function(HomeProduct product) onProductTap;
+  final VoidCallback? onRightIconTap;
 
   @override
   Widget build(BuildContext context) {
@@ -220,13 +225,37 @@ class ProductStrip extends StatelessWidget {
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
                 ),
               ),
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2B2B2B),
-                  borderRadius: BorderRadius.circular(6),
+              GestureDetector(
+                onTap: onRightIconTap,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFB5404),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x15FB5404),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'View All',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(Icons.arrow_forward, color: Colors.white, size: 14),
+                    ],
+                  ),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                child: const Icon(Icons.east, color: Colors.white, size: 18),
               ),
             ],
           ),
@@ -241,82 +270,276 @@ class ProductStrip extends StatelessWidget {
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (_, i) {
               final p = products[i];
-              return GestureDetector(
+              return HomeProductCard(
+                product: p,
                 onTap: () => onProductTap(p),
-                child: Container(
-                  width: 158,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFEDEDED)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-                          child: Image.network(
-                            p.image,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              color: const Color(0xFFF2F4F7),
-                              child: const Center(child: Icon(Icons.shopping_bag_outlined)),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 8, 8, 9),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              p.name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 12,
-                                height: 1.2,
-                                color: Color(0xFF1F2937),
-                              ),
-                            ),
-                            const SizedBox(height: 5),
-                            Row(
-                              children: [
-                                Text(
-                                  'Rs ${p.price.toStringAsFixed(0)}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF0B7E7B),
-                                    fontSize: 12.5,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                if (p.mrp > p.price)
-                                  Text(
-                                    'Rs ${p.mrp.toStringAsFixed(0)}',
-                                    style: const TextStyle(
-                                      decoration: TextDecoration.lineThrough,
-                                      color: Color(0xFF9AA0A6),
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               );
             },
           ),
         ),
       ],
+    );
+  }
+}
+
+class HomeProductCard extends StatefulWidget {
+  final HomeProduct product;
+  final VoidCallback onTap;
+
+  const HomeProductCard({
+    super.key,
+    required this.product,
+    required this.onTap,
+  });
+
+  @override
+  State<HomeProductCard> createState() => _HomeProductCardState();
+}
+
+class _HomeProductCardState extends State<HomeProductCard> {
+  final _apiService = AccountApiService();
+  bool _isWishlisted = false;
+  bool _toggling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkWishlistState();
+  }
+
+  @override
+  void didUpdateWidget(HomeProductCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.product.id != widget.product.id) {
+      _checkWishlistState();
+    }
+  }
+
+  Future<void> _checkWishlistState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final wishState = prefs.getString('wishlist_state_${widget.product.id}');
+    if (mounted) {
+      setState(() {
+        _isWishlisted = wishState == 'true';
+      });
+    }
+  }
+
+  Future<void> _toggleWishlist() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    if (token == null || token.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please login to add items to wishlist'),
+            backgroundColor: Color(0xFFFB5404),
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _toggling = true);
+
+    try {
+      if (_isWishlisted) {
+        final compareMapStr = prefs.getString('wishlist_compare_map') ?? '{}';
+        final compareMap = Map<String, dynamic>.from(jsonDecode(compareMapStr));
+        final compareIdStr = compareMap[widget.product.id.toString()];
+        final compareId = int.tryParse(compareIdStr ?? '') ?? 0;
+
+        final success = await _apiService.removeWishlistItem(widget.product.id, compareId);
+        if (success) {
+          setState(() {
+            _isWishlisted = false;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Item removed from wishlist'),
+                 // ignore: deprecated_member_use
+                backgroundColor: const Color(0xFF222222).withOpacity(0.85),
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.all(16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                duration: const Duration(milliseconds: 1000),
+              ),
+            );
+          }
+        }
+      } else {
+        final success = await _apiService.addWishlistItem(widget.product.id);
+        if (success) {
+          setState(() {
+            _isWishlisted = true;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Item added to wishlist'),
+                 // ignore: deprecated_member_use
+                backgroundColor: const Color(0xFF222222).withOpacity(0.85),
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.all(16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                duration: const Duration(milliseconds: 1000),
+              ),
+            );
+          }
+        }
+      }
+    } catch (_) {
+      // Ignore
+    } finally {
+      if (mounted) {
+        setState(() => _toggling = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.product;
+    final discount = p.mrp > p.price && p.price > 0
+        ? (((p.mrp - p.price) / p.mrp) * 100).round()
+        : 0;
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        width: 158,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFEDEDED)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                      child: Image.network(
+                        p.image,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFFF2F4F7),
+                          child: const Center(child: Icon(Icons.shopping_bag_outlined)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (discount > 0)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFB5404),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '$discount% OFF',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: GestureDetector(
+                      onTap: _toggling ? null : _toggleWishlist,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          // ignore: deprecated_member_use
+                          color: Colors.white.withOpacity(0.9),
+                          shape: BoxShape.circle,
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x10000000),
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: _toggling
+                              ? const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 1.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFB5404)),
+                                  ),
+                                )
+                              : Icon(
+                                  _isWishlisted ? Icons.favorite : Icons.favorite_border,
+                                  color: _isWishlisted ? const Color(0xFFFB5404) : const Color(0xFF777777),
+                                  size: 16,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 9),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    p.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      height: 1.2,
+                      color: Color(0xFF1F2937),
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Text(
+                        'Rs ${p.price.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0B7E7B),
+                          fontSize: 12.5,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      if (p.mrp > p.price)
+                        Text(
+                          'Rs ${p.mrp.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            decoration: TextDecoration.lineThrough,
+                            color: Color(0xFF9AA0A6),
+                            fontSize: 11,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
