@@ -31,6 +31,9 @@ import '../../features/account/presentation/faq_screen.dart';
 import '../../features/account/presentation/contact_support_screen.dart';
 import '../../features/account/presentation/become_supplier_screen.dart';
 import '../../features/account/presentation/policy_screen.dart';
+import '../../features/account/presentation/supplier_info_screen.dart';
+import '../../features/account/presentation/connect_supplier_screen.dart';
+import '../../features/product/presentation/recently_viewed_screen.dart';
 import '../constants/app_routes.dart';
 import '../../features/shop/presentation/shop_screen.dart';
 
@@ -54,9 +57,10 @@ class AppRouter {
           builder: (_) => const AddressScreen(),
         );
       case AppRoutes.home:
+        final initialTab = settings.arguments as int?;
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => const HomeScreen(),
+          builder: (_) => HomeScreen(initialTab: initialTab),
         );
       case AppRoutes.todayDeals:
         return MaterialPageRoute(
@@ -70,10 +74,18 @@ class AppRouter {
           builder: (_) => SearchScreen(initialQuery: initialQuery),
         );
       case AppRoutes.searchResults:
-        final query = (settings.arguments as String?) ?? '';
+        final args = settings.arguments;
+        String query = '';
+        String? categoryId;
+        if (args is Map<String, dynamic>) {
+          query = args['query']?.toString() ?? '';
+          categoryId = args['categoryId']?.toString();
+        } else if (args is String) {
+          query = args;
+        }
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => SearchResultsScreen(query: query),
+          builder: (_) => SearchResultsScreen(query: query, categoryId: categoryId),
         );
       case AppRoutes.cart:
         return MaterialPageRoute(
@@ -227,6 +239,16 @@ class AppRouter {
           settings: settings,
           builder: (_) => const BecomeSupplierScreen(),
         );
+      case AppRoutes.supplierInfo:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const SupplierInfoScreen(),
+        );
+      case AppRoutes.connectSupplier:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const ConnectSupplierScreen(),
+        );
       case AppRoutes.policy:
         final slug = settings.arguments as String? ?? '';
         return MaterialPageRoute(
@@ -240,6 +262,11 @@ class AppRouter {
         return MaterialPageRoute(
           settings: settings,
           builder: (_) => ShopScreen(shopId: shopId, slug: shopSlug),
+        );
+      case AppRoutes.recentlyViewed:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const RecentlyViewedScreen(),
         );
       default:
         return play.AppRoutes.onGenerateRoute(settings);

@@ -252,7 +252,10 @@ class _CategoryScreenState extends State<CategoryScreen> {
                                                   Navigator.of(context)
                                                       .pushNamed(
                                                     AppRoutes.searchResults,
-                                                    arguments: child.name,
+                                                    arguments: {
+                                                      'query': child.name,
+                                                      'categoryId': child.id,
+                                                    },
                                                   );
                                                 },
                                                 child: Column(

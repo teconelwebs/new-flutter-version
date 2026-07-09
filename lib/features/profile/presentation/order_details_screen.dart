@@ -126,7 +126,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       if (refundRes.statusCode == 200) {
         final body = jsonDecode(refundRes.body);
         final actualRefund = body['data'] ?? body;
-        if (actualRefund != null && (actualRefund['result'] != null || actualRefund['id'] != null)) {
+        if (actualRefund != null && (actualRefund['result'] == true || actualRefund['id'] != null)) {
           refundData = actualRefund;
         }
       }
@@ -157,11 +157,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     final invoiceUrl = 'https://supplierservice.welfog.com/get_invoice?order_id=${widget.oid}';
     final uri = Uri.parse(invoiceUrl);
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        throw 'Could not launch $invoiceUrl';
-      }
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

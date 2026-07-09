@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'address_screen.dart';
 
 class AddAddressDetailsScreen extends StatefulWidget {
   final String mode; // 'add' or 'edit'
@@ -188,6 +189,7 @@ class _AddAddressDetailsScreenState extends State<AddAddressDetailsScreen> {
               backgroundColor: Color(0xFF0F766E),
             ),
           );
+          AddressEventBus.emitAddressChanged();
           Navigator.pop(context);
         }
       } else {

@@ -106,8 +106,10 @@ class AppSearchBar extends StatelessWidget {
               onTap: onBack ?? () => Navigator.maybeOf(context)?.pop(),
             ),
           if (!showBackButton && onTap != null)
+            // ignore: prefer_const_constructors
             Padding(
               padding: const EdgeInsets.only(right: 10),
+              // ignore: prefer_const_constructors
               child: Icon(Icons.search, size: 20, color: _iconColor),
             ),
           Expanded(

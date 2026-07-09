@@ -163,11 +163,25 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
       await CartState.updateCartCount(current + 1);
 
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Added to Cart!'),
-            backgroundColor: Color(0xFF22C55E),
+          SnackBar(
+            content: const Text(
+              'Added to Cart!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            backgroundColor: const Color(0xB3111111),
             behavior: SnackBarBehavior.floating,
+            width: MediaQuery.sizeOf(context).width * 0.5,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            duration: const Duration(seconds: 1),
           ),
         );
       }

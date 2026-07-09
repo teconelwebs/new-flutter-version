@@ -7,6 +7,9 @@ class SessionStore {
   static const _kUserId = 'user_id';
   static const _kLoginUser = 'loginuser';
   static const _kMobile = 'mobile';
+  static const _kAccount = 'account';
+  static const _kPostLoginCheck = 'post_login_check';
+  static const _kUserName = 'user_name';
 
   static Future<bool> isLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();
@@ -21,6 +24,8 @@ class SessionStore {
     required String userId,
     required String userName,
     String mobile = '',
+    String account = 'login',
+    bool postLoginCheck = false,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await play.PlayProfileHelper.clearPlayProfileCache();
@@ -28,6 +33,13 @@ class SessionStore {
     await prefs.setString(_kAccessToken, accessToken);
     await prefs.setString(_kUserId, userId);
     await prefs.setString(_kLoginUser, userName);
+    await prefs.setString(_kUserName, userName);
+    await prefs.setString(_kAccount, account);
+    if (postLoginCheck) {
+      await prefs.setBool(_kPostLoginCheck, true);
+    } else {
+      await prefs.remove(_kPostLoginCheck);
+    }
     if (mobile.isNotEmpty) {
       await prefs.setString(_kMobile, mobile);
     }
@@ -40,6 +52,9 @@ class SessionStore {
     await prefs.remove(_kAccessToken);
     await prefs.remove(_kUserId);
     await prefs.remove(_kLoginUser);
+    await prefs.remove(_kUserName);
+    await prefs.remove(_kAccount);
+    await prefs.remove(_kPostLoginCheck);
     await prefs.remove(_kMobile);
   }
 

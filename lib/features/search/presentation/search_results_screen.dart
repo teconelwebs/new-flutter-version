@@ -4,9 +4,10 @@ import '../../product/presentation/widgets/product_card.dart';
 import '../data/search_api_service.dart';
 
 class SearchResultsScreen extends StatefulWidget {
-  const SearchResultsScreen({super.key, required this.query});
+  const SearchResultsScreen({super.key, required this.query, this.categoryId});
 
   final String query;
+  final String? categoryId;
 
   @override
   State<SearchResultsScreen> createState() => _SearchResultsScreenState();
@@ -28,7 +29,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   Future<void> _fetch() async {
     setState(() => _loading = true);
     try {
-      final items = await _searchApi.searchProducts(_query);
+      final items = await _searchApi.searchProducts(_query, categoryId: widget.categoryId);
       if (!mounted) return;
       setState(() => _products = items);
     } finally {
@@ -43,8 +44,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
-            const Icon(Icons.search, size: 18),
-            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 _query,
@@ -74,11 +73,16 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 )
               : GridView.builder(
                   padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio: 0.67,
+                    childAspectRatio: (() {
+                      final screenWidth = MediaQuery.sizeOf(context).width;
+                      final cardWidth = (screenWidth - 32 - 12) / 2;
+                      const contentHeight = 74.0;
+                      return cardWidth / (cardWidth + contentHeight);
+                    })(),
                   ),
                   itemCount: _products.length,
                   itemBuilder: (_, i) => ProductCard(item: _products[i]),

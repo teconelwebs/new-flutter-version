@@ -63,7 +63,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       setState(() => _isFetchingGPS = true);
     }
     try {
-      if (widget.isEdit) {
+      if (widget.isEdit && !forceGPS) {
         final lat = double.tryParse(widget.editLatitude);
         final lng = double.tryParse(widget.editLongitude);
         if (lat != null && lng != null) {

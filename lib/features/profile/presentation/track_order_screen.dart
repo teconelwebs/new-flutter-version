@@ -1040,8 +1040,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   Widget _buildHelpCard() {
     return InkWell(
       onTap: () {
-        // Navigate to Help & Support fallback route
-        Navigator.of(context).pushNamed(AppRoutes.profile);
+        // Navigate to Help & Support route
+        Navigator.of(context).pushNamed(AppRoutes.helpCenter);
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(

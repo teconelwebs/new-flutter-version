@@ -106,9 +106,12 @@ class _ProductScreenState extends State<ProductScreen> {
         _loading = false;
       });
 
+      _saveToRecentlyViewed(detail);
+
       // Fetch from API to check actual status if logged in
       if (userId.isNotEmpty) {
         _checkWishlistStatus();
+        _fetchAddress();
       }
     } catch (e) {
       if (!mounted) return;
@@ -116,6 +119,50 @@ class _ProductScreenState extends State<ProductScreen> {
         _error = e.toString().replaceFirst('Exception: ', '');
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _saveToRecentlyViewed(ProductDetailData detail) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? existingStr = prefs.getString('recently_viewed');
+      List<dynamic> list = [];
+      if (existingStr != null) {
+        try {
+          list = jsonDecode(existingStr) as List;
+        } catch (_) {}
+      }
+
+      final int parsedId = int.tryParse(detail.id) ?? 0;
+      if (parsedId == 0) return;
+
+      // Remove duplicates
+      list.removeWhere((item) => (item['id'] ?? 0) == parsedId);
+
+      final raw = detail.rawJson;
+      final duration = raw['shop_location']?['duration'] ?? raw['duration'] ?? detail.rawJson['data']?['duration'] ?? 0;
+
+      final Map<String, dynamic> itemMap = {
+        'id': parsedId,
+        'name': detail.name,
+        'price': detail.sellPrice,
+        'mrp': detail.mrpPrice,
+        'image': detail.images.isNotEmpty ? detail.images.first : '',
+        'slug': detail.slug,
+        'brand': detail.brand,
+        'rating': detail.rating,
+        'duration': duration,
+      };
+
+      list.insert(0, itemMap);
+
+      if (list.length > 10) {
+        list = list.sublist(0, 10);
+      }
+
+      await prefs.setString('recently_viewed', jsonEncode(list));
+    } catch (e) {
+      debugPrint('Error saving recently viewed product: $e');
     }
   }
 
@@ -146,6 +193,43 @@ class _ProductScreenState extends State<ProductScreen> {
       }
     } catch (error) {
       debugPrint('Error checking wishlist status: $error');
+    }
+  }
+
+  Future<void> _fetchAddress() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final currentUserId = prefs.getString('user_id') ?? '';
+      if (currentUserId.isEmpty) return;
+
+      final uri = Uri.parse(
+          'https://welfogapi.welfog.com/api/v2/allAddress/$currentUserId?id=$currentUserId');
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['result'] == true && data['addData'] is List) {
+          final addresses = data['addData'] as List;
+          final defaultAddress = addresses.firstWhere(
+            (addr) => addr['using_this'] == 1,
+            orElse: () => null,
+          );
+
+          if (defaultAddress != null) {
+            final pin = defaultAddress['postal_code']?.toString() ?? '';
+            if (pin.isNotEmpty) {
+              await prefs.setString('postal_code', pin);
+              if (mounted) {
+                setState(() {
+                  _pincode = pin;
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error finding location: $e");
     }
   }
 
@@ -330,8 +414,28 @@ class _ProductScreenState extends State<ProductScreen> {
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
               const Spacer(),
               TextButton(
-                onPressed: () =>
-                    Navigator.of(context).pushNamed(AppRoutes.home),
+                onPressed: () {
+                  final rawCat = _detail?.rawJson['category'];
+                  String? categoryName;
+                  if (rawCat is Map) {
+                    categoryName = rawCat['name']?.toString();
+                  } else {
+                    categoryName = _detail?.rawJson['category_name']?.toString();
+                  }
+
+                  if (categoryName != null && categoryName.trim().isNotEmpty) {
+                    Navigator.of(context).pushNamed(
+                      AppRoutes.searchResults,
+                      arguments: categoryName.trim(),
+                    );
+                  } else {
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      AppRoutes.home,
+                      (route) => false,
+                      arguments: 1,
+                    );
+                  }
+                },
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,
                   minimumSize: Size.zero,
@@ -356,11 +460,16 @@ class _ProductScreenState extends State<ProductScreen> {
               itemCount: _related.length,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 mainAxisSpacing: 8,
                 crossAxisSpacing: 8,
-                childAspectRatio: 0.67,
+                childAspectRatio: (() {
+                  final screenWidth = MediaQuery.sizeOf(context).width;
+                  final cardWidth = (screenWidth - 40 - 8) / 2;
+                  const contentHeight = 74.0;
+                  return cardWidth / (cardWidth + contentHeight);
+                })(),
               ),
               itemBuilder: (context, index) =>
                   ProductCard(item: _related[index]),

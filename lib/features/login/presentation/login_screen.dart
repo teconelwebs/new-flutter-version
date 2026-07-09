@@ -251,6 +251,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
         userId: result.userId,
         userName: result.userName,
         mobile: phone,
+        account: result.account,
+        postLoginCheck: result.account == 'register',
       );
       await _continue();
     } catch (error) {

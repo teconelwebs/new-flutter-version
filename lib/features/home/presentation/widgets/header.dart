@@ -150,12 +150,7 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
     }
   }
 
-  // Handles search click, saves to disk, navigates
   Future<void> _handleSearchPress() async {
-    final currentPlaceholder = _placeholders[_placeholderIndex];
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString("last_search_keyword", currentPlaceholder);
-    
     if (widget.onSearchTap != null) {
       widget.onSearchTap!();
     } else {
@@ -163,7 +158,6 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
       Navigator.pushNamed(
         context,
         SearchScreen.routeName,
-        arguments: currentPlaceholder,
       );
     }
   }
@@ -259,7 +253,7 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
                                 },
                                 child: const Padding(
                                   padding: EdgeInsets.all(6.0),
-                                  child: WishlistHeartIcon(size: 22, color: Color(0xFFFB5404), active: false),
+                                  child: WishlistHeartIcon(size: 22, color: Color(0xFFFB5404), active: true),
                                 ),
                               ),
                               const SizedBox(width: 10),

@@ -24,13 +24,17 @@ class SearchApiService {
     return list.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
   }
 
-  Future<List<ProductItem>> searchProducts(String query) async {
+  Future<List<ProductItem>> searchProducts(String query, {String? categoryId}) async {
     final prefs = await SharedPreferences.getInstance();
     final lat = prefs.getString('latitude') ?? '0';
     final lng = prefs.getString('longitude') ?? '0';
+    final trimmedQuery = query.trim();
 
     final params = {
-      'search': query.trim(),
+      if (categoryId != null && categoryId.trim().isNotEmpty && RegExp(r'^\d+$').hasMatch(categoryId.trim()))
+        'categories': categoryId.trim()
+      else if (trimmedQuery.isNotEmpty)
+        'name': trimmedQuery,
       'latitude': lat,
       'longitude': lng,
       'page': '1',
@@ -38,12 +42,60 @@ class SearchApiService {
     };
     final uri = Uri.parse('$_mainApi/products/search').replace(queryParameters: params);
     final response = await http.get(uri);
-    if (response.statusCode < 200 || response.statusCode >= 300) return const [];
+    
+    List data = [];
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      final decoded = jsonDecode(response.body);
+      final rawData = decoded is Map<String, dynamic> ? decoded['data'] : null;
+      if (rawData is List) {
+        data = rawData;
+      }
+    }
 
-    final decoded = jsonDecode(response.body);
-    final data = decoded is Map<String, dynamic> ? decoded['data'] : null;
-    if (data is! List) return const [];
-    return data.whereType<Map>().map(_mapProduct).toList();
+    // Fallback: If 0 products found and we have a search query (not category), fetch general products
+    final isCategorySearch = categoryId != null && categoryId.trim().isNotEmpty && RegExp(r'^\d+$').hasMatch(categoryId.trim());
+    if (data.isEmpty && trimmedQuery.isNotEmpty && !isCategorySearch) {
+      try {
+        final fallbackParams = {
+          'latitude': lat,
+          'longitude': lng,
+          'page': '1',
+          'limit': '20',
+        };
+        final fallbackUri = Uri.parse('$_mainApi/products/search').replace(queryParameters: fallbackParams);
+        final fallbackRes = await http.get(fallbackUri);
+        if (fallbackRes.statusCode >= 200 && fallbackRes.statusCode < 300) {
+          final decoded = jsonDecode(fallbackRes.body);
+          final rawData = decoded is Map<String, dynamic> ? decoded['data'] : null;
+          if (rawData is List) {
+            data = rawData;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (data.isEmpty) return const [];
+
+    // Map to ProductItem
+    final mappedProducts = data.whereType<Map>().map(_mapProduct).toList();
+
+    // Prioritize products containing the search query in their name/brand, followed by random products
+    if (trimmedQuery.isNotEmpty && !isCategorySearch) {
+      final lowerQuery = trimmedQuery.toLowerCase();
+      final matching = <ProductItem>[];
+      final nonMatching = <ProductItem>[];
+
+      for (var p in mappedProducts) {
+        if (p.title.toLowerCase().contains(lowerQuery) || p.brand.toLowerCase().contains(lowerQuery)) {
+          matching.add(p);
+        } else {
+          nonMatching.add(p);
+        }
+      }
+      return [...matching, ...nonMatching];
+    }
+
+    return mappedProducts;
   }
 
   Future<List<SearchCategory>> fetchCategories() async {
@@ -80,7 +132,14 @@ class SearchApiService {
             item['image'] ??
             '')
         .toString();
-    final priceRaw = item['final_price']?['sellPrice'] ?? item['new_price'] ?? item['price'] ?? 0;
+    final priceRaw = item['main_price'] ??
+        item['final_price']?['sellPrice'] ??
+        item['new_price'] ??
+        item['unit_price'] ??
+        item['discount_price'] ??
+        item['base_price'] ??
+        item['price'] ??
+        0;
     final slug = (item['slug'] ?? '').toString();
     final duration = int.tryParse((item['duration'] ?? '0').toString()) ?? 0;
     final price = _toDouble(priceRaw);

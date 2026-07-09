@@ -77,6 +77,8 @@ class LoginService {
         ? userMap['name']?.toString() ?? ''
         : '';
 
+    final account = data['account']?.toString() ?? 'login';
+
     if (accessToken.isEmpty || userId.isEmpty) {
       return const VerifyOtpResult(
         errorMessage: 'Login data missing from server response.',
@@ -87,6 +89,7 @@ class LoginService {
       accessToken: accessToken,
       userId: userId,
       userName: userName,
+      account: account,
     );
   }
 
@@ -105,12 +108,14 @@ class VerifyOtpResult {
     this.accessToken = '',
     this.userId = '',
     this.userName = '',
+    this.account = '',
   });
 
   final String? errorMessage;
   final String accessToken;
   final String userId;
   final String userName;
+  final String account;
 }
 
 class SendOtpResult {

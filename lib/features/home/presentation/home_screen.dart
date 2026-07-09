@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 // ignore: unused_import
 import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
@@ -13,6 +15,7 @@ import '../../category/presentation/category_screen.dart';
 import '../../cart/presentation/cart_screen.dart';
 import '../../product/data/models/product_item.dart';
 import '../../search/presentation/search_screen.dart';
+import '../../profile/data/profile_api_service.dart';
 import '../data/home_api_service.dart';
 import '../data/home_models.dart';
 import 'widgets/home_widgets.dart';
@@ -22,15 +25,17 @@ import 'widgets/category_widget.dart';
 import 'widgets/banner_widget.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.initialTab});
 
+  final int? initialTab;
   static const routeName = AppRoutes.home;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
   final HomeApiService _homeApi = HomeApiService();
   late Future<HomeBundle> _bundleFuture;
@@ -83,6 +88,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
+    if (widget.initialTab != null) {
+      _currentIndex = widget.initialTab!;
+    }
     _loadActiveAddressFromPrefs();
     _bundleFuture = _homeApi.getCachedHomeBundle().then((cached) {
       if (cached != null) {
@@ -157,7 +165,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       SystemUiOverlayStyle(
         statusBarColor: statusBarColor,
         statusBarIconBrightness: barIconBrightness,
-        statusBarBrightness: barIconBrightness == Brightness.light ? Brightness.dark : Brightness.light,
+        statusBarBrightness: barIconBrightness == Brightness.light
+            ? Brightness.dark
+            : Brightness.light,
       ),
     );
   }
@@ -289,6 +299,39 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
+  bool _isNameModalShowing = false;
+
+  Future<void> _checkAndShowNameModal() async {
+    if (_isNameModalShowing) return;
+    final prefs = await SharedPreferences.getInstance();
+    final account = prefs.getString('account') ?? 'login';
+    final localName = prefs.getString('user_name') ?? '';
+    final isNameSaved =
+        localName.isNotEmpty &&
+        localName.toLowerCase() != 'user' &&
+        localName.trim().isNotEmpty;
+
+    if (account == 'register' && !isNameSaved) {
+      _isNameModalShowing = true;
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return PopScope(
+            canPop: false,
+            child: _NameUpdateDialog(
+              onSuccess: () {
+                _isNameModalShowing = false;
+              },
+            ),
+          );
+        },
+      );
+    }
+  }
+
   Future<void> _checkGuestStatus() async {
     final loggedIn = await SessionStore.isLoggedIn();
     final uid = await SessionStore.getUserId();
@@ -297,6 +340,72 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _isGuest = !loggedIn;
         _userId = (loggedIn && uid != null && uid.isNotEmpty) ? uid : 'guest';
       });
+      if (loggedIn) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _checkAndShowNameModal();
+          _restoreDefaultAddressCoordinates();
+        });
+      }
+    }
+  }
+
+  Future<void> _restoreDefaultAddressCoordinates() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token') ?? '';
+      final userId = prefs.getString('user_id') ?? '';
+      if (token.isEmpty || userId.isEmpty) return;
+
+      final cachedLat = prefs.getString('latitude');
+      final cachedLng = prefs.getString('longitude');
+      if (cachedLat != null &&
+          cachedLat != '0' &&
+          cachedLng != null &&
+          cachedLng != '0') {
+        return;
+      }
+
+      final uri = Uri.parse(
+        'https://welfogapi.welfog.com/api/v2/get-user-by-access_token',
+      );
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'access_token': token, 'userId': userId}),
+      );
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['result'] == true) {
+          final addressData = decoded['addressData'];
+          if (addressData is Map<String, dynamic>) {
+            final lat = addressData['latitude']?.toString() ?? '0';
+            final lng = addressData['longitude']?.toString() ?? '0';
+            final city =
+                addressData['city']?.toString() ??
+                addressData['city_name']?.toString() ??
+                '';
+            final pin = addressData['postal_code']?.toString() ?? '';
+
+            await prefs.setString('latitude', lat);
+            await prefs.setString('longitude', lng);
+            if (city.isNotEmpty) {
+              await prefs.setString('city_name', city);
+            }
+            if (pin.isNotEmpty) {
+              await prefs.setString('postal_code', pin);
+            }
+
+            if (mounted) {
+              setState(() {
+                if (city.isNotEmpty) _displayCity = city;
+                if (pin.isNotEmpty) _displayPincode = pin;
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error restoring default coordinates: $e');
     }
   }
 
@@ -317,7 +426,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 displayCity: _displayCity,
                 displayPincode: _displayPincode,
                 onLocationTap: () {
-                  Navigator.of(context).pushNamed(AppRoutes.address).then((_) async {
+                  Navigator.of(context).pushNamed(AppRoutes.address).then((
+                    _,
+                  ) async {
                     await _loadActiveAddressFromPrefs();
                     setState(() {
                       _bundleFuture = _fetchBundleWithPincodeTracking();
@@ -331,14 +442,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   });
                   await _bundleFuture;
                 },
-                onSearch: () async {
-                  final prefs = await SharedPreferences.getInstance();
-                  final keyword = prefs.getString('last_search_keyword');
-                  if (!context.mounted) return;
-                  Navigator.of(context).pushNamed(
-                    SearchScreen.routeName,
-                    arguments: keyword,
-                  );
+                onSearch: () {
+                  Navigator.of(context).pushNamed(SearchScreen.routeName);
                 },
                 isGuest: _isGuest,
                 promptLogin: () {
@@ -355,7 +460,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   if (index == 0) {
                     await _loadActiveAddressFromPrefs();
                     final prefs = await SharedPreferences.getInstance();
-                    final savedPincode = prefs.getString('postal_code') ?? '302001';
+                    final savedPincode =
+                        prefs.getString('postal_code') ?? '302001';
                     if (savedPincode != _loadedPincode) {
                       setState(() {
                         _bundleFuture = _fetchBundleWithPincodeTracking();
@@ -370,7 +476,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               //   viewerId: _userId,
               // ),
               const CartScreen(embedded: true),
-              const AccountScreen(embedded: true),
+              AccountScreen(embedded: true, active: _currentIndex == 3),
             ],
           ),
 
@@ -390,7 +496,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 );
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE63946),
                   borderRadius: BorderRadius.circular(12),
@@ -496,17 +605,70 @@ class _HomeTab extends StatefulWidget {
 class _HomeTabState extends State<_HomeTab> {
   late ScrollController _scrollController;
   int _pullRefreshKey = 0;
+  List<HomeProduct> _recentProducts = [];
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+    _loadRecentlyViewed();
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  double _toDouble(dynamic val) {
+    if (val == null) return 0.0;
+    if (val is num) return val.toDouble();
+    return double.tryParse(val.toString()) ?? 0.0;
+  }
+
+  int _toInt(dynamic val) {
+    if (val == null) return 0;
+    if (val is num) return val.toInt();
+    return int.tryParse(val.toString()) ?? 0;
+  }
+
+  Future<void> _loadRecentlyViewed() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? cachedStr = prefs.getString('recently_viewed');
+      if (cachedStr != null) {
+        final decoded = jsonDecode(cachedStr);
+        if (decoded is List) {
+          final List<HomeProduct> loaded = decoded.map((item) {
+            return HomeProduct(
+              id: _toInt(item['id']),
+              name: (item['name'] ?? '').toString(),
+              price: _toDouble(item['price']),
+              mrp: _toDouble(item['mrp'] ?? item['price']),
+              image: (item['image'] ?? '').toString(),
+              slug: (item['slug'] ?? '').toString(),
+              duration: _toInt(item['duration']),
+              brand: (item['brand'] ?? '').toString(),
+              rating: _toDouble(item['rating'] ?? 4.3),
+            );
+          }).toList();
+
+          if (mounted) {
+            setState(() {
+              _recentProducts = loaded;
+            });
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _recentProducts = [];
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading recently viewed on home: $e');
+    }
   }
 
   ProductItem _toProductItem(HomeProduct p, int index) {
@@ -538,9 +700,7 @@ class _HomeTabState extends State<_HomeTab> {
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
           return const Center(
-            child: CircularProgressIndicator(
-              color: Color(0xFFFB5404),
-            ),
+            child: CircularProgressIndicator(color: Color(0xFFFB5404)),
           );
         }
         if (snap.hasError || !snap.hasData) {
@@ -550,7 +710,10 @@ class _HomeTabState extends State<_HomeTab> {
               children: [
                 const Text('Failed to load home data'),
                 const SizedBox(height: 8),
-                OutlinedButton(onPressed: widget.onRefresh, child: const Text('Retry')),
+                OutlinedButton(
+                  onPressed: widget.onRefresh,
+                  child: const Text('Retry'),
+                ),
               ],
             ),
           );
@@ -559,10 +722,6 @@ class _HomeTabState extends State<_HomeTab> {
         final bundle = snap.data!;
         final dealList = bundle.todayDeals.take(10).toList();
         final sections = bundle.sections.take(4).toList();
-        final promo = [...bundle.banner1, ...bundle.banner2]
-            .where((b) => b.image.trim().isNotEmpty)
-            .take(3)
-            .toList();
 
         return Stack(
           children: [
@@ -571,13 +730,16 @@ class _HomeTabState extends State<_HomeTab> {
                 setState(() {
                   _pullRefreshKey++;
                 });
+                await _loadRecentlyViewed();
                 await widget.onRefresh();
               },
               child: CustomScrollView(
                 controller: _scrollController,
                 slivers: [
                   SliverToBoxAdapter(
-                    child: SizedBox(height: MediaQuery.of(context).padding.top + 140),
+                    child: SizedBox(
+                      height: MediaQuery.of(context).padding.top + 140,
+                    ),
                   ),
                   SliverToBoxAdapter(
                     child: CategoryWidget(
@@ -586,10 +748,77 @@ class _HomeTabState extends State<_HomeTab> {
                     ),
                   ),
                   SliverToBoxAdapter(
-                    child: BannerWidget(
-                      pullRefreshKey: _pullRefreshKey,
-                    ),
+                    child: BannerWidget(slides: bundle.mobileSlider),
                   ),
+                  const SliverToBoxAdapter(child: TrustStrip()),
+                  if (_recentProducts.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: ProductStrip(
+                          title: 'Recently Viewed',
+                          products: _recentProducts,
+                          onProductTap: (p) {
+                            Navigator.of(context)
+                                .pushNamed(
+                                  AppRoutes.product,
+                                  arguments: _toProductItem(
+                                    p,
+                                    _recentProducts.indexOf(p),
+                                  ),
+                                )
+                                .then((_) => _loadRecentlyViewed());
+                          },
+                          onRightIconTap: () {
+                            Navigator.of(context)
+                                .pushNamed(AppRoutes.recentlyViewed)
+                                .then((_) => _loadRecentlyViewed());
+                          },
+                        ),
+                      ),
+                    ),
+                  if (bundle.banner1.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                        child: Column(
+                          children: bundle.banner1
+                              .where((b) => b.image.trim().isNotEmpty)
+                              .map(
+                                (b) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      final link = b.link;
+                                      if (link != null &&
+                                          link.isNotEmpty &&
+                                          link != '#') {
+                                        final parts = link
+                                            .replaceAll(RegExp(r'/$'), '')
+                                            .split('/');
+                                        final slug = parts.isNotEmpty
+                                            ? parts.last
+                                            : null;
+                                        if (slug != null && slug.isNotEmpty) {
+                                          Navigator.of(context)
+                                              .pushNamed(
+                                                AppRoutes.searchResults,
+                                                arguments: slug,
+                                              )
+                                              .then(
+                                                (_) => _loadRecentlyViewed(),
+                                              );
+                                        }
+                                      }
+                                    },
+                                    child: PromoBannerImage(imageUrl: b.image),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
+                    ),
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.only(top: 10),
@@ -597,32 +826,67 @@ class _HomeTabState extends State<_HomeTab> {
                         title: 'Today Deals',
                         products: dealList,
                         onProductTap: (p) {
-                          Navigator.of(context).pushNamed(
-                            AppRoutes.product,
-                            arguments: _toProductItem(p, 0),
-                          );
+                          Navigator.of(context)
+                              .pushNamed(
+                                AppRoutes.product,
+                                arguments: _toProductItem(
+                                  p,
+                                  dealList.indexOf(p),
+                                ),
+                              )
+                              .then((_) => _loadRecentlyViewed());
                         },
                         onRightIconTap: () {
-                          Navigator.of(context).pushNamed(AppRoutes.todayDeals);
+                          Navigator.of(context)
+                              .pushNamed(AppRoutes.todayDeals)
+                              .then((_) => _loadRecentlyViewed());
                         },
                       ),
                     ),
                   ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-                      child: Column(
-                        children: promo
-                            .map(
-                              (b) => Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: PromoBannerImage(imageUrl: b.image),
-                              ),
-                            )
-                            .toList(),
+                  if (bundle.banner2.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                        child: Column(
+                          children: bundle.banner2
+                              .where((b) => b.image.trim().isNotEmpty)
+                              .take(2)
+                              .map(
+                                (b) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      final link = b.link;
+                                      if (link != null &&
+                                          link.isNotEmpty &&
+                                          link != '#') {
+                                        final parts = link
+                                            .replaceAll(RegExp(r'/$'), '')
+                                            .split('/');
+                                        final slug = parts.isNotEmpty
+                                            ? parts.last
+                                            : null;
+                                        if (slug != null && slug.isNotEmpty) {
+                                          Navigator.of(context)
+                                              .pushNamed(
+                                                AppRoutes.searchResults,
+                                                arguments: slug,
+                                              )
+                                              .then(
+                                                (_) => _loadRecentlyViewed(),
+                                              );
+                                        }
+                                      }
+                                    },
+                                    child: PromoBannerImage(imageUrl: b.image),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
                       ),
                     ),
-                  ),
                   ...sections.map(
                     (s) => SliverToBoxAdapter(
                       child: Column(
@@ -633,16 +897,26 @@ class _HomeTabState extends State<_HomeTab> {
                               title: s.name,
                               products: s.products.take(10).toList(),
                               onProductTap: (p) {
-                                Navigator.of(context).pushNamed(
-                                  AppRoutes.product,
-                                  arguments: _toProductItem(p, s.products.indexOf(p)),
-                                );
+                                Navigator.of(context)
+                                    .pushNamed(
+                                      AppRoutes.product,
+                                      arguments: _toProductItem(
+                                        p,
+                                        s.products.indexOf(p),
+                                      ),
+                                    )
+                                    .then((_) => _loadRecentlyViewed());
                               },
                               onRightIconTap: () {
-                                Navigator.of(context).pushNamed(
-                                  AppRoutes.searchResults,
-                                  arguments: s.name,
-                                );
+                                Navigator.of(context)
+                                    .pushNamed(
+                                      AppRoutes.searchResults,
+                                      arguments: {
+                                        'query': s.name,
+                                        'categoryId': s.id,
+                                      },
+                                    )
+                                    .then((_) => _loadRecentlyViewed());
                               },
                             ),
                           ),
@@ -676,4 +950,262 @@ class _HomeTabState extends State<_HomeTab> {
   }
 }
 
+class _NameUpdateDialog extends StatefulWidget {
+  final VoidCallback onSuccess;
 
+  const _NameUpdateDialog({required this.onSuccess});
+
+  @override
+  State<_NameUpdateDialog> createState() => _NameUpdateDialogState();
+}
+
+class _NameUpdateDialogState extends State<_NameUpdateDialog> {
+  final TextEditingController _controller = TextEditingController();
+  final ProfileApiService _profileApi = ProfileApiService();
+  String? _errorText;
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveName() async {
+    final name = _controller.text.trim();
+    if (name.isEmpty) {
+      setState(() {
+        _errorText = 'Name is required*';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorText = null;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id') ?? '';
+      final token = prefs.getString('access_token') ?? '';
+
+      // Save local states immediately (just like React Native does)
+      await prefs.setString('user_name', name);
+      await prefs.setString('loginuser', name);
+      await prefs.setString('account', 'login');
+      await prefs.remove('post_login_check');
+
+      if (userId.isNotEmpty && token.isNotEmpty) {
+        try {
+          await _profileApi.updateProfileName(
+            userId: userId,
+            accessToken: token,
+            name: name,
+          );
+        } catch (apiError) {
+          debugPrint('Profile API update failed: $apiError');
+        }
+      }
+
+      if (mounted) {
+        widget.onSuccess();
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      setState(() {
+        _errorText = 'Could not save name. Please try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+      backgroundColor: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.account_circle,
+              size: 60.0,
+              color: Color(0xFF008083),
+            ),
+            const SizedBox(height: 10.0),
+            const Text(
+              'Complete your profile',
+              style: TextStyle(
+                fontSize: 18.0,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(height: 20.0),
+            TextField(
+              controller: _controller,
+              maxLength: 30,
+              decoration: InputDecoration(
+                hintText: 'Full Name',
+                counterText: '',
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 12.0,
+                  horizontal: 16.0,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                  borderSide: BorderSide(
+                    color: _errorText != null ? Colors.red : Colors.grey[300]!,
+                    width: 1.0,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                  borderSide: BorderSide(
+                    color: _errorText != null
+                        ? Colors.red
+                        : const Color(0xFF008083),
+                    width: 1.0,
+                  ),
+                ),
+              ),
+              onChanged: (val) {
+                if (_errorText != null) {
+                  setState(() {
+                    _errorText = null;
+                  });
+                }
+              },
+            ),
+            if (_errorText != null) ...[
+              const SizedBox(height: 5.0),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 5.0),
+                  child: Text(
+                    _errorText!,
+                    style: const TextStyle(color: Colors.red, fontSize: 12.0),
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 20.0),
+            SizedBox(
+              width: double.infinity,
+              height: 50.0,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _saveName,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF008083),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  elevation: 0,
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20.0,
+                        width: 20.0,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.0,
+                        ),
+                      )
+                    : const Text(
+                        'Save & Continue',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16.0,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class TrustStrip extends StatelessWidget {
+  const TrustStrip({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFEEEEEE), width: 1.0),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Expanded(
+              child: _buildItem(
+                Icons.local_shipping_outlined,
+                'Free Delivery',
+                'on orders',
+              ),
+            ),
+            Container(width: 1, color: const Color(0xFFE6E6E6)),
+            Expanded(
+              child: _buildItem(
+                Icons.cached_outlined,
+                'Easy Returns',
+                'Hassle-free returns',
+              ),
+            ),
+            Container(width: 1, color: const Color(0xFFE6E6E6)),
+            Expanded(
+              child: _buildItem(
+                Icons.gpp_good_outlined,
+                'Secure Payment',
+                '100% secure checkout',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItem(IconData icon, String title, String subtitle) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(icon, color: const Color(0xFFFB5404), size: 20),
+        const SizedBox(height: 6),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF111111),
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: const TextStyle(fontSize: 10, color: Color(0xFF666666)),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}

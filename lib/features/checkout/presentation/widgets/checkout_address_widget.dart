@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'package:welfog/features/address/presentation/address_screen.dart';
 
 class CheckoutAddressWidget extends StatefulWidget {
   final int refreshing;
@@ -36,6 +37,19 @@ class _CheckoutAddressWidgetState extends State<CheckoutAddressWidget> {
     super.initState();
     _getRealName();
     _fetchAddresses(showShimmer: true);
+    AddressEventBus.addListener(_fetchAddressesListener);
+  }
+
+  void _fetchAddressesListener() {
+    if (mounted) {
+      _fetchAddresses(showShimmer: false);
+    }
+  }
+
+  @override
+  void dispose() {
+    AddressEventBus.removeListener(_fetchAddressesListener);
+    super.dispose();
   }
 
   @override
@@ -149,7 +163,7 @@ class _CheckoutAddressWidgetState extends State<CheckoutAddressWidget> {
 
       if (userId == null || accessToken == null) return false;
 
-      final uri = Uri.parse('https://welfogapi.welfog.com/api/pincode/check');
+      final uri = Uri.parse('https://welfogapi.welfog.com/api/v2/pincode/check');
       final response = await http.post(
         uri,
         headers: {
@@ -177,6 +191,53 @@ class _CheckoutAddressWidgetState extends State<CheckoutAddressWidget> {
       debugPrint('Error checking pincode: $error');
       return false;
     }
+  }
+
+  String _formatFullAddress(Map<dynamic, dynamic> addr) {
+    final details = (addr['address_details']?.toString() ?? '').trim();
+    final address = (addr['address']?.toString() ?? '').trim();
+    final city = (addr['city_name']?.toString() ?? '').trim();
+    final state = (addr['state_name']?.toString() ?? '').trim();
+    final pincode = (addr['postal_code']?.toString() ?? '').trim();
+
+    final cleanDetails = (details.toLowerCase() == 'null' || details.toLowerCase() == 'null,') ? '' : details;
+    final cleanAddress = (address.toLowerCase() == 'null') ? '' : address;
+    final cleanCity = (city.toLowerCase() == 'null') ? '' : city;
+    final cleanState = (state.toLowerCase() == 'null') ? '' : state;
+    final cleanPincode = (pincode.toLowerCase() == 'null') ? '' : pincode;
+
+    String combined = '';
+    if (cleanDetails.isNotEmpty) {
+      combined = cleanDetails;
+    }
+    if (cleanAddress.isNotEmpty) {
+      if (combined.isNotEmpty) {
+        if (cleanAddress.toLowerCase().startsWith(cleanDetails.toLowerCase())) {
+          combined = cleanAddress;
+        } else {
+          combined += ', $cleanAddress';
+        }
+      } else {
+        combined = cleanAddress;
+      }
+    }
+
+    final combinedLower = combined.toLowerCase();
+    String suffix = '';
+    if (cleanCity.isNotEmpty && !combinedLower.contains(cleanCity.toLowerCase())) {
+      suffix += ', $cleanCity';
+    }
+    if (cleanState.isNotEmpty && !combinedLower.contains(cleanState.toLowerCase())) {
+      suffix += ', $cleanState';
+    }
+    if (cleanPincode.isNotEmpty && !combinedLower.contains(cleanPincode.toLowerCase())) {
+      suffix += ' - $cleanPincode';
+    }
+
+    if (combined.isEmpty && suffix.startsWith(', ')) {
+      return suffix.substring(2);
+    }
+    return '$combined$suffix';
   }
 
   @override
@@ -256,7 +317,7 @@ class _CheckoutAddressWidgetState extends State<CheckoutAddressWidget> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${currentAddress['address_details'] ?? ''}, ${currentAddress['address'] ?? ''}, ${currentAddress['city_name'] ?? ''}, ${currentAddress['state_name'] ?? ''} - ${currentAddress['postal_code'] ?? ''}',
+                    _formatFullAddress(currentAddress),
                     style: const TextStyle(
                       fontSize: 14,
                       color: Color(0xFF374151),

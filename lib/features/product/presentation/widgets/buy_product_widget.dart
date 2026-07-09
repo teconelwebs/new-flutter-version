@@ -37,12 +37,25 @@ class BuyProductWidget extends StatelessWidget {
       if (quantity < maxLimit) {
         onQuantityChanged(quantity + 1);
       } else {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Limit Reached'),
-            backgroundColor: Colors.orange,
+          SnackBar(
+            content: const Text(
+              'Limit Reached',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            backgroundColor: const Color(0xB3111111),
             behavior: SnackBarBehavior.floating,
+            width: MediaQuery.sizeOf(context).width * 0.5,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            duration: const Duration(seconds: 1),
           ),
         );
       }

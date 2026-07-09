@@ -71,6 +71,31 @@ class ProfileApiService {
     return 'Profile update failed (${response.statusCode})';
   }
 
+  Future<String?> updateProfileName({
+    required String userId,
+    required String accessToken,
+    required String name,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/profile/update'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode({
+          'id': userId,
+          'name': name,
+        }),
+      );
+
+      if (response.statusCode == 200) return null;
+      return 'Profile update failed (${response.statusCode})';
+    } catch (e) {
+      return 'Profile update failed: $e';
+    }
+  }
+
   String _formatDobForDisplay(String raw) {
     if (raw.isEmpty) return '';
     final datePart = raw.split('T').first;

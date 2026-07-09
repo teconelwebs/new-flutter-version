@@ -616,15 +616,27 @@ class _HomeProductCardState extends State<HomeProductCard> {
             _isWishlisted = false;
           });
           if (mounted) {
+            const msg = 'Item removed from wishlist';
+            const textWidth = (msg.length * 7.5) + 32;
+            ScaffoldMessenger.of(context).clearSnackBars();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text('Item removed from wishlist'),
-                 // ignore: deprecated_member_use
-                backgroundColor: const Color(0xFF222222).withOpacity(0.85),
+                content: const Text(
+                  msg,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                backgroundColor: const Color(0xB3111111),
                 behavior: SnackBarBehavior.floating,
-                margin: const EdgeInsets.all(16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                duration: const Duration(milliseconds: 1000),
+                width: textWidth,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                duration: const Duration(seconds: 1),
               ),
             );
           }
@@ -636,15 +648,27 @@ class _HomeProductCardState extends State<HomeProductCard> {
             _isWishlisted = true;
           });
           if (mounted) {
+            const msg = 'Item added to wishlist';
+            const textWidth = (msg.length * 7.5) + 32;
+            ScaffoldMessenger.of(context).clearSnackBars();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text('Item added to wishlist'),
-                 // ignore: deprecated_member_use
-                backgroundColor: const Color(0xFF222222).withOpacity(0.85),
+                content: const Text(
+                  msg,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                backgroundColor: const Color(0xB3111111),
                 behavior: SnackBarBehavior.floating,
-                margin: const EdgeInsets.all(16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                duration: const Duration(milliseconds: 1000),
+                width: textWidth,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                duration: const Duration(seconds: 1),
               ),
             );
           }

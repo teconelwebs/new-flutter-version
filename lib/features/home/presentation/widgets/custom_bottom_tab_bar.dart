@@ -149,8 +149,9 @@ class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
                           color: isFocused
                               ? const Color(0xFFFB5404)
                               : const Color(0xFF666666),
-                          fontWeight:
-                              isFocused ? FontWeight.bold : FontWeight.normal,
+                          fontWeight: isFocused
+                              ? FontWeight.bold
+                              : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -184,10 +185,7 @@ class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
       return Stack(
         clipBehavior: Clip.none,
         children: [
-          CartIcon(
-            size: 26,
-            active: isFocused,
-          ),
+          CartIcon(size: 26, active: isFocused),
           if (widget.cartCount > 0)
             Positioned(
               right: -6,
@@ -198,10 +196,7 @@ class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
                   color: Colors.red,
                   shape: BoxShape.circle,
                 ),
-                constraints: const BoxConstraints(
-                  minWidth: 16,
-                  minHeight: 16,
-                ),
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                 child: Text(
                   '${widget.cartCount}',
                   style: const TextStyle(
@@ -219,32 +214,15 @@ class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
 
     switch (tab.label) {
       case "Home":
-        return HomeIcon(
-          size: 26,
-          color: selectedColor,
-        );
+        return HomeIcon(size: 26, color: selectedColor);
       case "Categories":
-        return CategoriesIcon(
-          size: 26,
-          color: selectedColor,
-        );
+        return CategoriesIcon(size: 26, color: selectedColor);
       case "Account":
-        return AccountIcon(
-          size: 26,
-          color: selectedColor,
-        );
+        return AccountIcon(size: 26, color: selectedColor);
       case "Play":
-        return PlayIcon(
-          size: 26,
-          active: isFocused,
-          activeColor: activeColor,
-        );
+        return PlayIcon(size: 26, active: isFocused, activeColor: activeColor);
       default:
-        return Icon(
-          Icons.help_outline,
-          size: 26,
-          color: selectedColor,
-        );
+        return Icon(Icons.help_outline, size: 26, color: selectedColor);
     }
   }
 }

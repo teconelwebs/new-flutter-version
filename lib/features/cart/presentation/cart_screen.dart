@@ -601,7 +601,7 @@ class _CartScreenState extends State<CartScreen>
   }
 
   void _handleCheckoutPress() {
-    Navigator.of(context).pushNamed('/Checkout');
+    Navigator.of(context).pushNamed(AppRoutes.confirmAddress);
   }
 
   void _showCustomPopup(String message) {
@@ -630,11 +630,25 @@ class _CartScreenState extends State<CartScreen>
     if (safeQty < 1) return;
 
     if (safeQty > 2) {
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Maximum you can buy 2 items at one time'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: const Text(
+            'Maximum you can buy 2 items at one time',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          backgroundColor: const Color(0xB3111111),
+          behavior: SnackBarBehavior.floating,
+          width: MediaQuery.sizeOf(context).width * 0.5,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          duration: const Duration(seconds: 1),
         ),
       );
       return;

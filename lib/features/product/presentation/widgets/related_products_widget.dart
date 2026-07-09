@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import '../../../../core/constants/app_routes.dart';
 
 class RelatedProductsWidget extends StatefulWidget {
   final String productId;
@@ -127,9 +128,10 @@ class _RelatedProductsWidgetState extends State<RelatedProductsWidget> {
               ),
               GestureDetector(
                 onTap: () {
-                  Navigator.of(context).pushNamed(
-                    '/Category/all',
-                    arguments: {'id': 'all', 'name': 'All Categories'},
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                    AppRoutes.home,
+                    (route) => false,
+                    arguments: 1,
                   );
                 },
                 // ignore: prefer_const_constructors

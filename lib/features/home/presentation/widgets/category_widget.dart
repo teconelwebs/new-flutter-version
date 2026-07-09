@@ -214,7 +214,10 @@ class _CategoryWidgetState extends State<CategoryWidget> {
     }
     Navigator.of(context).pushNamed(
       AppRoutes.searchResults,
-      arguments: name,
+      arguments: {
+        'query': name,
+        'categoryId': id,
+      },
     );
   }
 

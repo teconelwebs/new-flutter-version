@@ -1,40 +1,20 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../../core/constants/app_routes.dart';
+import '../../data/home_models.dart';
 
 double _safeBannerAspectRatio(double? ratio, {double fallback = 3.0}) {
   if (ratio == null || !ratio.isFinite || ratio <= 0) return fallback;
   return ratio.clamp(1.2, 5.0);
 }
 
-class BannerData {
-  final String image;
-  final String? link;
-
-  BannerData({required this.image, this.link});
-
-  factory BannerData.fromJson(Map<String, dynamic> json) {
-    return BannerData(
-      image: json['image'] ?? "",
-      link: json['link'],
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-        'image': image,
-        'link': link,
-      };
-}
-
 class BannerWidget extends StatefulWidget {
-  final int pullRefreshKey;
+  final List<HomeBanner> slides;
 
   const BannerWidget({
     super.key,
-    this.pullRefreshKey = 0,
+    required this.slides,
   });
 
   @override
@@ -46,10 +26,7 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
 
   static const Duration _slideDuration = Duration(milliseconds: 3000);
 
-  // Local States
-  List<BannerData> _slides = [];
-  bool _loading = true;
-  bool _error = false;
+  List<HomeBanner> _slides = [];
   int _activePage = 0;
   bool _isManualSwipe = false;
   bool _isAutoAdvancing = false;
@@ -57,11 +34,8 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
 
   final Map<int, double> _aspectRatios = {};
 
-  // Progress indicators animations references
   late AnimationController _progressController;
   late Animation<double> _progressAnimation;
-
-  static const String cacheKey = "home_mobile_slider_v3";
 
   @override
   void initState() {
@@ -74,14 +48,21 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
     _progressAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_progressController);
     _progressController.addStatusListener(_onProgressStatusChanged);
 
-    _initBannersData();
+    _slides = widget.slides;
+    _precalculateAspectRatios();
+    _startAutoCarousel();
   }
 
   @override
   void didUpdateWidget(covariant BannerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.pullRefreshKey > 0 && widget.pullRefreshKey != oldWidget.pullRefreshKey) {
-      _fetchBanners(force: true);
+    if (widget.slides != oldWidget.slides) {
+      setState(() {
+        _slides = widget.slides;
+        _activePage = 0;
+      });
+      _precalculateAspectRatios();
+      _startAutoCarousel();
     }
   }
 
@@ -93,107 +74,10 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
     super.dispose();
   }
 
-  // Cache loading logic
-  Future<void> _initBannersData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(cacheKey);
-
-      if (raw != null) {
-        final parsed = jsonDecode(raw);
-        final List<dynamic> rawSlides = parsed['slides'] ?? [];
-
-        if (rawSlides.isNotEmpty) {
-          final loadedSlides = rawSlides.map((s) => BannerData.fromJson(s)).toList();
-          setState(() {
-            _slides = loadedSlides;
-            _loading = false;
-          });
-          _precalculateAspectRatios();
-          _startAutoCarousel();
-          return;
-        }
-      }
-    } catch (_) {}
-
-    await _fetchBanners();
-  }
-
-  // Fetch slider items from network with retry fallback
-  Future<void> _fetchBanners({bool force = false}) async {
-    if (!force && _slides.isNotEmpty) {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
-      return;
-    }
-
-    if (mounted) {
-      setState(() {
-        _loading = _slides.isEmpty;
-        _error = false;
-      });
-    }
-
-    const String apiUrl = "https://welfogapi.welfog.com/api/v2/bannerdata/";
-    const String cdnBase = "https://d1f02fefkbso7w.cloudfront.net/";
-
-    int attempts = 3;
-    for (int i = 1; i <= attempts; i++) {
-      try {
-        final response = await http.get(Uri.parse(apiUrl));
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          final decoded = jsonDecode(response.body);
-          final rawSlides = decoded['mobile_slider'] as List? ?? [];
-          
-          final List<BannerData> parsedSlides = rawSlides.whereType<Map>().map((e) {
-            final String img = (e['image'] ?? "").toString();
-            final String fullImg = img.startsWith("http") ? img : "$cdnBase$img";
-            return BannerData(
-              image: fullImg,
-              link: (e['link'] ?? "").toString(),
-            );
-          }).toList();
-
-          if (parsedSlides.isNotEmpty) {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString(
-              cacheKey,
-              jsonEncode({
-                'ts': DateTime.now().millisecondsSinceEpoch,
-                'slides': parsedSlides.map((s) => s.toJson()).toList(),
-              }),
-            );
-
-            if (mounted) {
-              setState(() {
-                _slides = parsedSlides;
-                _loading = false;
-                _error = false;
-              });
-              _precalculateAspectRatios();
-              _startAutoCarousel();
-            }
-            return;
-          }
-        }
-      } catch (err) {
-        debugPrint("Error fetching banners attempt $i: $err");
-        if (i == attempts && mounted) {
-          setState(() {
-            _error = _slides.isEmpty;
-            _loading = false;
-          });
-        }
-      }
-      await Future.delayed(Duration(milliseconds: 300 * i));
-    }
-  }
-
-  // Dynamic Image resolution/aspect ratio calculations
   void _precalculateAspectRatios() {
     for (int i = 0; i < _slides.length; i++) {
       final imgUrl = _slides[i].image;
+      if (imgUrl.trim().isEmpty) continue;
       final Image image = Image.network(imgUrl);
       
       image.image.resolve(const ImageConfiguration()).addListener(
@@ -262,8 +146,7 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
     }
   }
 
-  // Navigation triggers on slide clicks
-  void _handleBannerPress(BannerData slide) {
+  void _handleBannerPress(HomeBanner slide) {
     if (slide.link == null || slide.link!.isEmpty) return;
 
     final parts = slide.link!.replaceAll(RegExp(r'/$'), '').split('/');
@@ -279,31 +162,8 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        child: AspectRatio(
-          aspectRatio: 3 / 1,
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F0F0),
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_error) {
-      return SizedBox(
-        height: 120,
-        child: Center(
-          child: Text(
-            "Failed to load banners",
-            style: TextStyle(color: Colors.red.shade700, fontSize: 16),
-          ),
-        ),
-      );
+    if (_slides.isEmpty) {
+      return const SizedBox.shrink();
     }
 
     final double activeAspect = _safeBannerAspectRatio(_aspectRatios[_activePage]);

@@ -27,6 +27,7 @@ class _SearchScreenState extends State<SearchScreen> {
   List<SearchCategory> _categories = const [];
   bool _categoriesLoading = true;
   bool _suggestionLoading = false;
+  bool _isSearching = false;
   Timer? _debounce;
 
   @override
@@ -45,13 +46,6 @@ class _SearchScreenState extends State<SearchScreen> {
   void _onTextChanged() => setState(() {});
 
   Future<void> _loadInitial() async {
-    if (_queryCtrl.text.isEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getString('last_search_keyword');
-      if (saved != null && saved.trim().isNotEmpty && mounted) {
-        _queryCtrl.text = saved.trim();
-      }
-    }
     await _loadRecent();
     await _loadCategories();
     if (_queryCtrl.text.trim().isNotEmpty) {
@@ -87,15 +81,22 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _onQueryChanged(String value) {
     _debounce?.cancel();
-    if (value.trim().isEmpty) {
-      setState(() => _suggestions = const []);
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _suggestions = const [];
+        _suggestionLoading = false;
+      });
       return;
     }
+    setState(() {
+      _suggestionLoading = true;
+      _suggestions = const []; // Clear old suggestions immediately while typing new characters
+    });
     _debounce = Timer(const Duration(milliseconds: 320), () async {
       if (!mounted) return;
-      setState(() => _suggestionLoading = true);
       try {
-        final list = await _searchApi.autosuggest(value);
+        final list = await _searchApi.autosuggest(trimmed);
         if (!mounted) return;
         setState(() => _suggestions = list);
       } finally {
@@ -107,16 +108,32 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _performSearch([String? raw]) async {
     final query = (raw ?? _queryCtrl.text).trim();
     if (query.isEmpty) return;
+    setState(() {
+      _isSearching = true;
+    });
     FocusScope.of(context).unfocus();
     _queryCtrl.text = query;
     await _saveRecent(query);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('last_search_keyword', query);
     if (!mounted) return;
-    Navigator.of(context).pushNamed(
+    
+    await Navigator.of(context).pushNamed(
       AppRoutes.searchResults,
       arguments: query,
     );
+
+    if (mounted) {
+      setState(() {
+        _isSearching = false;
+      });
+      final q = _queryCtrl.text.trim();
+      if (q.isNotEmpty) {
+        _onQueryChanged(q);
+      } else {
+        _loadRecent();
+      }
+    }
   }
 
   @override
@@ -166,7 +183,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildDiscovery() {
     final q = _queryCtrl.text.trim();
     if (q.isNotEmpty) {
-      if (_suggestionLoading) {
+      if (_suggestionLoading || _isSearching) {
         return const Center(
           child: CircularProgressIndicator(
             strokeWidth: 2,
@@ -185,7 +202,8 @@ class _SearchScreenState extends State<SearchScreen> {
       return ListView.separated(
         padding: const EdgeInsets.symmetric(vertical: 4),
         itemCount: _suggestions.length,
-        separatorBuilder: (_, __) => const Divider(height: 1, indent: 52, color: Color(0xFFF3F4F6)),
+        separatorBuilder: (_, __) =>
+            const Divider(height: 1, indent: 52, color: Color(0xFFF3F4F6)),
         itemBuilder: (_, i) {
           final s = _suggestions[i];
           return ListTile(
@@ -196,13 +214,15 @@ class _SearchScreenState extends State<SearchScreen> {
                 color: const Color(0xFFF3F4F6),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF6B7280)),
+              child: const Icon(Icons.search_rounded,
+                  size: 18, color: Color(0xFF6B7280)),
             ),
             title: Text(
               s,
               style: const TextStyle(fontSize: 14, color: Color(0xFF111827)),
             ),
-            trailing: const Icon(Icons.north_west_rounded, size: 16, color: Color(0xFF9CA3AF)),
+            trailing: const Icon(Icons.north_west_rounded,
+                size: 16, color: Color(0xFF9CA3AF)),
             onTap: () => _performSearch(s),
           );
         },
@@ -234,7 +254,8 @@ class _SearchScreenState extends State<SearchScreen> {
                 },
                 style: TextButton.styleFrom(
                   foregroundColor: const Color(0xFFFB5404),
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  textStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600),
                 ),
                 child: const Text('Clear All'),
               ),
@@ -248,10 +269,12 @@ class _SearchScreenState extends State<SearchScreen> {
                   (r) => ActionChip(
                     backgroundColor: const Color(0xFFF9FAFB),
                     side: const BorderSide(color: Color(0xFFE5E7EB)),
-                    avatar: const Icon(Icons.history_rounded, size: 14, color: Color(0xFF6B7280)),
+                    avatar: const Icon(Icons.history_rounded,
+                        size: 14, color: Color(0xFF6B7280)),
                     label: Text(
                       r,
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
+                      style: const TextStyle(
+                          fontSize: 13, color: Color(0xFF374151)),
                     ),
                     onPressed: () => _performSearch(r),
                   ),
@@ -268,7 +291,6 @@ class _SearchScreenState extends State<SearchScreen> {
             color: Color(0xFF111827),
           ),
         ),
-        const SizedBox(height: 10),
         if (_categoriesLoading)
           const Padding(
             padding: EdgeInsets.all(20),
@@ -288,7 +310,8 @@ class _SearchScreenState extends State<SearchScreen> {
               crossAxisCount: MediaQuery.sizeOf(context).width < 360 ? 3 : 3,
               mainAxisSpacing: 10,
               crossAxisSpacing: 10,
-              childAspectRatio: MediaQuery.sizeOf(context).width < 360 ? 0.95 : 1.05,
+              childAspectRatio:
+                  MediaQuery.sizeOf(context).width < 360 ? 0.95 : 1.05,
             ),
             itemBuilder: (_, i) {
               final c = _categories[i];
@@ -316,8 +339,9 @@ class _SearchScreenState extends State<SearchScreen> {
                         child: Image.network(
                           c.iconUrl,
                           fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) =>
-                              const Icon(Icons.category_outlined, color: Color(0xFF9CA3AF)),
+                          errorBuilder: (_, __, ___) => const Icon(
+                              Icons.category_outlined,
+                              color: Color(0xFF9CA3AF)),
                         ),
                       ),
                       const SizedBox(height: 6),

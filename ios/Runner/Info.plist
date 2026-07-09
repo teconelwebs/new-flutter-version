@@ -66,9 +66,30 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Allow Welfog to access your camera to upload product photos, scan QR codes, and add images to reviews.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Allow Welfog to access your photos so you can upload images for your profile, reviews, and product searches.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Allow Welfog to save product images, invoices, and receipts to your device.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We need your location to deliver order and suggest correct local address.</string>
+	<string>Allow Welfog to access your location to show nearby stores, estimate delivery times, and auto-fill your delivery address.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Allow Welfog to access your microphone for voice search and recording audio or video reviews.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>We need your location to deliver order and suggest correct local address.</string>
+	<string>Allow Welfog to access your location to help you track your live delivery status even when the app is in the background.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>phonepe</string>
+		<string>tez</string>
+		<string>paytm</string>
+		<string>gpay</string>
+		<string>upi</string>
+	</array>
 </dict>
 </plist>

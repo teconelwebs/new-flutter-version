@@ -5,6 +5,30 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/constants/app_routes.dart';
 
+class AddressEventBus {
+  static final List<VoidCallback> _listeners = [];
+
+  static void addListener(VoidCallback listener) {
+    if (!_listeners.contains(listener)) {
+      _listeners.add(listener);
+    }
+  }
+
+  static void removeListener(VoidCallback listener) {
+    _listeners.remove(listener);
+  }
+
+  static void emitAddressChanged() {
+    for (final listener in List<VoidCallback>.from(_listeners)) {
+      try {
+        listener();
+      } catch (e) {
+        debugPrint('Error invoking AddressEventBus listener: $e');
+      }
+    }
+  }
+}
+
 class AddressScreen extends StatefulWidget {
   const AddressScreen({super.key});
 
@@ -24,6 +48,13 @@ class _AddressScreenState extends State<AddressScreen> {
     super.initState();
     _getRealName();
     _fetchAddresses();
+    AddressEventBus.addListener(_fetchAddresses);
+  }
+
+  @override
+  void dispose() {
+    AddressEventBus.removeListener(_fetchAddresses);
+    super.dispose();
   }
 
   Future<void> _getRealName() async {
@@ -285,7 +316,7 @@ class _AddressScreenState extends State<AddressScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${address['address_details'] ?? ''}, ${address['address'] ?? ''}, ${address['city_name'] ?? ''}',
+                  _formatFullAddress(address),
                   style: const TextStyle(color: Colors.grey, fontSize: 13),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -460,26 +491,13 @@ class _AddressScreenState extends State<AddressScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                '${item['address'] ?? ''}${item['city_name'] != null && item['city_name'].toString().isNotEmpty ? ', ${item['city_name']}' : ''}',
+                                _formatFullAddress(item),
                                 style: const TextStyle(
                                   color: Color(0xFF4B5563),
                                   fontSize: 13,
                                   height: 1.4,
                                 ),
                               ),
-                              if (item['address_details'] != null &&
-                                  item['address_details'].toString().trim().isNotEmpty &&
-                                  item['address_details'].toString().toLowerCase() != 'null') ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  item['address_details'].toString(),
-                                  style: const TextStyle(
-                                    color: Color(0xFF4B5563),
-                                    fontSize: 13,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ],
                               const SizedBox(height: 8),
                               Text(
                                 'Phone: ${item['phone'] ?? ''}',
@@ -618,5 +636,52 @@ class _AddressScreenState extends State<AddressScreen> {
         ),
       ),
     );
+  }
+
+  String _formatFullAddress(Map<dynamic, dynamic> addr) {
+    final details = (addr['address_details']?.toString() ?? '').trim();
+    final address = (addr['address']?.toString() ?? '').trim();
+    final city = (addr['city_name']?.toString() ?? '').trim();
+    final state = (addr['state_name']?.toString() ?? '').trim();
+    final pincode = (addr['postal_code']?.toString() ?? '').trim();
+
+    final cleanDetails = (details.toLowerCase() == 'null' || details.toLowerCase() == 'null,') ? '' : details;
+    final cleanAddress = (address.toLowerCase() == 'null') ? '' : address;
+    final cleanCity = (city.toLowerCase() == 'null') ? '' : city;
+    final cleanState = (state.toLowerCase() == 'null') ? '' : state;
+    final cleanPincode = (pincode.toLowerCase() == 'null') ? '' : pincode;
+
+    String combined = '';
+    if (cleanDetails.isNotEmpty) {
+      combined = cleanDetails;
+    }
+    if (cleanAddress.isNotEmpty) {
+      if (combined.isNotEmpty) {
+        if (cleanAddress.toLowerCase().startsWith(cleanDetails.toLowerCase())) {
+          combined = cleanAddress;
+        } else {
+          combined += ', $cleanAddress';
+        }
+      } else {
+        combined = cleanAddress;
+      }
+    }
+
+    final combinedLower = combined.toLowerCase();
+    String suffix = '';
+    if (cleanCity.isNotEmpty && !combinedLower.contains(cleanCity.toLowerCase())) {
+      suffix += ', $cleanCity';
+    }
+    if (cleanState.isNotEmpty && !combinedLower.contains(cleanState.toLowerCase())) {
+      suffix += ', $cleanState';
+    }
+    if (cleanPincode.isNotEmpty && !combinedLower.contains(cleanPincode.toLowerCase())) {
+      suffix += ' - $cleanPincode';
+    }
+
+    if (combined.isEmpty && suffix.startsWith(', ')) {
+      return suffix.substring(2);
+    }
+    return '$combined$suffix';
   }
 }

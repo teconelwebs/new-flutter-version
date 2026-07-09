@@ -152,6 +152,40 @@ class _OrdersScreenState extends State<OrdersScreen> {
     }
   }
 
+  bool _isReviewWindowOpen(String? dateString) {
+    if (dateString == null || dateString.isEmpty) return false;
+    try {
+      final targetDate = DateTime.parse(dateString);
+      final today = DateTime.now();
+      final difference = today.difference(targetDate);
+      return difference.inDays <= 30;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _openReviewModal(Map<String, dynamic> order) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return _ReviewSubmitDialog(
+          order: order,
+          onSuccess: (updatedReview) {
+            setState(() {
+              final index = _orders.indexWhere((o) => o['oid'] == order['oid']);
+              if (index != -1) {
+                final updatedOrder = Map<String, dynamic>.from(_orders[index]);
+                updatedOrder['review'] = updatedReview;
+                _orders[index] = updatedOrder;
+              }
+            });
+          },
+        );
+      },
+    );
+  }
+
 
 
 
@@ -381,6 +415,73 @@ class _OrdersScreenState extends State<OrdersScreen> {
                               ),
                               const SizedBox(height: 16),
 
+                              // 2.5. Product Rating Row
+                              if (['delivered', 'completed'].contains(order['current_order_status']?.toString().toLowerCase().trim())) ...[
+                                () {
+                                  final hasReview = order['review'] != null && order['review']['rating'] != null;
+                                  final canReview = _isReviewWindowOpen(order['date']?.toString());
+                                  if (!canReview && !hasReview) return const SizedBox.shrink();
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: InkWell(
+                                      onTap: canReview ? () => _openReviewModal(order) : null,
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade50,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: Colors.grey.shade200, width: 0.8),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Text(
+                                                  hasReview
+                                                      ? (canReview ? "Your Rating (Tap to change)" : "Your Rating (Locked)")
+                                                      : "Rate this product",
+                                                  style: TextStyle(
+                                                    color: Colors.grey.shade700,
+                                                    fontSize: 12.5,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                Row(
+                                                  children: List.generate(5, (index) {
+                                                    final starNum = index + 1;
+                                                    final double userRating = double.tryParse(order['review']?['rating']?.toString() ?? '0') ?? 0.0;
+                                                    final isStarred = starNum <= userRating;
+                                                    return Icon(
+                                                      isStarred ? Icons.star : Icons.star_border,
+                                                      size: 20,
+                                                      color: (canReview || hasReview) ? const Color(0xFFFFB800) : Colors.grey.shade400,
+                                                    );
+                                                  }),
+                                                ),
+                                              ],
+                                            ),
+                                            if (!canReview && hasReview) ...[
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                "Reviews cannot be edited after 30 days of purchase.",
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.grey.shade500,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }(),
+                              ],
+
                               const Divider(height: 1, color: Color(0xFFF3F4F6)),
                               const SizedBox(height: 12),
 
@@ -544,6 +645,200 @@ class StepIndicator extends StatelessWidget {
           }),
         ),
       ],
+    );
+  }
+}
+
+class _ReviewSubmitDialog extends StatefulWidget {
+  final Map<String, dynamic> order;
+  final Function(Map<String, dynamic>) onSuccess;
+
+  const _ReviewSubmitDialog({
+    required this.order,
+    required this.onSuccess,
+  });
+
+  @override
+  State<_ReviewSubmitDialog> createState() => _ReviewSubmitDialogState();
+}
+
+class _ReviewSubmitDialogState extends State<_ReviewSubmitDialog> {
+  int _currentRating = 0;
+  final TextEditingController _commentController = TextEditingController();
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.order['review'] != null) {
+      final double rVal = double.tryParse(widget.order['review']['rating']?.toString() ?? '0') ?? 0.0;
+      _currentRating = rVal.toInt();
+      _commentController.text = widget.order['review']['comment']?.toString() ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitReview() async {
+    if (_currentRating == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one star.')),
+      );
+      return;
+    }
+
+    setState(() => _submitting = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      final userIdStr = prefs.getString('user_id') ?? '';
+      final accessToken = prefs.getString('access_token') ?? '';
+
+      if (userIdStr.isEmpty || accessToken.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login session expired.')),
+        );
+        return;
+      }
+
+      final dynamic userId = int.tryParse(userIdStr) ?? userIdStr;
+      final dynamic orderId = int.tryParse(widget.order['oid']?.toString() ?? '') ?? widget.order['oid'];
+      final dynamic productId = int.tryParse(widget.order['product_id']?.toString() ?? '') ?? widget.order['product_id'];
+
+      final payload = {
+        'user_id': userId,
+        'order_id': orderId,
+        'product_id': productId,
+        'rating': _currentRating,
+        'comment': _commentController.text.trim(),
+      };
+
+      final response = await http.post(
+        Uri.parse('https://welfogapi.welfog.com/api/v2/reviews/submit'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        widget.onSuccess({
+          'rating': _currentRating,
+          'comment': _commentController.text.trim(),
+        });
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Review submitted successfully!')),
+          );
+        }
+      } else {
+        throw 'Server returned status: ${response.statusCode}';
+      }
+    } catch (e) {
+      debugPrint('Review Submit Error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to save your review. Please try again.')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isEditing = widget.order['review'] != null;
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isEditing ? 'Update Review' : 'Rate Product',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) {
+                  final starNum = index + 1;
+                  return IconButton(
+                    onPressed: () {
+                      setState(() => _currentRating = starNum);
+                    },
+                    icon: Icon(
+                      starNum <= _currentRating ? Icons.star : Icons.star_border,
+                      size: 40,
+                      color: const Color(0xFFFFB800),
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _commentController,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: 'Write your comments here...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFFB5404)),
+                  ),
+                  contentPadding: const EdgeInsets.all(12),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+                    child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _submitting ? null : _submitReview,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFB5404),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    ),
+                    child: _submitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Text('Submit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

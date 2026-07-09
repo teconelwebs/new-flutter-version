@@ -65,7 +65,9 @@ class ProductCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              item.subtitle,
+              item.brand.trim().isEmpty || item.brand.trim().toLowerCase() == 'no brand'
+                  ? ' '
+                  : item.brand.trim(),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: Color(0xFF6E7380), fontSize: 12),

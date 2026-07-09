@@ -6,8 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
-import '../../data/models/product_item.dart';
-import '../../../../core/constants/app_routes.dart';
 
 class ProductDetailsWidget extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -32,6 +30,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
   String _errorMessage = '';
   bool _checkingDelivery = false;
   String _lastCheckedPin = '';
+  dynamic _checkedPincodeDuration;
 
   int _apiTotalReviews = 0;
   double _apiRating = 0.0;
@@ -46,14 +45,13 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
     final rVal =
         widget.data['rating'] ?? widget.data['product']?['rating'] ?? 0.0;
     _apiRating = double.tryParse(rVal.toString()) ?? 0.0;
-    if (_apiRating <= 0) _apiRating = 4.3;
 
     final rawRc = widget.data['total_ratings'] ??
         widget.data['rating_count'] ??
         widget.data['ratings_count'] ??
         widget.data['product']?['total_ratings'] ??
         widget.data['product']?['rating_count'];
-    _totalRatings = int.tryParse(rawRc?.toString() ?? '') ?? 48;
+    _totalRatings = int.tryParse(rawRc?.toString() ?? '') ?? 0;
 
     _fetchReviews();
     if (widget.pincode.isNotEmpty) {
@@ -64,9 +62,13 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
   @override
   void didUpdateWidget(ProductDetailsWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.pincode != widget.pincode) {
-      _pincodeController.text = widget.pincode;
-      _checkDelivery(widget.pincode);
+    final pincodeChanged = oldWidget.pincode != widget.pincode;
+    final dataChanged = oldWidget.data != widget.data;
+    if (pincodeChanged || dataChanged) {
+      if (widget.pincode.isNotEmpty) {
+        _pincodeController.text = widget.pincode;
+        _checkDelivery(widget.pincode);
+      }
     }
   }
 
@@ -95,7 +97,6 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                 widget.data['product']?['rating'] ??
                 0.0;
             _apiRating = double.tryParse(rVal.toString()) ?? 0.0;
-            if (_apiRating <= 0) _apiRating = 4.3;
 
             final rawRc = data['total_ratings'] ??
                 data['rating_count'] ??
@@ -105,8 +106,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                 widget.data['product']?['total_ratings'] ??
                 widget.data['product']?['rating_count'];
             _totalRatings =
-                int.tryParse(rawRc?.toString() ?? '') ?? (_apiTotalReviews * 4);
-            if (_totalRatings <= 0) _totalRatings = 48;
+                int.tryParse(rawRc?.toString() ?? '') ?? _apiTotalReviews;
           });
         }
       }
@@ -131,29 +131,57 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getString('user_id') ?? '';
+      final userIdStr = prefs.getString('user_id') ?? '';
+      final accessToken = prefs.getString('access_token') ?? '';
       final dynamicShopLocationId =
           widget.data['location_id'] ?? widget.data['product']?['location_id'];
 
+      // Parse IDs to numbers (int) if possible
+      final dynamic userId = int.tryParse(userIdStr) ?? (userIdStr.isEmpty ? null : userIdStr);
+      
+      final shopLocationIdStr = (dynamicShopLocationId ?? '').toString();
+      final dynamic shopLocationId = int.tryParse(shopLocationIdStr) ?? (shopLocationIdStr.isEmpty ? null : shopLocationIdStr);
+
+      final productIdStr = (widget.data['id'] ?? widget.data['product']?['id'] ?? widget.data['product_id'] ?? '').toString();
+      final dynamic shopProductId = int.tryParse(productIdStr) ?? (productIdStr.isEmpty ? null : productIdStr);
+
+      // Parse coordinates to numbers (double) if possible
+      final latVal = widget.data['shop_location']?['shop_latitude'] ??
+          widget.data['product']?['shop_location']?['shop_latitude'];
+      final lngVal = widget.data['shop_location']?['shop_longitude'] ??
+          widget.data['product']?['shop_location']?['shop_longitude'];
+      final dynamic shopLatitude = double.tryParse(latVal?.toString() ?? '') ?? latVal;
+      final dynamic shopLongitude = double.tryParse(lngVal?.toString() ?? '') ?? lngVal;
+
       final payload = {
         'pincode': pin,
-        'shop_latitude': widget.data['shop_location']?['shop_latitude'] ??
-            widget.data['product']?['shop_location']?['shop_latitude'],
-        'shop_longitude': widget.data['shop_location']?['shop_longitude'] ??
-            widget.data['product']?['shop_location']?['shop_longitude'],
-        'shop_product_id': widget.data['id'] ??
-            widget.data['product']?['id'] ??
-            widget.data['product_id'],
+        'shop_latitude': shopLatitude,
+        'shop_longitude': shopLongitude,
+        'shop_product_id': shopProductId,
         'user_id': userId,
-        'shop_location_id': dynamicShopLocationId,
+        'shop_location_id': shopLocationId,
       };
 
-      final uri = Uri.parse('https://welfogapi.welfog.com/api/pincode/check');
+      final Map<String, String> headers = {
+        'Content-Type': 'application/json',
+      };
+      if (accessToken.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $accessToken';
+      }
+
+      final uri = Uri.parse('https://welfogapi.welfog.com/api/v2/pincode/check');
+      
+      debugPrint('🔍 Outgoing Pincode Check Payload: ${jsonEncode(payload)}');
+      debugPrint('🔍 Outgoing Headers: $headers');
+
       final response = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: jsonEncode(payload),
       );
+
+      debugPrint('🔍 Response Status Code: ${response.statusCode}');
+      debugPrint('🔍 Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -162,13 +190,21 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
             _deliveryMessage =
                 data['message'] ?? 'Product available for delivery';
             _errorMessage = '';
+            _checkedPincodeDuration = data['duration'] ?? data['data']?['duration'];
           });
         } else {
           setState(() {
             _errorMessage = 'Ops.. Product is Not available on this pincode';
             _deliveryMessage = '';
+            _checkedPincodeDuration = null;
           });
         }
+      } else {
+        setState(() {
+          _errorMessage = 'Ops.. Product is Not available on this pincode';
+          _deliveryMessage = '';
+          _checkedPincodeDuration = null;
+        });
       }
     } catch (e) {
       setState(() {
@@ -184,11 +220,33 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
   }
 
   String _formatDeliveryTime(dynamic duration) {
-    if (duration == null) return '2–4 days';
-    final double dur = double.tryParse(duration.toString()) ?? 0.0;
-    if (dur <= 1440) return '1 day';
-    final days = (dur / 1440).ceil();
-    return '$days days';
+    if (duration == null) return '2 - 4 days';
+    final double? parsedVal = double.tryParse(duration.toString());
+    if (parsedVal == null || parsedVal < 0) {
+      return '2 - 4 days';
+    }
+
+    final int minutes = parsedVal.toInt();
+    final int days = minutes ~/ 1440; // Math.floor(minutes / 1440)
+
+    if (days > 0) {
+      final int min = days;
+      final int max = days + 1;
+      return '$min - $max days';
+    }
+
+    final int hours = (minutes % 1440) ~/ 60;
+    final int mins = minutes % 60;
+
+    String result = '';
+    if (hours > 0) {
+      result += '$hours hr${hours > 1 ? 's' : ''}';
+    }
+    if (mins > 0) {
+      result += '${result.isNotEmpty ? ' ' : ''}$mins min${mins > 1 ? 's' : ''}';
+    }
+
+    return result.trim().isNotEmpty ? result.trim() : '0 min';
   }
 
   List<Color> _parseGradient(String colorVal) {
@@ -318,59 +376,60 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
           ),
 
           // Star rating reviews summary
-          GestureDetector(
-            onTap: widget.onRatingTap,
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 4, bottom: 6),
-              child: Row(
-                children: [
-                  // Green capsule rating badge
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF16A34A), // Emerald Green
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          _apiRating > 0
-                              ? _apiRating.toStringAsFixed(1)
-                              : '4.3',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
+          if (_apiTotalReviews > 0)
+            GestureDetector(
+              onTap: widget.onRatingTap,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 6),
+                child: Row(
+                  children: [
+                    // Green capsule rating badge
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF16A34A), // Emerald Green
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            _apiRating > 0
+                                ? _apiRating.toStringAsFixed(1)
+                                : '0.0',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 3),
-                        const Icon(Icons.star, color: Colors.white, size: 13),
-                      ],
+                          const SizedBox(width: 3),
+                          const Icon(Icons.star, color: Colors.white, size: 13),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
+                    const SizedBox(width: 6),
 
-                  // Rating & Review counts
-                  Text(
-                    '$_totalRatings Ratings | ${_apiTotalReviews > 0 ? _apiTotalReviews : 0} Reviews',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF4B5563),
-                      fontWeight: FontWeight.w500,
+                    // Rating & Review counts
+                    Text(
+                      '$_totalRatings Ratings | $_apiTotalReviews Reviews',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF4B5563),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 2),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: Color(0xFF9CA3AF),
-                    size: 18,
-                  ),
-                ],
+                    const SizedBox(width: 2),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Color(0xFF9CA3AF),
+                      size: 18,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
 
           // Price info
           Padding(
@@ -467,6 +526,9 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                                   height: 1.2,
                                   color: Color(0xFF1F2937),
                                 ),
+                                onChanged: (value) {
+                                  setState(() {});
+                                },
                                 decoration: const InputDecoration(
                                   hintText: 'Enter Pincode',
                                   counterText: '',
@@ -610,7 +672,14 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    'Estimated Delivery ${_formatDeliveryTime(widget.data['shop_location']?['duration'] ?? widget.data['duration'] ?? 0)}',
+                                    'Estimated Delivery ${_formatDeliveryTime(
+                                      _checkedPincodeDuration ??
+                                      widget.data['shop_location']?['duration'] ??
+                                      widget.data['duration'] ??
+                                      widget.data['data']?['duration'] ??
+                                      widget.data['product']?['shop_location']?['duration'] ??
+                                      widget.data['product']?['duration']
+                                    )}',
                                     style: TextStyle(
                                         color: Colors.green.shade800,
                                         fontWeight: FontWeight.w600),
@@ -684,20 +753,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                             variantKey.toLowerCase() == 'size' ||
                             item['size'] != null) {
                           return GestureDetector(
-                            onTap: () {
-                              Navigator.of(context).pushReplacementNamed(
-                                AppRoutes.product,
-                                arguments: ProductItem(
-                                  id: '',
-                                  title: item['name'] ?? item['size'] ?? '',
-                                  subtitle: '',
-                                  price: 0,
-                                  rating: 0,
-                                  color: Colors.transparent,
-                                  slug: item['slug'] ?? '',
-                                ),
-                              );
-                            },
+                            onTap: null,
                             child: Container(
                               margin: const EdgeInsets.symmetric(
                                   horizontal: 4, vertical: 4),
@@ -737,20 +793,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                           final isSelectedColor = isSelected;
 
                           return GestureDetector(
-                            onTap: () {
-                              Navigator.of(context).pushReplacementNamed(
-                                AppRoutes.product,
-                                arguments: ProductItem(
-                                  id: '',
-                                  title: item['name'] ?? item['color'] ?? '',
-                                  subtitle: '',
-                                  price: 0,
-                                  rating: 0,
-                                  color: Colors.transparent,
-                                  slug: item['slug'] ?? '',
-                                ),
-                              );
-                            },
+                            onTap: null,
                             child: Container(
                               margin: const EdgeInsets.symmetric(
                                   horizontal: 4, vertical: 4),
@@ -807,20 +850,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                         // 3. IMAGE THUMBNAILS
                         if (item['thumb'] != null) {
                           return GestureDetector(
-                            onTap: () {
-                              Navigator.of(context).pushReplacementNamed(
-                                AppRoutes.product,
-                                arguments: ProductItem(
-                                  id: '',
-                                  title: item['name'] ?? '',
-                                  subtitle: '',
-                                  price: 0,
-                                  rating: 0,
-                                  color: Colors.transparent,
-                                  slug: item['slug'] ?? '',
-                                ),
-                              );
-                            },
+                            onTap: null,
                             child: Container(
                               width: 44,
                               height: 44,

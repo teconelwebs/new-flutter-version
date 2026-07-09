@@ -5,9 +5,10 @@ import '../../../core/constants/app_routes.dart';
 import '../data/account_api_service.dart';
 
 class AccountScreen extends StatefulWidget {
-  const AccountScreen({super.key, this.embedded = false});
+  const AccountScreen({super.key, this.embedded = false, this.active = false});
 
   final bool embedded;
+  final bool active;
 
   @override
   State<AccountScreen> createState() => _AccountScreenState();
@@ -60,6 +61,14 @@ class _AccountScreenState extends State<AccountScreen> {
       bg: Color(0xFFE0F2FE),
     ),
     _MenuItem(
+      keyName: 'supplierInfo',
+      label: 'Supplier Info',
+      subtitle: 'Brands/Supplier',
+      icon: Icons.qr_code_scanner_outlined,
+      tint: Color(0xFFEA580C),
+      bg: Color(0xFFFFEDD5),
+    ),
+    _MenuItem(
       keyName: 'help',
       label: 'Help Center',
       subtitle: 'Instant Help',
@@ -83,14 +92,26 @@ class _AccountScreenState extends State<AccountScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  @override
+  void didUpdateWidget(covariant AccountScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) {
+      _load(silent: true);
+    }
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _loading = true);
+    }
     try {
       final u = await _api.fetchUser();
       if (!mounted) return;
       setState(() => _user = u);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && !silent) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -125,6 +146,9 @@ class _AccountScreenState extends State<AccountScreen> {
         return;
       case 'help':
         Navigator.of(context).pushNamed(AppRoutes.helpCenter);
+        return;
+      case 'supplierInfo':
+        Navigator.of(context).pushNamed(AppRoutes.supplierInfo);
         return;
       default:
         ScaffoldMessenger.of(context).showSnackBar(

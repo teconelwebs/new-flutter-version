@@ -75,7 +75,14 @@ class ProductApiService {
           final brand = (raw['brand'] ?? raw['data']?['brand'] ?? '')
               .toString();
           final price = _toDouble(
-            raw['main_price'] ?? raw['new_price'] ?? raw['price'],
+            raw['main_price'] ??
+                raw['final_price']?['sellPrice'] ??
+                raw['new_price'] ??
+                raw['unit_price'] ??
+                raw['discount_price'] ??
+                raw['base_price'] ??
+                raw['price'] ??
+                0,
           );
           final image = _asAbsolute(
             (raw['thumbnail_image'] ??

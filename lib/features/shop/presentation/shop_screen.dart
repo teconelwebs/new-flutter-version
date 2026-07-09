@@ -163,9 +163,12 @@ class _ShopScreenState extends State<ShopScreen> {
                       const SliverToBoxAdapter(child: SizedBox.shrink()),
 
                     // "All Products" label
+                    // ignore: prefer_const_constructors
                     SliverToBoxAdapter(
+                      // ignore: prefer_const_constructors
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                        // ignore: prefer_const_constructors
                         child: Text(
                           'All Products',
                           style: const TextStyle(
@@ -181,12 +184,12 @@ class _ShopScreenState extends State<ShopScreen> {
                     if (_loadingProducts)
                       SliverToBoxAdapter(child: _buildProductsSkeleton(cardWidth))
                     else if (_products.isEmpty)
-                      SliverToBoxAdapter(
+                      const SliverToBoxAdapter(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 48),
+                          padding: EdgeInsets.symmetric(vertical: 48),
                           child: Center(
                             child: Column(
-                              children: const [
+                              children: [
                                 Icon(Icons.shopping_bag_outlined, size: 48, color: Color(0xFFCCCCCC)),
                                 SizedBox(height: 12),
                                 Text(
@@ -290,10 +293,10 @@ class _ShopScreenState extends State<ShopScreen> {
             Positioned(
               bottom: -30,
               child: Container(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
-                  boxShadow: const [
+                  boxShadow: [
                     BoxShadow(
                       color: Color(0x25000000),
                       blurRadius: 8,
