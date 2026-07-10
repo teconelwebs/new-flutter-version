@@ -147,32 +147,70 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
       );
     }
 
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final childAspectRatio = homeProductGridAspectRatio(screenWidth);
+    // Split list into left and right columns for masonry layout
+    final leftColumnItems = [];
+    final rightColumnItems = [];
+    for (int i = 0; i < _products.length; i++) {
+      if (i % 2 == 0) {
+        leftColumnItems.add(_products[i]);
+      } else {
+        rightColumnItems.add(_products[i]);
+      }
+    }
 
-    return GridView.builder(
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(12),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: childAspectRatio,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: leftColumnItems.map((p) {
+                final originalIndex = _products.indexOf(p);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: HomeProductCard(
+                    product: p,
+                    onTap: () {
+                      Navigator.of(context).pushNamed(
+                        AppRoutes.product,
+                        arguments: _toProductItem(p, originalIndex),
+                      ).then((_) {
+                        _loadRecentlyViewed();
+                      });
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: rightColumnItems.map((p) {
+                final originalIndex = _products.indexOf(p);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: HomeProductCard(
+                    product: p,
+                    onTap: () {
+                      Navigator.of(context).pushNamed(
+                        AppRoutes.product,
+                        arguments: _toProductItem(p, originalIndex),
+                      ).then((_) {
+                        _loadRecentlyViewed();
+                      });
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
-      itemCount: _products.length,
-      itemBuilder: (context, index) {
-        final p = _products[index];
-        return HomeProductCard(
-          product: p,
-          onTap: () {
-            Navigator.of(context).pushNamed(
-              AppRoutes.product,
-              arguments: _toProductItem(p, index),
-            ).then((_) {
-              _loadRecentlyViewed();
-            });
-          },
-        );
-      },
     );
   }
 }

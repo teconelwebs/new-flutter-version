@@ -4,16 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-// ignore: unused_import
 import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
+import '../../../core/services/push_notification_service.dart';
+import '../../../core/widgets/app_loader.dart';
 
+import 'package:app_links/app_links.dart';
 import '../../account/presentation/account_screen.dart';
-import '../../../core/storage/session_store.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/router/app_router.dart';
+import '../../../core/storage/session_store.dart';
 import '../../../core/state/cart_state.dart';
 import '../../category/presentation/category_screen.dart';
 import '../../cart/presentation/cart_screen.dart';
 import '../../product/data/models/product_item.dart';
+import '../../product/presentation/product_screen.dart';
 import '../../search/presentation/search_screen.dart';
 import '../../profile/data/profile_api_service.dart';
 import '../data/home_api_service.dart';
@@ -123,10 +127,28 @@ class _HomeScreenState extends State<HomeScreen>
     _syncPushTokenInBackground();
     _listenToNativeFlutterEvents();
     _updateStatusBarColor();
+
+    PushNotificationService.instance.onNotificationTapped = (data) {
+      if (mounted) {
+        _handleNotificationRouting(data);
+      }
+    };
+    PushNotificationService.instance.initialize();
+
+    play.customClosePlayCallback = () {
+      if (mounted) {
+        setState(() {
+          _currentIndex = 0;
+        });
+        _updateStatusBarColor();
+      }
+    };
   }
 
   @override
   void dispose() {
+    play.customClosePlayCallback = null;
+    PushNotificationService.instance.onNotificationTapped = null;
     _subConnectivity?.cancel();
     _subDeepLinks?.cancel();
     _offlineToastTimer?.cancel();
@@ -199,62 +221,129 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  Uri? _lastHandledUri;
+  DateTime? _lastHandledTime;
+
   // 3. Deep Linking Manager (equivalent to Linking.addEventListener)
-  void _initDeepLinkListener() {
-    // Standard Universal/Scheme link mapping equivalent:
-    // _subDeepLinks = linkStream.listen((String? link) {
-    //   if (link != null) _handleUriRouting(Uri.parse(link));
-    // });
+  void _initDeepLinkListener() async {
+    final appLinks = AppLinks();
+
+    // 1. Listen to incoming links while app is running
+    _subDeepLinks = appLinks.uriLinkStream.listen((Uri? uri) {
+      if (uri != null) {
+        _handleUriRouting(uri);
+      }
+    }, onError: (err) {
+      debugPrint('DeepLink Error: $err');
+    });
+
+    // 2. Handle initial link if app was launched from cold state
+    try {
+      final initialUri = await appLinks.getInitialLink();
+      if (initialUri != null) {
+        _handleUriRouting(initialUri);
+      }
+    } catch (e) {
+      debugPrint('DeepLink Initial Link Error: $e');
+    }
   }
 
-  // ignore: unused_element
   void _handleUriRouting(Uri uri) {
+    final now = DateTime.now();
+    if (_lastHandledUri == uri &&
+        _lastHandledTime != null &&
+        now.difference(_lastHandledTime!) < const Duration(seconds: 2)) {
+      debugPrint('DeepLink: Ignore duplicate event for $uri');
+      return;
+    }
+    _lastHandledUri = uri;
+    _lastHandledTime = now;
+
     final segments = uri.pathSegments;
     if (segments.isEmpty) return;
 
-    switch (segments[0]) {
-      case "products":
-        if (segments.length > 1) {
-          // ignore: unused_local_variable
-          final slug = segments[1];
-          // Navigate to Product Details screen
-          // Navigator.pushNamed(context, '/product', arguments: slug);
+    debugPrint('DeepLink: Received $uri, segments: $segments');
+
+    final productsIdx = segments.indexOf('products');
+    if (productsIdx != -1 && segments.length > productsIdx + 1) {
+      final slug = segments[productsIdx + 1];
+      if (slug.isNotEmpty) {
+        final trimmed = slug.trim();
+        if (trimmed == ProductScreen.currentlyVisibleSlug) {
+          debugPrint('DeepLink: ProductScreen for slug $trimmed is already visible, skipping push.');
+          return;
         }
-        break;
-      case "OtheruserProfile":
-        if (segments.length > 1) {
-          // ignore: unused_local_variable
-          final profileId = segments[1];
-          // Open other user profile screen
+        if (trimmed == AppRouter.lastResolvedSlug) {
+          AppRouter.lastResolvedSlug = null; // Clear it so subsequent clicks are handled normally
+          debugPrint('DeepLink: Skip duplicate initial route push for slug: $trimmed');
+          return;
         }
-        break;
-      case "Play":
-        if (segments.length > 2 && segments[1] == "sepreel") {
-          // ignore: unused_local_variable
-          final playId = segments[2];
-          // Open Reel / Play module
-        }
-        break;
-      default:
-        break;
+        if (!mounted) return;
+        Navigator.of(context).pushNamed(
+          AppRoutes.product,
+          arguments: trimmed,
+        );
+      }
     }
   }
 
   // 4. Background Sync Push Notifications Token status checking
   Future<void> _syncPushTokenInBackground() async {
     try {
-      // Fetch userId from Storage/SharedPreferences:
-      // final prefs = await SharedPreferences.getInstance();
-      // final String? userId = prefs.getString("user_id");
-      // if (userId == null) return;
-
-      // GET API call token-status check
-      // final response = await http.get(Uri.parse('$secondAPI/notification/token-status?user_id=$userId'));
-      // if (response.statusCode == 200) {
-      //   // Sync logic: If not exists, fetch and save token via POST '/notification/save-token'
-      // }
+      await PushNotificationService.instance.syncTokenWithBackend();
     } catch (e) {
       debugPrint("Background token sync skipped/failed: $e");
+    }
+  }
+
+  void _handleNotificationRouting(Map<String, dynamic> data) {
+    final typeForRouting = data['notificationFor'] ?? data['notification_for'];
+    if (typeForRouting == null) return;
+
+    switch (typeForRouting.toString()) {
+      case 'home':
+        setState(() {
+          _currentIndex = 0;
+        });
+        _updateStatusBarColor();
+        break;
+      case 'track_order':
+        final trackingId = data['oid'] ?? data['orderId'];
+        if (trackingId != null) {
+          Navigator.of(context).pushNamed(
+            AppRoutes.trackOrder,
+            arguments: {'oid': trackingId.toString()},
+          );
+        } else {
+          Navigator.of(context).pushNamed(AppRoutes.trackOrder);
+        }
+        break;
+      case 'top_deals':
+        Navigator.of(context).pushNamed(AppRoutes.todayDeals);
+        break;
+      case 'category':
+        final categoryId = data['linkId'] ?? data['categoryId'] ?? data['id'] ?? data['slug'];
+        if (categoryId != null) {
+          Navigator.of(context).pushNamed(
+            AppRoutes.searchResults,
+            arguments: {'query': '', 'categoryId': categoryId.toString()},
+          );
+        } else {
+          setState(() {
+            _currentIndex = 1; // Categories Tab index
+          });
+          _updateStatusBarColor();
+        }
+        break;
+      case 'product':
+        final productIdentifier = data['linkId'] ?? data['productId'] ?? data['slug'] ?? data['id'];
+        if (productIdentifier != null) {
+          Navigator.of(context).pushNamed(
+            AppRoutes.product,
+            arguments: productIdentifier.toString(),
+          );
+        }
+        break;
     }
   }
 
@@ -471,12 +560,13 @@ class _HomeScreenState extends State<HomeScreen>
                 },
               ),
               const CategoryScreen(embedded: true),
-              // play.EmbeddedReelsWrapper(
-              //   key: ValueKey('play_session_$_userId'),
-              //   viewerId: _userId,
-              // ),
+              play.EmbeddedReelsWrapper(
+                key: ValueKey('play_session_$_userId'),
+                viewerId: _userId,
+                isActive: _currentIndex == 2,
+              ),
               const CartScreen(embedded: true),
-              AccountScreen(embedded: true, active: _currentIndex == 3),
+              AccountScreen(embedded: true, active: _currentIndex == 4),
             ],
           ),
 
@@ -532,45 +622,47 @@ class _HomeScreenState extends State<HomeScreen>
       ),
 
       // Custom Bottom Tab Bar Navigation equivalent to RN's CustomBottomTabBar
-      bottomNavigationBar: ValueListenableBuilder<int>(
-        valueListenable: CartState.cartCountNotifier,
-        builder: (context, cartCount, _) {
-          return CustomBottomTabBar(
-            currentIndex: _currentIndex,
-            onTap: (index) async {
-              setState(() {
-                _currentIndex = index;
-              });
-              _updateStatusBarColor();
-              if (index == 2) {
-                CartScreen.emitRefreshTabAction();
-              }
-              if (index == 0) {
-                final prefs = await SharedPreferences.getInstance();
-                final savedPincode = prefs.getString('postal_code') ?? '302001';
-                if (savedPincode != _loadedPincode) {
-                  setState(() {
-                    _bundleFuture = _fetchBundleWithPincodeTracking();
-                  });
-                }
-              }
-            },
-            isGuest: _isGuest,
-            cartCount: cartCount,
-            promptLogin: () {
-              Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
-                _checkGuestStatus(); // Check guest status again when returning from Login
-              });
-            },
-            clearGuestMode: () async {
-              // Clear guest mode status if needed
-            },
-            dismissLoginModal: () {
-              // Dismiss modal if showing
-            },
-          );
-        },
-      ),
+      bottomNavigationBar: _currentIndex == 2
+          ? null
+          : ValueListenableBuilder<int>(
+              valueListenable: CartState.cartCountNotifier,
+              builder: (context, cartCount, _) {
+                return CustomBottomTabBar(
+                  currentIndex: _currentIndex,
+                  onTap: (index) async {
+                    setState(() {
+                      _currentIndex = index;
+                    });
+                    _updateStatusBarColor();
+                    if (index == 3) {
+                      CartScreen.emitRefreshTabAction();
+                    }
+                    if (index == 0) {
+                      final prefs = await SharedPreferences.getInstance();
+                      final savedPincode = prefs.getString('postal_code') ?? '302001';
+                      if (savedPincode != _loadedPincode) {
+                        setState(() {
+                          _bundleFuture = _fetchBundleWithPincodeTracking();
+                        });
+                      }
+                    }
+                  },
+                  isGuest: _isGuest,
+                  cartCount: cartCount,
+                  promptLogin: () {
+                    Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
+                      _checkGuestStatus(); // Check guest status again when returning from Login
+                    });
+                  },
+                  clearGuestMode: () async {
+                    // Clear guest mode status if needed
+                  },
+                  dismissLoginModal: () {
+                    // Dismiss modal if showing
+                  },
+                );
+              },
+            ),
     );
   }
 }
@@ -699,9 +791,7 @@ class _HomeTabState extends State<_HomeTab> {
       future: widget.bundleFuture,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
-          return const Center(
-            child: CircularProgressIndicator(color: Color(0xFFFB5404)),
-          );
+          return const AppLoader.page();
         }
         if (snap.hasError || !snap.hasData) {
           return Center(
@@ -1113,14 +1203,7 @@ class _NameUpdateDialogState extends State<_NameUpdateDialog> {
                   elevation: 0,
                 ),
                 child: _isLoading
-                    ? const SizedBox(
-                        height: 20.0,
-                        width: 20.0,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.0,
-                        ),
-                      )
+                    ? const AppLoader.button()
                     : const Text(
                         'Save & Continue',
                         style: TextStyle(

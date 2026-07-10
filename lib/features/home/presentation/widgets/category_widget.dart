@@ -9,11 +9,7 @@ class CategoryWidget extends StatefulWidget {
   final int pullRefreshKey;
   final ValueChanged<int>? onTabChange;
 
-  const CategoryWidget({
-    super.key,
-    this.pullRefreshKey = 0,
-    this.onTabChange,
-  });
+  const CategoryWidget({super.key, this.pullRefreshKey = 0, this.onTabChange});
 
   @override
   State<CategoryWidget> createState() => _CategoryWidgetState();
@@ -108,8 +104,10 @@ class _CategoryWidgetState extends State<CategoryWidget> {
   }
 
   // HTTP API Call equivalent
-  Future<void> _fetchCategories(
-      {bool fromRefresh = false, bool cacheMiss = false}) async {
+  Future<void> _fetchCategories({
+    bool fromRefresh = false,
+    bool cacheMiss = false,
+  }) async {
     if (mounted && _categories.length <= 1) {
       setState(() {
         _loading = true;
@@ -130,8 +128,8 @@ class _CategoryWidgetState extends State<CategoryWidget> {
           final String fullImg = img.isEmpty
               ? ""
               : (img.startsWith("http")
-                  ? img
-                  : "$cdnBase${img.startsWith('/') ? img.substring(1) : img}");
+                    ? img
+                    : "$cdnBase${img.startsWith('/') ? img.substring(1) : img}");
           return {
             "id": (e['id'] ?? "").toString(),
             "name": (e['name'] ?? "").toString(),
@@ -163,8 +161,9 @@ class _CategoryWidgetState extends State<CategoryWidget> {
   // Automatically scroll horizontal strip at regular intervals
   void _startAutoScroll() {
     _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      final scrollCategories =
-          _categories.where((c) => c['id'] != 'all').toList();
+      final scrollCategories = _categories
+          .where((c) => c['id'] != 'all')
+          .toList();
       // ignore: prefer_const_declarations
       final double step = itemWidth + tileGap;
 
@@ -214,10 +213,7 @@ class _CategoryWidgetState extends State<CategoryWidget> {
     }
     Navigator.of(context).pushNamed(
       AppRoutes.searchResults,
-      arguments: {
-        'query': name,
-        'categoryId': id,
-      },
+      arguments: {'query': name, 'categoryId': id},
     );
   }
 
@@ -227,10 +223,13 @@ class _CategoryWidgetState extends State<CategoryWidget> {
       return _buildSkeletonLoader();
     }
 
-    final scrollableCategories =
-        _categories.where((c) => c['id'] != 'all').toList();
-    final allItem = _categories.firstWhere((c) => c['id'] == 'all',
-        orElse: () => allCategory);
+    final scrollableCategories = _categories
+        .where((c) => c['id'] != 'all')
+        .toList();
+    final allItem = _categories.firstWhere(
+      (c) => c['id'] == 'all',
+      orElse: () => allCategory,
+    );
 
     return Container(
       color: Colors.white,
@@ -305,8 +304,11 @@ class _CategoryWidgetState extends State<CategoryWidget> {
                       width: 40,
                       height: 40,
                       fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.category,
-                          color: Colors.grey, size: 24),
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.category,
+                        color: Colors.grey,
+                        size: 24,
+                      ),
                     ),
             ),
             const SizedBox(height: 6),
@@ -319,8 +321,9 @@ class _CategoryWidgetState extends State<CategoryWidget> {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isAll ? FontWeight.w600 : FontWeight.w500,
-                color:
-                    isAll ? const Color(0xFFF47405) : const Color(0xFF333333),
+                color: isAll
+                    ? const Color(0xFFF47405)
+                    : const Color(0xFF333333),
               ),
               textAlign: TextAlign.center,
             ),

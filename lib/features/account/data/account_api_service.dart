@@ -357,6 +357,7 @@ class WishlistProduct {
     required this.thumbnailImage,
     required this.rating,
     required this.link,
+    this.brand = '',
     this.stock,
     this.quantity,
     this.isOutOfStock,
@@ -369,6 +370,7 @@ class WishlistProduct {
   final String thumbnailImage;
   final String rating;
   final String link;
+  final String brand;
   final String? stock;
   final String? quantity;
   final bool? isOutOfStock;
@@ -382,6 +384,7 @@ class WishlistProduct {
       thumbnailImage: (json['thumbnail_image'] ?? '').toString(),
       rating: (json['rating'] ?? '0').toString(),
       link: (json['link'] ?? '').toString(),
+      brand: (json['brand'] ?? '').toString(),
       stock: json['stock']?.toString(),
       quantity: json['quantity']?.toString(),
       isOutOfStock: json['isOutOfStock'] as bool?,

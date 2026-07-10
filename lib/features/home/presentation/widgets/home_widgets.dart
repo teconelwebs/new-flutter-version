@@ -4,6 +4,7 @@ import '../../data/home_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../../../account/data/account_api_service.dart';
+import '../../../../core/constants/app_routes.dart';
 
 double _safeBannerAspectRatio(double? ratio, {double fallback = 3.0}) {
   if (ratio == null || !ratio.isFinite || ratio <= 0) return fallback;
@@ -18,7 +19,7 @@ double homeProductGridAspectRatio(
 }) {
   final cardWidth =
       (screenWidth - horizontalPadding * 2 - crossAxisSpacing) / 2;
-  const contentHeight = 100.0;
+  final contentHeight = screenWidth < 360 ? 76.0 : 84.0;
   return cardWidth / (cardWidth + contentHeight);
 }
 
@@ -457,7 +458,7 @@ class ProductStrip extends StatelessWidget {
     if (products.isEmpty) return const SizedBox.shrink();
     final screenWidth = MediaQuery.sizeOf(context).width;
     final cardWidth = (screenWidth * 0.42).clamp(140.0, 175.0);
-    final stripHeight = cardWidth + 108;
+    final stripHeight = cardWidth + 88;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,12 +592,7 @@ class _HomeProductCardState extends State<HomeProductCard> {
     final token = prefs.getString('access_token');
     if (token == null || token.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please login to add items to wishlist'),
-            backgroundColor: Color(0xFFFB5404),
-          ),
-        );
+        Navigator.of(context).pushNamed(AppRoutes.login);
       }
       return;
     }
@@ -763,15 +759,17 @@ class _HomeProductCardState extends State<HomeProductCard> {
 
     return GestureDetector(
       onTap: widget.onTap,
-      child: Container(
-        width: widget.cardWidth,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFEDEDED)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Container(
+          width: widget.cardWidth,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFEDEDED)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AspectRatio(
               aspectRatio: 1,
@@ -855,13 +853,10 @@ class _HomeProductCardState extends State<HomeProductCard> {
                 ],
               ),
             ),
-            if (widget.cardWidth == null)
-              Expanded(child: contentSection)
-            else
-              contentSection,
+            contentSection,
           ],
         ),
       ),
-    );
+    ));
   }
 }

@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'address_screen.dart';
+import '../../../core/widgets/app_loader.dart';
 
 class AddAddressDetailsScreen extends StatefulWidget {
   final String mode; // 'add' or 'edit'
@@ -94,12 +96,84 @@ class _AddAddressDetailsScreenState extends State<AddAddressDetailsScreen> {
     if (mounted) setState(() {});
   }
 
+  OverlayEntry? _messageOverlayEntry;
+
   @override
   void dispose() {
+    _messageOverlayEntry?.remove();
+    _messageOverlayEntry = null;
     _addressDetailsController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     super.dispose();
+  }
+
+  void _showCustomPopup(String message, {bool success = false}) {
+    if (!mounted) return;
+    _messageOverlayEntry?.remove();
+    _messageOverlayEntry = null;
+
+    final overlay = Overlay.of(context);
+    final entry = OverlayEntry(
+      builder: (context) => Positioned(
+        bottom: 50,
+        left: 20,
+        right: 20,
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Material(
+            color: Colors.transparent,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(178),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withAlpha(38),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        success ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                        color: success ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          message,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    _messageOverlayEntry = entry;
+    overlay.insert(entry);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (_messageOverlayEntry == entry) {
+        entry.remove();
+        _messageOverlayEntry = null;
+      }
+    });
   }
 
   Future<void> _saveAddress() async {
@@ -183,22 +257,13 @@ class _AddAddressDetailsScreenState extends State<AddAddressDetailsScreen> {
         await _checkProductPincode(_pincodeText);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Address saved successfully'),
-              backgroundColor: Color(0xFF0F766E),
-            ),
-          );
+          _showCustomPopup('Address saved successfully', success: true);
           AddressEventBus.emitAddressChanged();
           Navigator.pop(context);
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to save address: ${response.statusCode}'),
-            ),
-          );
+          _showCustomPopup('Failed to save address: ${response.statusCode}');
         }
       }
     } catch (e) {
@@ -406,7 +471,7 @@ class _AddAddressDetailsScreenState extends State<AddAddressDetailsScreen> {
                   ),
                   onPressed: _isSaving ? null : _saveAddress,
                   child: _isSaving
-                      ? const CircularProgressIndicator(color: Colors.white)
+                      ? const AppLoader.button()
                       : const Text(
                           'Save Address',
                           style: TextStyle(

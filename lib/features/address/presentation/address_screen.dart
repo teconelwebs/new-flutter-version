@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/constants/app_routes.dart';
+import '../../../core/widgets/app_loader.dart';
 
 class AddressEventBus {
   static final List<VoidCallback> _listeners = [];
@@ -51,8 +53,12 @@ class _AddressScreenState extends State<AddressScreen> {
     AddressEventBus.addListener(_fetchAddresses);
   }
 
+  OverlayEntry? _messageOverlayEntry;
+
   @override
   void dispose() {
+    _messageOverlayEntry?.remove();
+    _messageOverlayEntry = null;
     AddressEventBus.removeListener(_fetchAddresses);
     super.dispose();
   }
@@ -219,29 +225,72 @@ class _AddressScreenState extends State<AddressScreen> {
     }
   }
 
-  void _showCustomPopup(String message) {
+  void _showCustomPopup(String message, {bool success = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
-            letterSpacing: 0.3,
+    _messageOverlayEntry?.remove();
+    _messageOverlayEntry = null;
+
+    final overlay = Overlay.of(context);
+    final entry = OverlayEntry(
+      builder: (context) => Positioned(
+        bottom: 50,
+        left: 20,
+        right: 20,
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Material(
+            color: Colors.transparent,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(178),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withAlpha(38),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        success ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                        color: success ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          message,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
-        // ignore: deprecated_member_use
-        backgroundColor: const Color(0xFF1F2937).withOpacity(0.95),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        margin: const EdgeInsets.only(bottom: 12, left: 24, right: 24),
-        duration: const Duration(seconds: 1),
       ),
     );
+
+    _messageOverlayEntry = entry;
+    overlay.insert(entry);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (_messageOverlayEntry == entry) {
+        entry.remove();
+        _messageOverlayEntry = null;
+      }
+    });
   }
 
   Future<void> _handleDeleteAddress(String addressId) async {
@@ -393,9 +442,7 @@ class _AddressScreenState extends State<AddressScreen> {
         centerTitle: true,
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF0F766E)),
-            )
+          ? const AppLoader.page()
           : _addresses.isEmpty
           ? Center(
               child: Column(

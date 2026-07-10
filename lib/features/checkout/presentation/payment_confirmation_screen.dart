@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/state/cart_state.dart';
+import '../../../core/widgets/app_loader.dart';
 import 'cashfree_webview_page.dart';
 
 class PaymentConfirmationScreen extends StatefulWidget {
@@ -65,7 +66,9 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
       _buyNowProductId = args['buy_now']?.toString();
       _addressId = args['address_id']?.toString();
     }
-    _fetchUserDataAndCart();
+    _fetchUserDataAndCart().then((_) {
+      _loadAndApplySavedCoupon();
+    });
     _fetchPaymentTypes();
   }
 
@@ -204,10 +207,29 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
     }
   }
 
-  Future<void> _handleApplyCoupon() async {
+  Future<void> _loadAndApplySavedCoupon() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedCoupon = prefs.getString('applied_coupon_code');
+      if (savedCoupon != null && savedCoupon.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _couponController.text = savedCoupon;
+          });
+        }
+        await _handleApplyCoupon(isAutoReapply: true);
+      }
+    } catch (e) {
+      debugPrint('Error loading saved coupon: $e');
+    }
+  }
+
+  Future<void> _handleApplyCoupon({bool isAutoReapply = false}) async {
     final code = _couponController.text.trim();
     if (code.isEmpty) {
-      setState(() => _couponMessage = 'Please enter a coupon code.');
+      if (mounted) {
+        setState(() => _couponMessage = 'Please enter a coupon code.');
+      }
       return;
     }
 
@@ -216,7 +238,7 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
       final token = prefs.getString('access_token');
       final userId = prefs.getString('user_id');
 
-      final uri = Uri.parse('https://welfogapi.welfog.com/api/coupon-apply');
+      final uri = Uri.parse('https://welfogapi.welfog.com/api/v2/coupon-apply');
       final response = await http.post(
         uri,
         headers: {
@@ -231,33 +253,58 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
         if (data['result'] == true) {
           final amt =
               double.tryParse(data['couponDiscount']?.toString() ?? '') ?? 0.0;
-          setState(() {
-            _discount = amt;
-            _couponMessage = data['message'] ?? 'Coupon applied successfully!';
-          });
+          
+          await prefs.setString('applied_coupon_code', code);
+
+          if (mounted) {
+            setState(() {
+              _discount = amt;
+              _couponMessage = data['message'] ?? 'Coupon applied successfully!';
+            });
+          }
           await _fetchUserDataAndCart();
         } else {
-          setState(() {
-            _couponMessage = 'Invalid or expired coupon.';
-          });
+          await prefs.remove('applied_coupon_code');
+          if (mounted) {
+            setState(() {
+              _discount = 0.0;
+              if (!isAutoReapply) {
+                _couponMessage = 'Invalid or expired coupon.';
+              } else {
+                _couponController.text = '';
+                _couponMessage = '';
+              }
+            });
+          }
         }
       }
     } catch (_) {
-      setState(() => _couponMessage = 'Failed to apply coupon.');
+      if (mounted) {
+        setState(() => _couponMessage = 'Failed to apply coupon.');
+      }
     }
   }
 
-  void _handleRemoveCoupon() {
-    setState(() {
-      _couponController.text = '';
-      _discount = 0.0;
-      _couponMessage = '';
-    });
-    _fetchUserDataAndCart();
+  void _handleRemoveCoupon() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('applied_coupon_code');
+      if (mounted) {
+        setState(() {
+          _couponController.text = '';
+          _discount = 0.0;
+          _couponMessage = '';
+        });
+      }
+      await _fetchUserDataAndCart();
+    } catch (e) {
+      debugPrint('Error removing coupon: $e');
+    }
   }
 
   Future<void> _updateCartAfterOrder() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('applied_coupon_code');
     final token = prefs.getString('access_token');
     final userId = prefs.getString('user_id');
 
@@ -640,8 +687,7 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
         centerTitle: true,
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF008083)))
+          ? const AppLoader.page()
           : Stack(
               children: [
                 ListView(
@@ -842,72 +888,109 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
                                   fontSize: 16,
                                   color: Color(0xFF0F766E))),
                           const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF9FAFB),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                        color: const Color(0xFFD1D5DB)),
+                          if (_discount > 0) ...[
+                            Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE0F2F1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: const Color(0xFF008083), width: 1),
+                              ),
+                              padding: const EdgeInsets.all(14),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.local_offer, color: Color(0xFF008083), size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _couponController.text.toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Color(0xFF008083),
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                        if (_couponMessage.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _couponMessage,
+                                            style: const TextStyle(
+                                              color: Color(0xFF008083),
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12),
-                                  child: Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: TextField(
-                                      controller: _couponController,
-                                      style: const TextStyle(
-                                          fontSize: 14, height: 1.2),
-                                      decoration: const InputDecoration(
-                                        hintText: 'Enter Promo Code',
-                                        hintStyle: TextStyle(
-                                            color: Color(0xFF9CA3AF),
-                                            fontSize: 14),
-                                        filled: true,
-                                        fillColor: Colors.transparent,
-                                        border: InputBorder.none,
-                                        enabledBorder: InputBorder.none,
-                                        focusedBorder: InputBorder.none,
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.zero,
+                                  IconButton(
+                                    icon: const Icon(Icons.cancel, color: Color(0xFFD32F2F), size: 24),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    onPressed: _handleRemoveCoupon,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF9FAFB),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFFD1D5DB)),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: TextField(
+                                        controller: _couponController,
+                                        style: const TextStyle(fontSize: 14, height: 1.2),
+                                        decoration: const InputDecoration(
+                                          hintText: 'Enter Promo Code',
+                                          hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+                                          filled: true,
+                                          fillColor: Colors.transparent,
+                                          border: InputBorder.none,
+                                          enabledBorder: InputBorder.none,
+                                          focusedBorder: InputBorder.none,
+                                          isDense: true,
+                                          contentPadding: EdgeInsets.zero,
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF0F766E),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8)),
-                                  minimumSize: const Size(80, 44),
+                                const SizedBox(width: 12),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0F766E),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    minimumSize: const Size(80, 44),
+                                  ),
+                                  onPressed: _handleApplyCoupon,
+                                  child: const Text(
+                                    'Apply',
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  ),
                                 ),
-                                onPressed: _discount > 0
-                                    ? _handleRemoveCoupon
-                                    : _handleApplyCoupon,
-                                child: Text(
-                                  _discount > 0 ? 'Remove' : 'Apply',
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_couponMessage.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(_couponMessage,
-                                  style: TextStyle(
-                                      color: _discount > 0
-                                          ? Colors.green
-                                          : Colors.red,
-                                      fontWeight: FontWeight.bold)),
+                              ],
                             ),
+                            if (_couponMessage.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  _couponMessage,
+                                  style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                          ],
                         ],
                       ),
                     ),
@@ -1213,8 +1296,7 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
                             ),
                             onPressed: _isPlacingOrder ? null : _placeOrder,
                             child: _isPlacingOrder
-                                ? const CircularProgressIndicator(
-                                    color: Colors.white)
+                                ? const AppLoader.button()
                                 : const Text('Place Order',
                                     style: TextStyle(
                                         color: Colors.white,

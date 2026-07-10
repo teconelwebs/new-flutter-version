@@ -90,10 +90,31 @@ class PlayProfileHelper {
         Uri.parse('$_playApi/users/bymobile/$mobile'),
         headers: headers,
       );
-      if (mobileRes.statusCode == 404 || mobileRes.statusCode == 429) {
-        return null;
+      if (mobileRes.statusCode == 404) {
+        final createRes = await http.post(
+          Uri.parse('$_playApi/users/'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'userid': mainUserId,
+            'username': mainUserId,
+            'mobile': mobile,
+          }),
+        );
+        if (createRes.statusCode >= 200 && createRes.statusCode < 300) {
+          final body = jsonDecode(createRes.body);
+          if (body is Map<String, dynamic> && body['_id'] != null) {
+            final finalUserId = body['_id'].toString();
+            await prefs.setString('cached_user_id', finalUserId);
+            await prefs.setString('loginid', finalUserId);
+            await prefs.setString('play_profile_id', finalUserId);
+            await prefs.setString('play_profile_user_name', (body['username'] ?? '').toString());
+            await prefs.setString('play_profile_name', (body['name'] ?? body['username'] ?? '').toString());
+            await prefs.setString('fourth_userid', (body['userid'] ?? finalUserId).toString());
+            return finalUserId;
+          }
+        }
       }
-      if (mobileRes.statusCode < 200 || mobileRes.statusCode >= 300) {
+      if (mobileRes.statusCode == 429 || mobileRes.statusCode < 200 || mobileRes.statusCode >= 300) {
         return null;
       }
 

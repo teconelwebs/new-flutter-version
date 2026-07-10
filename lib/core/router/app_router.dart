@@ -20,6 +20,7 @@ import '../../features/checkout/presentation/order_success_screen.dart';
 import '../../features/profile/presentation/orders_screen.dart';
 import '../../features/profile/presentation/order_details_screen.dart';
 import '../../features/profile/presentation/track_order_screen.dart';
+import '../../features/profile/presentation/notifications_screen.dart';
 import '../../features/account/presentation/settings_screen.dart';
 import '../../features/account/presentation/blocked_users_screen.dart';
 import '../../features/account/presentation/delete_account_help_screen.dart';
@@ -39,7 +40,34 @@ import '../../features/shop/presentation/shop_screen.dart';
 
 
 class AppRouter {
+  static String? lastResolvedSlug;
+
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
+    final name = settings.name ?? '';
+    final normalizedName = name.startsWith('http')
+        ? name
+        : (name.startsWith('/') ? name : '/$name');
+    final uri = Uri.tryParse(normalizedName);
+    if (uri != null) {
+      final segments = uri.pathSegments;
+      final productsIdx = segments.indexOf('products');
+      if (productsIdx != -1 && segments.length > productsIdx + 1) {
+        final slug = segments[productsIdx + 1];
+        if (slug.isNotEmpty) {
+          final trimmed = slug.trim();
+          if (trimmed == ProductScreen.currentlyVisibleSlug) {
+            debugPrint('DeepLink Router: Slug $trimmed is already visible, ignoring push.');
+            return null;
+          }
+          lastResolvedSlug = trimmed;
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => ProductScreen(slug: trimmed),
+          );
+        }
+      }
+    }
+
     switch (settings.name) {
       case AppRoutes.splash:
         return MaterialPageRoute(
@@ -93,10 +121,20 @@ class AppRouter {
           builder: (_) => const CartScreen(),
         );
       case AppRoutes.product:
-        final item = settings.arguments as ProductItem?;
+        final args = settings.arguments;
+        ProductItem? item;
+        String? slug;
+        if (args is ProductItem) {
+          item = args;
+        } else if (args is String) {
+          slug = args;
+        } else if (args is Map<String, dynamic>) {
+          item = args['item'] as ProductItem?;
+          slug = args['slug'] as String?;
+        }
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => ProductScreen(item: item),
+          builder: (_) => ProductScreen(item: item, slug: slug),
         );
       case AppRoutes.profile:
         return MaterialPageRoute(
@@ -145,6 +183,11 @@ class AppRouter {
           settings: settings,
           builder: (_) => const OrdersScreen(),
         );
+      case AppRoutes.notifications:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const NotificationsScreen(),
+        );
       case AppRoutes.orderDetails:
         final args = settings.arguments as Map<String, dynamic>? ?? {};
         return MaterialPageRoute(
@@ -155,11 +198,16 @@ class AppRouter {
           ),
         );
       case AppRoutes.trackOrder:
-        final args = settings.arguments as Map<String, dynamic>? ?? {};
+        final args = settings.arguments is Map ? settings.arguments as Map : {};
+        final oid = args['oid']?.toString() ?? '';
+        final orderMap = args['order'] is Map
+            ? Map<String, dynamic>.from(args['order'] as Map)
+            : null;
         return MaterialPageRoute(
           settings: settings,
           builder: (_) => TrackOrderScreen(
-            oid: args['oid']?.toString() ?? '',
+            oid: oid,
+            initialOrder: orderMap,
           ),
         );
       case AppRoutes.addAddressDetails:

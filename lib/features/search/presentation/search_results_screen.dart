@@ -71,22 +71,51 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     ],
                   ),
                 )
-              : GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: (() {
-                      final screenWidth = MediaQuery.sizeOf(context).width;
-                      final cardWidth = (screenWidth - 32 - 12) / 2;
-                      const contentHeight = 74.0;
-                      return cardWidth / (cardWidth + contentHeight);
-                    })(),
-                  ),
-                  itemCount: _products.length,
-                  itemBuilder: (_, i) => ProductCard(item: _products[i]),
-                ),
+              : (() {
+                  // Split list into left and right columns
+                  final leftColumnItems = [];
+                  final rightColumnItems = [];
+                  for (int i = 0; i < _products.length; i++) {
+                    if (i % 2 == 0) {
+                      leftColumnItems.add(_products[i]);
+                    } else {
+                      rightColumnItems.add(_products[i]);
+                    }
+                  }
+
+                  return SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: leftColumnItems
+                                .map((item) => Padding(
+                                      padding: const EdgeInsets.only(bottom: 12),
+                                      child: ProductCard(item: item),
+                                    ))
+                                .toList(),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: rightColumnItems
+                                .map((item) => Padding(
+                                      padding: const EdgeInsets.only(bottom: 12),
+                                      child: ProductCard(item: item),
+                                    ))
+                                .toList(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                })(),
     );
   }
 }

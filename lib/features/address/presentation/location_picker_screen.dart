@@ -72,42 +72,111 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             _mapLoading = false;
           });
           _reverseGeocode(lat, lng);
+          _requestPermissionOnly();
           return;
         }
-      }
-
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        setState(() => _mapLoading = false);
-        return;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
+          if (mounted) {
+            _showCustomDialog(
+              'Location Access Denied',
+              'We need location permission to detect your address automatically. Please enable it in Settings.',
+              openSettings: true,
+            );
+          }
           setState(() => _mapLoading = false);
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          _showCustomDialog(
+            'Location Access Denied',
+            'We need location permission to detect your address automatically. Please enable it in Settings.',
+            openSettings: true,
+          );
+        }
         setState(() => _mapLoading = false);
         return;
       }
 
-      // Try to get last known location first for instant response
-      final lastKnown = await Geolocator.getLastKnownPosition();
-      if (lastKnown != null) {
-        _updateMapPosition(lastKnown.latitude, lastKnown.longitude);
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          _showCustomDialog(
+            'Location Services Disabled',
+            'Please enable location services in your phone settings to detect your address automatically.',
+            openLocationSettings: true,
+          );
+        }
+        setState(() => _mapLoading = false);
+        return;
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        // ignore: deprecated_member_use
-        desiredAccuracy: LocationAccuracy.best,
-      );
+      Position? position;
+      try {
+        // Try high accuracy with timeout
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 5),
+          ),
+        );
+      } catch (e) {
+        debugPrint('High accuracy getCurrentPosition failed/timeout: $e');
+        // Fallback 1: Try low accuracy
+        try {
+          position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.low,
+              timeLimit: Duration(seconds: 5),
+            ),
+          );
+        } catch (e2) {
+          debugPrint('Low accuracy getCurrentPosition failed/timeout: $e2');
+        }
+      }
 
-      _updateMapPosition(position.latitude, position.longitude);
+      if (position != null) {
+        _updateMapPosition(position.latitude, position.longitude);
+      } else {
+        // Fallback 2: Try last known position
+        final lastKnown = await Geolocator.getLastKnownPosition();
+        if (lastKnown != null) {
+          _updateMapPosition(lastKnown.latitude, lastKnown.longitude);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Using last known location due to weak GPS signal.'),
+              ),
+            );
+          }
+        } else {
+          // If everything fails, show dialog
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Location Error'),
+                content: const Text(
+                  'Could not fetch your current location. Please ensure GPS is active on your device or search manually.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            );
+          }
+        }
+      }
     } catch (e) {
       debugPrint('Error detecting location: $e');
       setState(() => _mapLoading = false);
@@ -116,6 +185,55 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         setState(() => _isFetchingGPS = false);
       }
     }
+  }
+
+  Future<void> _requestPermissionOnly() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        await Geolocator.requestPermission();
+      }
+    } catch (e) {
+      debugPrint('Background permission request error: $e');
+    }
+  }
+
+  void _showCustomDialog(
+    String title,
+    String message, {
+    bool openSettings = false,
+    bool openLocationSettings = false,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context); // Go back to address list
+            },
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              if (openSettings) {
+                await Geolocator.openAppSettings();
+              } else if (openLocationSettings) {
+                await Geolocator.openLocationSettings();
+              }
+              // Force GPS fetching when returning from settings
+              _detectCurrentLocation(forceGPS: true);
+            },
+            child: const Text('Settings'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _updateMapPosition(double lat, double lng) {

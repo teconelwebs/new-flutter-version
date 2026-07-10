@@ -19,7 +19,7 @@ class TabModel {
 const List<TabModel> tabs = [
   TabModel(label: "Home", screen: "index", route: "/"),
   TabModel(label: "Categories", screen: "Categorys", route: "/Categorys"),
-  // TabModel(label: "Play", screen: "Play", route: "/Play"),
+  TabModel(label: "Play", screen: "Play", route: "/Play"),
   TabModel(label: "Cart", screen: "Cart", route: "/Cart"),
   TabModel(label: "Account", screen: "Account", route: "/Account"),
 ];
@@ -50,7 +50,7 @@ class CustomBottomTabBar extends StatefulWidget {
 }
 
 class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
-  bool _flutterOpening = false;
+
 
   void _tabPressHaptic() => HapticFeedback.lightImpact();
   void _tabBlockedHaptic() => HapticFeedback.heavyImpact();
@@ -60,22 +60,7 @@ class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
     _tabPressHaptic();
 
     if (tab.screen == "Play") {
-      setState(() {
-        _flutterOpening = true;
-      });
-
-      try {
-        await Future.delayed(const Duration(milliseconds: 500));
-        widget.onTap(index);
-      } catch (e) {
-        debugPrint("Play screen launch failed: $e");
-      } finally {
-        if (mounted) {
-          setState(() {
-            _flutterOpening = false;
-          });
-        }
-      }
+      widget.onTap(index);
       return;
     }
 
@@ -161,17 +146,6 @@ class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
             }),
           ),
         ),
-        if (_flutterOpening)
-          Positioned.fill(
-            child: Container(
-              // ignore: deprecated_member_use
-              color: const Color(0xFFFAFAFA).withOpacity(0.8),
-              alignment: Alignment.center,
-              child: const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFB5404)),
-              ),
-            ),
-          ),
       ],
     );
   }

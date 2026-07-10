@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/widgets/app_loader.dart';
 import '../../product/data/models/product_item.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
@@ -375,7 +376,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         ),
                       ),
                       child: _isSubmittingCancel
-                          ? const CircularProgressIndicator(color: Colors.white)
+                          ? const AppLoader.button()
                           : const Text(
                               'Confirm Cancel Order',
                               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -434,7 +435,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFFB5404)))
+          ? const AppLoader.page()
           : _error.isNotEmpty
               ? Center(child: Text(_error, style: const TextStyle(color: Colors.red)))
               : _orderDetails == null

@@ -34,5 +34,6 @@ class AppRoutes {
   static const shop = '/shop';
   static const supplierInfo = '/profile/supplier-info';
   static const connectSupplier = '/profile/connect-supplier';
+  static const notifications = '/profile/notifications';
 }
 

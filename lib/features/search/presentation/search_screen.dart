@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/app_routes.dart';
+import '../../account/data/account_api_service.dart';
+import '../../product/data/models/product_item.dart';
 import '../data/search_api_service.dart';
 import 'widgets/app_search_bar.dart';
 
@@ -20,15 +22,75 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final _searchApi = SearchApiService();
+  final _accountApi = AccountApiService();
   final _queryCtrl = TextEditingController();
   final _focusNode = FocusNode();
   List<String> _suggestions = const [];
   List<String> _recent = const [];
   List<SearchCategory> _categories = const [];
+  List<WishlistItem> _wishlistPreview = const [];
   bool _categoriesLoading = true;
   bool _suggestionLoading = false;
+  bool _wishlistLoading = false;
   bool _isSearching = false;
   Timer? _debounce;
+
+  ProductItem _toProductItem(WishlistProduct p) {
+    final imageUrl = p.thumbnailImage.isNotEmpty
+        ? 'https://d1f02fefkbso7w.cloudfront.net/${p.thumbnailImage}'
+        : '';
+    return ProductItem(
+      id: p.id.toString(),
+      title: p.name,
+      subtitle: p.brand.isEmpty ? 'Fast delivery' : p.brand,
+      price: _cleanPrice(p.sellingPrice),
+      rating: 4.5,
+      color: const Color(0xFFF3E8FF),
+      imageUrl: imageUrl,
+      slug: p.link.isNotEmpty ? p.link : p.id.toString(),
+      brand: p.brand,
+      durationMinutes: 0,
+    );
+  }
+
+  double _cleanPrice(dynamic priceRaw) {
+    if (priceRaw == null) return 0.0;
+    if (priceRaw is num) return priceRaw.toDouble();
+    final cleanStr = priceRaw.toString().replaceAll(RegExp(r'[^0-9.]'), '');
+    return double.tryParse(cleanStr) ?? 0.0;
+  }
+
+  Future<void> _fetchWishlistPreview() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_id') ?? '';
+    final token = prefs.getString('access_token') ?? '';
+    if (userId.isEmpty || token.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _wishlistPreview = const [];
+          _wishlistLoading = false;
+        });
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _wishlistLoading = true);
+    }
+    try {
+      final items = await _accountApi.fetchWishlist();
+      if (!mounted) return;
+      setState(() {
+        _wishlistPreview = items;
+      });
+    } catch (e) {
+      debugPrint('Error fetching wishlist preview: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _wishlistLoading = false);
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -38,6 +100,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     _queryCtrl.addListener(_onTextChanged);
     _loadInitial();
+    _fetchWishlistPreview();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
@@ -363,7 +426,293 @@ class _SearchScreenState extends State<SearchScreen> {
               );
             },
           ),
+          const SizedBox(height: 12),
+          _buildPromoCard(),
+          _buildWishlistSection(),
       ],
+    );
+  }
+
+  Widget _buildPromoCard() {
+    return Container(
+      margin: const EdgeInsets.only(top: 4, bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6F7F9),
+        border: Border.all(color: const Color(0xFFEDF2F7)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Top Brands. Best Deals.',
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Explore 1000+ brands and get the best offers every day!',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF6B7280),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).pushNamed(
+                      AppRoutes.searchResults,
+                      arguments: 'All Categories',
+                    );
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFB5404),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    child: const Text(
+                      'Shop Now',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Image.asset(
+            'assets/vector/bag_vector.png',
+            width: 48,
+            height: 48,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const Icon(
+              Icons.shopping_bag_outlined,
+              size: 48,
+              color: Color(0xFFFB5404),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWishlistSection() {
+    if (_wishlistLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Color(0xFFFB5404),
+          ),
+        ),
+      );
+    }
+
+    if (_wishlistPreview.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final displayItems = _wishlistPreview.take(2).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 6),
+        const Center(
+          child: Text(
+            'Your wishlist',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF111827),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            const Expanded(
+              child: Divider(
+                height: 1.5,
+                thickness: 1.5,
+                color: Color(0xFFFB5404),
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                Navigator.of(context).pushNamed(AppRoutes.wishlist).then((_) {
+                  _fetchWishlistPreview();
+                });
+              },
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'See your wishlist',
+                  style: TextStyle(
+                    color: Color(0xFFFB5404),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+            const Expanded(
+              child: Divider(
+                height: 1.5,
+                thickness: 1.5,
+                color: Color(0xFFFB5404),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: displayItems.isNotEmpty
+                  ? _buildWishlistMiniCard(displayItems[0])
+                  : const SizedBox.shrink(),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: displayItems.length > 1
+                  ? _buildWishlistMiniCard(displayItems[1])
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        GestureDetector(
+          onTap: () {
+            Navigator.of(context).pushNamed(AppRoutes.wishlist).then((_) {
+              _fetchWishlistPreview();
+            });
+          },
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFB5404).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: const Color(0xFFFB5404).withValues(alpha: 0.16),
+                width: 1,
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            alignment: Alignment.center,
+            child: const Text(
+              'View all wishlist product',
+              style: TextStyle(
+                color: Color(0xFFFB5404),
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWishlistMiniCard(WishlistItem item) {
+    final p = item.product;
+    final imageUrl = p.thumbnailImage.isNotEmpty
+        ? 'https://d1f02fefkbso7w.cloudfront.net/${p.thumbnailImage}'
+        : '';
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).pushNamed(
+          AppRoutes.product,
+          arguments: _toProductItem(p),
+        ).then((_) {
+          _fetchWishlistPreview();
+        });
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFEDEDED), width: 0.7),
+        ),
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AspectRatio(
+              aspectRatio: 1.2,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F7F7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: imageUrl.isEmpty
+                    ? const Icon(Icons.image_outlined, color: Colors.grey)
+                    : Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.image_not_supported_outlined,
+                          color: Colors.grey,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              p.brand.trim().isEmpty || p.brand.trim().toLowerCase() == 'no brand'
+                  ? ' '
+                  : p.brand.trim(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF6B7280),
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              p.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF111827),
+                height: 1.25,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '₹${_cleanPrice(p.sellingPrice).toStringAsFixed(0)}',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFFB5404),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/constants/app_routes.dart';
+import '../../../core/widgets/app_loader.dart';
 import '../data/models/product_item.dart';
 import '../data/product_api_service.dart';
 import 'widgets/product_card.dart';
@@ -16,11 +17,13 @@ import 'widgets/buy_product_btn_widget.dart';
 import 'widgets/customer_reviews_widget.dart';
 
 class ProductScreen extends StatefulWidget {
-  const ProductScreen({super.key, this.item});
+  const ProductScreen({super.key, this.item, this.slug});
 
   final ProductItem? item;
+  final String? slug;
 
   static const routeName = AppRoutes.product;
+  static String? currentlyVisibleSlug;
 
   @override
   State<ProductScreen> createState() => _ProductScreenState();
@@ -47,11 +50,21 @@ class _ProductScreenState extends State<ProductScreen> {
   @override
   void initState() {
     super.initState();
+    final slug = widget.slug ?? widget.item?.slug;
+    if (slug != null && slug.trim().isNotEmpty) {
+      ProductScreen.currentlyVisibleSlug = slug.trim();
+    }
     _load();
   }
 
   @override
   void dispose() {
+    final slug = widget.slug ?? widget.item?.slug;
+    if (slug != null && slug.trim().isNotEmpty) {
+      if (ProductScreen.currentlyVisibleSlug == slug.trim()) {
+        ProductScreen.currentlyVisibleSlug = null;
+      }
+    }
     _scrollController.dispose();
     super.dispose();
   }
@@ -69,12 +82,16 @@ class _ProductScreenState extends State<ProductScreen> {
 
   Future<void> _load() async {
     final seed = widget.item;
-    if (seed == null) {
-      setState(() {
-        _loading = false;
-        _error = 'Product not found';
-      });
-      return;
+    final slug = widget.slug ?? seed?.slug;
+
+    if (slug == null || slug.trim().isEmpty) {
+      if (seed == null) {
+        setState(() {
+          _loading = false;
+          _error = 'Product not found';
+        });
+        return;
+      }
     }
 
     setState(() {
@@ -83,9 +100,11 @@ class _ProductScreenState extends State<ProductScreen> {
     });
 
     try {
-      final slugOrId = seed.slug.trim().isNotEmpty ? seed.slug.trim() : seed.id;
+      final String slugOrId = (slug != null && slug.trim().isNotEmpty) ? slug.trim() : seed!.id;
+      final String productId = seed != null ? seed.id : slugOrId;
+
       final detail =
-          await _api.fetchProductDetail(slugOrId: slugOrId, productId: seed.id);
+          await _api.fetchProductDetail(slugOrId: slugOrId, productId: productId);
       final related = await _api.fetchRelatedProducts(detail.id);
 
       final prefs = await SharedPreferences.getInstance();
@@ -299,9 +318,7 @@ class _ProductScreenState extends State<ProductScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFFfb5404)),
-        ),
+        body: AppLoader.page(),
       );
     }
 
@@ -456,24 +473,45 @@ class _ProductScreenState extends State<ProductScreen> {
               child: Center(child: Text('No related products found')),
             )
           else
-            GridView.builder(
-              itemCount: _related.length,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: (() {
-                  final screenWidth = MediaQuery.sizeOf(context).width;
-                  final cardWidth = (screenWidth - 40 - 8) / 2;
-                  const contentHeight = 74.0;
-                  return cardWidth / (cardWidth + contentHeight);
-                })(),
-              ),
-              itemBuilder: (context, index) =>
-                  ProductCard(item: _related[index]),
-            ),
+            (() {
+              final leftColumnItems = [];
+              final rightColumnItems = [];
+              for (int i = 0; i < _related.length; i++) {
+                if (i % 2 == 0) {
+                  leftColumnItems.add(_related[i]);
+                } else {
+                  rightColumnItems.add(_related[i]);
+                }
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: leftColumnItems
+                          .map((item) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: ProductCard(item: item),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: rightColumnItems
+                          .map((item) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: ProductCard(item: item),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                ],
+              );
+            })(),
         ],
       ),
     );

@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/state/cart_state.dart';
+import '../../../../core/widgets/app_loader.dart';
 
 
 class BuyProductBtnWidget extends StatefulWidget {
@@ -71,7 +72,7 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
 
     if (isGuest) {
       // ignore: use_build_context_synchronously
-      Navigator.of(context).pushNamed('/User/Login');
+      Navigator.of(context).pushNamed(AppRoutes.login);
       return;
     }
 
@@ -254,7 +255,7 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
                       ? null
                       : () => _addToCart(false),
                   child: _loading
-                      ? const CircularProgressIndicator(color: Colors.white)
+                      ? const AppLoader.button()
                       : const Text(
                           'Add to Cart',
                           style: TextStyle(
@@ -285,7 +286,7 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
                       ? null
                       : () => _addToCart(true),
                   child: _buyNowLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
+                      ? const AppLoader.button()
                       : const Text(
                           'Buy Now',
                           style: TextStyle(

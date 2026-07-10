@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/constants/app_routes.dart';
+import '../../../core/widgets/app_loader.dart';
 
 class TrackOrderScreen extends StatefulWidget {
   final String oid;
+  final Map<String, dynamic>? initialOrder;
 
-  const TrackOrderScreen({super.key, required this.oid});
+  const TrackOrderScreen({super.key, required this.oid, this.initialOrder});
 
   @override
   State<TrackOrderScreen> createState() => _TrackOrderScreenState();
@@ -32,6 +34,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialOrder != null) {
+      _selectedOrder = widget.initialOrder;
+      _fetchTrackingData(widget.oid);
+    }
     _fetchOrders(page: 1);
     _dropdownScrollController.addListener(() {
       if (!_dropdownScrollController.hasClients) return;
@@ -190,8 +196,17 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     }
   }
 
-  Color _getStatusColor(String? status) {
-    final s = (status ?? "").toLowerCase();
+  String _getDeliveryStatusString(dynamic status) {
+    if (status == null) return '';
+    if (status is Map) {
+      final s = status['status'] ?? status['name'] ?? status['delivery_status_string'] ?? '';
+      return s.toString();
+    }
+    return status.toString();
+  }
+
+  Color _getStatusColor(dynamic status) {
+    final s = _getDeliveryStatusString(status).toLowerCase();
     if (s == 'hold') return Colors.blue;
     if (s.contains('deliver')) return const Color(0xFF22C55E);
     if (s.contains('cancel') || s.contains('fail')) return const Color(0xFFEF4444);
@@ -242,9 +257,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
         centerTitle: true,
       ),
       body: _loadingOrders && _orders.isEmpty
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFFB5404)),
-            )
+          ? const AppLoader.page()
           : Column(
               children: [
                 // Order Selector Header
@@ -374,7 +387,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                                 return const Padding(
                                   padding: EdgeInsets.symmetric(vertical: 8.0),
                                   child: Center(
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFB5404)),
+                                    child: AppLoader.button(color: Color(0xFFFB5404)),
                                   ),
                                 );
                               }
@@ -399,7 +412,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
-                                    (item['delivery_status'] ?? '').toUpperCase(),
+                                    _getDeliveryStatusString(item['delivery_status']).toUpperCase(),
                                     style: TextStyle(
                                       color: _getStatusColor(item['delivery_status']),
                                       fontWeight: FontWeight.bold,
@@ -452,7 +465,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                                       const Center(
                                         child: Padding(
                                           padding: EdgeInsets.symmetric(vertical: 24.0),
-                                          child: CircularProgressIndicator(color: Color(0xFFFB5404)),
+                                          child: AppLoader(color: Color(0xFFFB5404)),
                                         ),
                                       )
                                     else if (_trackingError.isNotEmpty)
@@ -512,7 +525,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                 _buildInfoGridCell('TOTAL AMOUNT', '₹${_selectedOrder!['grand_total']}', Icons.currency_rupee_outlined),
                 _buildInfoGridCell(
                   'STATUS',
-                  (_selectedOrder!['delivery_status'] ?? '').toUpperCase(),
+                  _getDeliveryStatusString(_selectedOrder!['delivery_status']).toUpperCase(),
                   Icons.local_shipping_outlined,
                   color: _getStatusColor(_selectedOrder!['delivery_status']),
                 ),

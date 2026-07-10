@@ -12,10 +12,12 @@ import '../widgets/reel_item.dart';
 
 class ReelsScreen extends StatefulWidget {
   final String initialReelId;
+  final bool isActive;
 
   const ReelsScreen({
     super.key,
     this.initialReelId = '',
+    this.isActive = true,
   });
 
   @override
@@ -84,6 +86,20 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
         onDismissed: scope.dismissProfileSetup,
       );
     });
+  }
+
+  @override
+  void didUpdateWidget(ReelsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) {
+      if (!widget.isActive) {
+        _preloadPool?.pauseAll();
+      } else {
+        if (_reels.isNotEmpty) {
+          _preloadPool?.prefetchWindowBackground(_reels, _currentIndex);
+        }
+      }
+    }
   }
 
   @override
@@ -429,7 +445,7 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
             reel: reel,
             pool: pool,
             api: _api,
-            isActive: index == _currentIndex && _routeVisible,
+            isActive: index == _currentIndex && _routeVisible && widget.isActive,
             onClose: _handleClose,
             onRemoveReel: _removeReel,
           );

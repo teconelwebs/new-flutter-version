@@ -184,52 +184,127 @@ class _TodayDealsScreenState extends State<TodayDealsScreen> {
       );
     }
 
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final childAspectRatio = homeProductGridAspectRatio(screenWidth);
-
-    return GridView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(12),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: childAspectRatio,
-      ),
-      itemCount: _products.length + (_loading && _hasMore ? 2 : 0),
-      itemBuilder: (context, index) {
-        if (index >= _products.length) {
-          // Render a simple loading skeleton or indicator
-          return Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9FAFB),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFEDEDED)),
-            ),
-            child: const Center(
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFB5404)),
-                ),
-              ),
-            ),
-          );
+    // Split list into left and right columns for masonry layout
+    final totalCount = _products.length + (_loading && _hasMore ? 2 : 0);
+    final leftColumnItems = [];
+    final rightColumnItems = [];
+    
+    for (int i = 0; i < totalCount; i++) {
+      if (i < _products.length) {
+        final p = _products[i];
+        if (i % 2 == 0) {
+          leftColumnItems.add(p);
+        } else {
+          rightColumnItems.add(p);
         }
+      } else {
+        // Skeleton loader
+        if (i % 2 == 0) {
+          leftColumnItems.add(null);
+        } else {
+          rightColumnItems.add(null);
+        }
+      }
+    }
 
-        final p = _products[index];
-        return HomeProductCard(
-          product: p,
-          onTap: () {
-            Navigator.of(context).pushNamed(
-              AppRoutes.product,
-              arguments: _toProductItem(p, index),
-            );
-          },
-        );
-      },
+    return SingleChildScrollView(
+      controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: leftColumnItems.map((p) {
+                if (p == null) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Container(
+                      height: 180,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFEDEDED)),
+                      ),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFB5404)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                
+                final originalIndex = _products.indexOf(p);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: HomeProductCard(
+                    product: p,
+                    onTap: () {
+                      Navigator.of(context).pushNamed(
+                        AppRoutes.product,
+                        arguments: _toProductItem(p, originalIndex),
+                      );
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: rightColumnItems.map((p) {
+                if (p == null) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Container(
+                      height: 180,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFEDEDED)),
+                      ),
+                      child: const Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFB5404)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                
+                final originalIndex = _products.indexOf(p);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: HomeProductCard(
+                    product: p,
+                    onTap: () {
+                      Navigator.of(context).pushNamed(
+                        AppRoutes.product,
+                        arguments: _toProductItem(p, originalIndex),
+                      );
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

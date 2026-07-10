@@ -47,41 +47,14 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF0A63E8), Color(0xFF04B1E7)],
-          ),
-        ),
+      backgroundColor: Colors.white,
+      body: Center(
         child: FadeTransition(
           opacity: _fade,
-          child: const Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircleAvatar(
-                radius: 42,
-                backgroundColor: Colors.white,
-                child: Icon(Icons.storefront_rounded, size: 40),
-              ),
-              SizedBox(height: 18),
-              Text(
-                'Welfog',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Shop smarter. Play better.',
-                style: TextStyle(color: Colors.white70, fontSize: 15),
-              ),
-            ],
+          child: Image.asset(
+            'assets/images/splash.png',
+            width: 200,
+            fit: BoxFit.contain,
           ),
         ),
       ),

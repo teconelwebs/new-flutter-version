@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/constants/app_routes.dart';
+import '../../../core/widgets/app_loader.dart';
 import '../../product/data/models/product_item.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -214,11 +215,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         onRefresh: () => _fetchOrders(),
         color: const Color(0xFFFB5404),
         child: _loading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFFFB5404),
-                ),
-              )
+            ? const AppLoader.page()
             : _orders.isEmpty
                 ? ListView(
                     children: [
@@ -288,7 +285,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 16.0),
                           child: Center(
                             child: _loadingMore
-                                ? const CircularProgressIndicator(color: Color(0xFFFB5404))
+                                ? const AppLoader.button(color: Color(0xFFFB5404))
                                 : const SizedBox.shrink(),
                           ),
                         );
@@ -494,7 +491,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                         Navigator.pushNamed(
                                           context,
                                           AppRoutes.trackOrder,
-                                          arguments: {'oid': order['oid']},
+                                          arguments: {
+                                            'oid': order['oid'],
+                                            'order': order,
+                                          },
                                         );
                                       },
                                       style: OutlinedButton.styleFrom(
@@ -826,11 +826,7 @@ class _ReviewSubmitDialogState extends State<_ReviewSubmitDialog> {
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     ),
                     child: _submitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
+                        ? const AppLoader.button()
                         : const Text('Submit', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                 ],

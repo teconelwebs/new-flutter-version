@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+VoidCallback? customClosePlayCallback;
+
 /// Closes the Flutter Activity and returns to the React Native app.
 void closeFlutterPlay() {
-  SystemNavigator.pop();
+  if (customClosePlayCallback != null) {
+    customClosePlayCallback!();
+  } else {
+    SystemNavigator.pop();
+  }
 }
 
 const _navChannel = MethodChannel('welfog/nav');

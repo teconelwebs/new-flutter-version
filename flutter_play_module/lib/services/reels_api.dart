@@ -16,7 +16,8 @@ import '../models/user_profile.dart';
 import '../utils/share_links.dart';
 import 'device_id_store.dart';
 
-const _baseUrl = 'https://api.welfog.com/api';
+// const _baseUrl = 'https://api.welfog.com/api';
+const  _baseUrl = 'https://unnecessitous-domitila-unbudging.ngrok-free.dev/api';
 const _secondBaseUrl = 'https://welfogapi.welfog.com/api';
 const _prefetchLimit = 50;
 
@@ -97,8 +98,10 @@ class ReelUploadStatus {
 class ReelsApi {
   final String viewerId;
   final String deviceId;
+
   /// Main app user id (numeric) from RN — used when generating share links.
   final String shareUserId;
+
   /// Fallback main user id when play profile is being set up.
   final String mainUserId;
 
@@ -117,8 +120,9 @@ class ReelsApi {
   }
 
   Map<String, String> get _headers {
-    final resolvedDeviceId =
-        deviceId.trim().isNotEmpty ? deviceId.trim() : DeviceIdStore.peekOrGenerate();
+    final resolvedDeviceId = deviceId.trim().isNotEmpty
+        ? deviceId.trim()
+        : DeviceIdStore.peekOrGenerate();
     return {
       'Accept': 'application/json',
       'x-android-id': resolvedDeviceId,
@@ -130,14 +134,16 @@ class ReelsApi {
         'Content-Type': 'application/json',
       };
 
-  Future<({List<Reel> reels, bool hasMore})> fetchReelsPage({String exclude = ''}) async {
+  Future<({List<Reel> reels, bool hasMore})> fetchReelsPage(
+      {String exclude = ''}) async {
     final trimmedExclude = _trimExcludeIds(exclude);
     Object? lastError;
 
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
         return await _fetchReelsOnce(
-          exclude: attempt == 2 && trimmedExclude.isNotEmpty ? '' : trimmedExclude,
+          exclude:
+              attempt == 2 && trimmedExclude.isNotEmpty ? '' : trimmedExclude,
         );
       } catch (e) {
         lastError = e;
@@ -167,7 +173,8 @@ class ReelsApi {
     return ids.sublist(ids.length - 120).join(',');
   }
 
-  Future<({List<Reel> reels, bool hasMore})> _fetchReelsOnce({required String exclude}) async {
+  Future<({List<Reel> reels, bool hasMore})> _fetchReelsOnce(
+      {required String exclude}) async {
     final uri = Uri.parse('$_baseUrl/reels/shownew').replace(
       queryParameters: {
         'limit': '$_prefetchLimit',
@@ -228,10 +235,14 @@ class ReelsApi {
     if (response.statusCode < 200 || response.statusCode >= 300) return [];
     final body = jsonDecode(response.body);
     if (body is! List) return [];
-    return body.whereType<Map<String, dynamic>>().map(ReelComment.fromJson).toList();
+    return body
+        .whereType<Map<String, dynamic>>()
+        .map(ReelComment.fromJson)
+        .toList();
   }
 
-  Future<ReelComment?> addComment(String reelId, String text, {String? parentId}) async {
+  Future<ReelComment?> addComment(String reelId, String text,
+      {String? parentId}) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/comment/new'),
       headers: _jsonHeaders,
@@ -302,7 +313,8 @@ class ReelsApi {
   }
 
   Future<List<LiveProduct>> fetchProductsForReel(String reelId) async {
-    final uri = Uri.parse('$_secondBaseUrl/opensearch/products-by-video-link').replace(
+    final uri =
+        Uri.parse('$_secondBaseUrl/opensearch/products-by-video-link').replace(
       queryParameters: {'video_link': reelId, 'page': '1', 'size': '20'},
     );
     final response = await http.get(uri, headers: _headers);
@@ -311,7 +323,10 @@ class ReelsApi {
     if (body is! Map || body['success'] != true) return [];
     final products = body['products'];
     if (products is! List) return [];
-    return products.whereType<Map<String, dynamic>>().map(LiveProduct.fromJson).toList();
+    return products
+        .whereType<Map<String, dynamic>>()
+        .map(LiveProduct.fromJson)
+        .toList();
   }
 
   Future<String> getShareMessage(String reelId) async {
@@ -372,8 +387,10 @@ class ReelsApi {
       final request = http.Request('GET', uri)
         ..headers.addAll(_headers)
         ..followRedirects = false;
-      final response = await client.send(request).timeout(const Duration(seconds: 8));
-      final location = response.headers['location'] ?? response.headers['Location'];
+      final response =
+          await client.send(request).timeout(const Duration(seconds: 8));
+      final location =
+          response.headers['location'] ?? response.headers['Location'];
       final parsed = _parseProfileIdFromShareLocation(location);
       if (parsed != null) return parsed;
 
@@ -489,10 +506,12 @@ class ReelsApi {
     final List raw = body is List
         ? body
         : (body is Map ? (body['reels'] ?? body['data'] ?? []) as List : []);
-    final posts = raw.whereType<Map<String, dynamic>>().map(ProfilePost.fromJson).toList();
-    final hasMore = body is Map
-        ? (body['hasMore'] == true)
-        : posts.length >= limit;
+    final posts = raw
+        .whereType<Map<String, dynamic>>()
+        .map(ProfilePost.fromJson)
+        .toList();
+    final hasMore =
+        body is Map ? (body['hasMore'] == true) : posts.length >= limit;
     return (posts: posts, hasMore: hasMore && posts.isNotEmpty);
   }
 
@@ -517,17 +536,18 @@ class ReelsApi {
       return (reels: <Reel>[], hasMore: false, rawCount: 0);
     }
     final body = jsonDecode(response.body);
-    final reelsRaw = body is List ? body : (body is Map ? body['reels'] ?? body['data'] : null);
-    if (reelsRaw is! List) return (reels: <Reel>[], hasMore: false, rawCount: 0);
+    final reelsRaw = body is List
+        ? body
+        : (body is Map ? body['reels'] ?? body['data'] : null);
+    if (reelsRaw is! List)
+      return (reels: <Reel>[], hasMore: false, rawCount: 0);
     final rawCount = reelsRaw.length;
     final reels = reelsRaw
         .whereType<Map<String, dynamic>>()
         .map(Reel.fromJson)
         .where((r) => r.id.isNotEmpty && r.playbackUrl.isNotEmpty)
         .toList();
-    final hasMore = body is Map
-        ? (body['hasMore'] == true)
-        : rawCount >= limit;
+    final hasMore = body is Map ? (body['hasMore'] == true) : rawCount >= limit;
     return (reels: reels, hasMore: hasMore, rawCount: rawCount);
   }
 
@@ -564,7 +584,8 @@ class ReelsApi {
     return userId;
   }
 
-  Future<List<FollowUser>> fetchFollowList(String profileUserId, String type) async {
+  Future<List<FollowUser>> fetchFollowList(
+      String profileUserId, String type) async {
     if (profileUserId.isEmpty) return [];
     final queryType = type == 'following' ? 'following' : 'followers';
     final resolved = await resolveFollowListUserId(profileUserId);
@@ -593,7 +614,8 @@ class ReelsApi {
   }
 
   /// List lengths include blocked users — matches Instagram-style profile counts.
-  Future<({int followers, int following})> fetchFollowCounts(String profileUserId) async {
+  Future<({int followers, int following})> fetchFollowCounts(
+      String profileUserId) async {
     if (profileUserId.isEmpty) return (followers: 0, following: 0);
     final results = await Future.wait([
       fetchFollowList(profileUserId, 'followers'),
@@ -602,7 +624,8 @@ class ReelsApi {
     return (followers: results[0].length, following: results[1].length);
   }
 
-  Future<UserProfile> updateUserProfile(String profileId, Map<String, dynamic> payload) async {
+  Future<UserProfile> updateUserProfile(
+      String profileId, Map<String, dynamic> payload) async {
     final response = await http.put(
       Uri.parse('$_baseUrl/users/$profileId'),
       headers: _jsonHeaders,
@@ -610,7 +633,9 @@ class ReelsApi {
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final body = response.body.isNotEmpty ? jsonDecode(response.body) : {};
-      final msg = body is Map ? (body['message']?.toString() ?? 'Update failed') : 'Update failed';
+      final msg = body is Map
+          ? (body['message']?.toString() ?? 'Update failed')
+          : 'Update failed';
       throw Exception(msg);
     }
     final body = jsonDecode(response.body);
@@ -633,7 +658,8 @@ class ReelsApi {
 
     final ext = p.extension(file.path).toLowerCase();
     final isPng = ext == '.png';
-    final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}${isPng ? '.png' : '.jpg'}';
+    final fileName =
+        'profile_${DateTime.now().millisecondsSinceEpoch}${isPng ? '.png' : '.jpg'}';
     final contentType = isPng ? 'image/png' : 'image/jpeg';
 
     final request = http.MultipartRequest(
@@ -737,7 +763,8 @@ class ReelsApi {
     final ids = <String>{};
     for (final item in raw) {
       if (item is! Map) continue;
-      final map = item is Map<String, dynamic> ? item : Map<String, dynamic>.from(item);
+      final map =
+          item is Map<String, dynamic> ? item : Map<String, dynamic>.from(item);
       for (final key in ['_id', 'id', 'userid', 'userId']) {
         final value = map[key]?.toString().trim();
         if (value != null && value.isNotEmpty) ids.add(value);
@@ -777,7 +804,8 @@ class ReelsApi {
 
   /// Returns only the short link from GET /plays/profile/{mongoId}/share.
   Future<String> getProfileShareUrl(String profileMongoId) async {
-    final msg = await getProfileShareMessage(profileMongoId, isOwnProfile: true);
+    final msg =
+        await getProfileShareMessage(profileMongoId, isOwnProfile: true);
     if (msg.isEmpty) return '';
     final lines = msg.split('\n');
     return lines.length > 1 ? lines.last.trim() : '';
@@ -806,7 +834,8 @@ class ReelsApi {
       params['userLimit'] = '$userLimit';
     }
 
-    final uri = Uri.parse('$_baseUrl/users/search_populer').replace(queryParameters: params);
+    final uri = Uri.parse('$_baseUrl/users/search_populer')
+        .replace(queryParameters: params);
     final response = await http.get(uri, headers: _headers);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Search failed (${response.statusCode})');
@@ -848,7 +877,8 @@ class ReelsApi {
     };
 
     final endpoints = [
-      Uri.parse('$_baseUrl/reels/current/$reelId').replace(queryParameters: params),
+      Uri.parse('$_baseUrl/reels/current/$reelId')
+          .replace(queryParameters: params),
       Uri.parse('$_baseUrl/reels/reel/$reelId'),
     ];
 
@@ -895,16 +925,16 @@ class ReelsApi {
     final items = _extractMusicItems(body, isSearch);
     final meta = body is Map ? body : <String, dynamic>{};
     final totalPages = meta['totalPages'] ?? meta['pagination']?['totalPages'];
-    final explicitHasMore = meta['hasMore'] ?? meta['hasNextPage'] ?? meta['pagination']?['hasMore'];
+    final explicitHasMore = meta['hasMore'] ??
+        meta['hasNextPage'] ??
+        meta['pagination']?['hasMore'];
     final hasMore = explicitHasMore is bool
         ? explicitHasMore
         : totalPages is num
             ? page < totalPages.toInt()
             : items.length >= _musicPageSize;
     return MusicPageResult(
-      items: items
-          .where((t) => t.id.isNotEmpty && t.url.isNotEmpty)
-          .toList(),
+      items: items.where((t) => t.id.isNotEmpty && t.url.isNotEmpty).toList(),
       hasMore: hasMore,
     );
   }
@@ -1136,5 +1166,4 @@ class ReelsApi {
     }
     return null;
   }
-
 }

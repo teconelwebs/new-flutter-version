@@ -1,13 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
-// ignore: unnecessary_import
-import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../search/presentation/search_screen.dart';
 import '../../../search/presentation/widgets/app_search_bar.dart';
 import 'delivery_icon.dart';
 import 'wishlist_heart_icon.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/storage/session_store.dart';
 
 class Header extends StatefulWidget {
   final Color backgroundColor;
@@ -138,12 +139,43 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
       final prefs = await SharedPreferences.getInstance();
       final String? userId = prefs.getString("user_id");
 
-      if (userId != null) {
-        // Custom counting logic placeholder
-        int calculatedUnread = 0;
-        setState(() {
-          _unreadCount = calculatedUnread;
-        });
+      if (userId != null && userId.isNotEmpty) {
+        final uri = Uri.parse(
+          'https://welfogapi.welfog.com/api/notifications?user_id=$userId',
+        );
+        final response = await http.get(uri);
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['status'] == 200 && data['notificationsByMonth'] != null) {
+            int calculatedUnread = 0;
+            final monthsMap = data['notificationsByMonth'];
+            if (monthsMap is Map<String, dynamic>) {
+              monthsMap.forEach((key, value) {
+                if (value is List) {
+                  for (var record in value) {
+                    if (record is Map && record['data'] is Map) {
+                      final recordData = record['data'] as Map;
+                      if (recordData['order'] is List) {
+                        final orderList = recordData['order'] as List;
+                        for (var item in orderList) {
+                          if (item is Map && (item['view'] == 0 || item['view'] == '0')) {
+                            calculatedUnread++;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              });
+            }
+
+            if (mounted) {
+              setState(() {
+                _unreadCount = calculatedUnread;
+              });
+            }
+          }
+        }
       }
     } catch (e) {
       debugPrint("Error fetching notification counts: $e");
@@ -248,8 +280,18 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
                             children: [
                               // Wishlist click
                               GestureDetector(
-                                onTap: () {
-                                  Navigator.of(context).pushNamed(AppRoutes.wishlist);
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () async {
+                                  final navigator = Navigator.of(context);
+                                  final prompt = widget.promptLogin;
+                                  final loggedIn = await SessionStore.isLoggedIn();
+                                  if (!loggedIn) {
+                                    if (prompt != null) {
+                                      prompt();
+                                    }
+                                    return;
+                                  }
+                                  navigator.pushNamed(AppRoutes.wishlist);
                                 },
                                 child: const Padding(
                                   padding: EdgeInsets.all(6.0),
@@ -260,14 +302,18 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
 
                               // Notification click
                               GestureDetector(
-                                onTap: () {
-                                  if (widget.isGuest) {
-                                    if (widget.promptLogin != null) {
-                                      widget.promptLogin!();
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () async {
+                                  final prompt = widget.promptLogin;
+                                  final navigator = Navigator.of(context);
+                                  final loggedIn = await SessionStore.isLoggedIn();
+                                  if (!loggedIn) {
+                                    if (prompt != null) {
+                                      prompt();
                                     }
                                     return;
                                   }
-                                  // Navigator.pushNamed(context, '/notifications');
+                                  navigator.pushNamed(AppRoutes.notifications);
                                 },
                                 child: Padding(
                                   padding: const EdgeInsets.all(6.0),

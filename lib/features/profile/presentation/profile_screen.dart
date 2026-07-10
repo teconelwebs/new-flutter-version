@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -25,8 +26,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const _genders = ['', 'Male', 'Female', 'Other'];
   static const _maritalOptions = ['', 'Single', 'Married', 'Divorced', 'Widowed'];
 
+  OverlayEntry? _messageOverlayEntry;
+
   @override
   void dispose() {
+    _messageOverlayEntry?.remove();
+    _messageOverlayEntry = null;
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _dobCtrl.dispose();
@@ -132,12 +137,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showMessage(String message, {bool success = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: success ? const Color(0xFF16A34A) : null,
+    _messageOverlayEntry?.remove();
+    _messageOverlayEntry = null;
+
+    final overlay = Overlay.of(context);
+    final entry = OverlayEntry(
+      builder: (context) => Positioned(
+        bottom: 50,
+        left: 20,
+        right: 20,
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Material(
+            color: Colors.transparent,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withAlpha(178),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withAlpha(38),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        success ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                        color: success ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          message,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
+
+    _messageOverlayEntry = entry;
+    overlay.insert(entry);
+    Future.delayed(const Duration(seconds: 1), () {
+      if (_messageOverlayEntry == entry) {
+        entry.remove();
+        _messageOverlayEntry = null;
+      }
+    });
   }
 
   @override

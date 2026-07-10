@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/constants/app_routes.dart';
 import '../../../core/state/cart_state.dart';
+import '../../../core/widgets/app_loader.dart';
 
 // ---------------------------------------------------------------------------
 // CartItem Model
@@ -223,6 +224,7 @@ class _CartScreenState extends State<CartScreen>
   // ignore: unused_field
   bool _refreshing = false;
   bool _isDeleting = false;
+  DateTime? _lastToastTime;
 
   late AnimationController _bounceController;
   late Animation<double> _bounceAnimation;
@@ -606,21 +608,50 @@ class _CartScreenState extends State<CartScreen>
 
   void _showCustomPopup(String message) {
     if (!mounted) return;
+    final now = DateTime.now();
+    if (_lastToastTime != null &&
+        now.difference(_lastToastTime!) < const Duration(milliseconds: 1500)) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      _lastToastTime = now;
+      return;
+    }
+    _lastToastTime = now;
+
+    ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message,
-            style: const TextStyle(
-                fontWeight: FontWeight.w500, letterSpacing: 0.3)),
-        // ignore: deprecated_member_use
-        backgroundColor: const Color(0xFF222222).withOpacity(0.85),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        margin: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom + 80,
-          left: 24,
-          right: 24,
-        ),
         duration: const Duration(seconds: 2),
+        content: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              // ignore: deprecated_member_use
+              color: const Color(0xFF222222).withOpacity(0.9),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  // ignore: deprecated_member_use
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -630,27 +661,7 @@ class _CartScreenState extends State<CartScreen>
     if (safeQty < 1) return;
 
     if (safeQty > 2) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Maximum you can buy 2 items at one time',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-          backgroundColor: const Color(0xB3111111),
-          behavior: SnackBarBehavior.floating,
-          width: MediaQuery.sizeOf(context).width * 0.5,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          duration: const Duration(seconds: 1),
-        ),
-      );
+      _showCustomPopup('Maximum purchase limit is 2 units');
       return;
     }
 
@@ -1039,7 +1050,7 @@ class _CartScreenState extends State<CartScreen>
                     slivers: [
                       if (_loading)
                         const SliverFillRemaining(
-                          child: Center(child: CircularProgressIndicator()),
+                          child: AppLoader.page(),
                         )
                       else if (_cartItems.isEmpty && _savedForLater.isEmpty)
                         // ─── Empty Cart — centered vertically ──────────────
