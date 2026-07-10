@@ -7,6 +7,7 @@ import '../../features/address/presentation/add_address_details_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/home/presentation/today_deals_screen.dart';
+import '../../features/home/presentation/dynamic_promotion_screen.dart';
 import '../../features/login/presentation/login_screen.dart';
 import '../../features/product/data/models/product_item.dart';
 import '../../features/product/presentation/product_screen.dart';
@@ -315,6 +316,12 @@ class AppRouter {
         return MaterialPageRoute(
           settings: settings,
           builder: (_) => const RecentlyViewedScreen(),
+        );
+      case AppRoutes.dynamicPromotion:
+        final slug = settings.arguments as String? ?? '';
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => DynamicPromotionScreen(slug: slug),
         );
       default:
         return play.AppRoutes.onGenerateRoute(settings);

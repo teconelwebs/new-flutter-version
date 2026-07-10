@@ -877,32 +877,7 @@ class _HomeTabState extends State<_HomeTab> {
                               .map(
                                 (b) => Padding(
                                   padding: const EdgeInsets.only(bottom: 10),
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      final link = b.link;
-                                      if (link != null &&
-                                          link.isNotEmpty &&
-                                          link != '#') {
-                                        final parts = link
-                                            .replaceAll(RegExp(r'/$'), '')
-                                            .split('/');
-                                        final slug = parts.isNotEmpty
-                                            ? parts.last
-                                            : null;
-                                        if (slug != null && slug.isNotEmpty) {
-                                          Navigator.of(context)
-                                              .pushNamed(
-                                                AppRoutes.searchResults,
-                                                arguments: slug,
-                                              )
-                                              .then(
-                                                (_) => _loadRecentlyViewed(),
-                                              );
-                                        }
-                                      }
-                                    },
-                                    child: PromoBannerImage(imageUrl: b.image),
-                                  ),
+                                  child: PromoBannerImage(imageUrl: b.image),
                                 ),
                               )
                               .toList(),
@@ -945,32 +920,7 @@ class _HomeTabState extends State<_HomeTab> {
                               .map(
                                 (b) => Padding(
                                   padding: const EdgeInsets.only(bottom: 10),
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      final link = b.link;
-                                      if (link != null &&
-                                          link.isNotEmpty &&
-                                          link != '#') {
-                                        final parts = link
-                                            .replaceAll(RegExp(r'/$'), '')
-                                            .split('/');
-                                        final slug = parts.isNotEmpty
-                                            ? parts.last
-                                            : null;
-                                        if (slug != null && slug.isNotEmpty) {
-                                          Navigator.of(context)
-                                              .pushNamed(
-                                                AppRoutes.searchResults,
-                                                arguments: slug,
-                                              )
-                                              .then(
-                                                (_) => _loadRecentlyViewed(),
-                                              );
-                                        }
-                                      }
-                                    },
-                                    child: PromoBannerImage(imageUrl: b.image),
-                                  ),
+                                  child: PromoBannerImage(imageUrl: b.image),
                                 ),
                               )
                               .toList(),

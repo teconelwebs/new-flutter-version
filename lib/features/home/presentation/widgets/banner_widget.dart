@@ -152,9 +152,9 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
     final parts = slide.link!.replaceAll(RegExp(r'/$'), '').split('/');
     final slug = parts.isNotEmpty ? parts.last : null;
 
-    if (slug != null) {
+    if (slug != null && slug.isNotEmpty) {
       Navigator.of(context).pushNamed(
-        AppRoutes.searchResults,
+        AppRoutes.dynamicPromotion,
         arguments: slug,
       );
     }
