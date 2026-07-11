@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
 import '../../../core/services/push_notification_service.dart';
 import '../../../core/widgets/app_loader.dart';
+import '../../../core/widgets/no_internet_widget.dart';
 
 import 'package:app_links/app_links.dart';
 import '../../account/presentation/account_screen.dart';
@@ -41,6 +42,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
+  int _previousIndex = 0;
   final HomeApiService _homeApi = HomeApiService();
   late Future<HomeBundle> _bundleFuture;
   String? _loadedPincode;
@@ -138,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen>
     play.customClosePlayCallback = () {
       if (mounted) {
         setState(() {
-          _currentIndex = 0;
+          _currentIndex = _previousIndex == 2 ? 0 : _previousIndex;
         });
         _updateStatusBarColor();
       }
@@ -221,8 +223,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  Uri? _lastHandledUri;
-  DateTime? _lastHandledTime;
 
   // 3. Deep Linking Manager (equivalent to Linking.addEventListener)
   void _initDeepLinkListener() async {
@@ -249,16 +249,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _handleUriRouting(Uri uri) {
-    final now = DateTime.now();
-    if (_lastHandledUri == uri &&
-        _lastHandledTime != null &&
-        now.difference(_lastHandledTime!) < const Duration(seconds: 2)) {
-      debugPrint('DeepLink: Ignore duplicate event for $uri');
-      return;
-    }
-    _lastHandledUri = uri;
-    _lastHandledTime = now;
-
     final segments = uri.pathSegments;
     if (segments.isEmpty) return;
 
@@ -273,9 +263,8 @@ class _HomeScreenState extends State<HomeScreen>
           debugPrint('DeepLink: ProductScreen for slug $trimmed is already visible, skipping push.');
           return;
         }
-        if (trimmed == AppRouter.lastResolvedSlug) {
-          AppRouter.lastResolvedSlug = null; // Clear it so subsequent clicks are handled normally
-          debugPrint('DeepLink: Skip duplicate initial route push for slug: $trimmed');
+        if (AppRouter.shouldIgnoreSlug(trimmed)) {
+          debugPrint('DeepLink: Skip duplicate push for slug: $trimmed');
           return;
         }
         if (!mounted) return;
@@ -515,6 +504,12 @@ class _HomeScreenState extends State<HomeScreen>
                 displayCity: _displayCity,
                 displayPincode: _displayPincode,
                 onLocationTap: () {
+                  if (_isGuest) {
+                    Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
+                      _checkGuestStatus();
+                    });
+                    return;
+                  }
                   Navigator.of(context).pushNamed(AppRoutes.address).then((
                     _,
                   ) async {
@@ -542,6 +537,9 @@ class _HomeScreenState extends State<HomeScreen>
                 },
                 onTabChange: (index) async {
                   setState(() {
+                    if (_currentIndex != 2) {
+                      _previousIndex = _currentIndex;
+                    }
                     _currentIndex = index;
                   });
                   _updateStatusBarColor();
@@ -631,6 +629,9 @@ class _HomeScreenState extends State<HomeScreen>
                   currentIndex: _currentIndex,
                   onTap: (index) async {
                     setState(() {
+                      if (_currentIndex != 2) {
+                        _previousIndex = _currentIndex;
+                      }
                       _currentIndex = index;
                     });
                     _updateStatusBarColor();
@@ -659,6 +660,9 @@ class _HomeScreenState extends State<HomeScreen>
                   },
                   dismissLoginModal: () {
                     // Dismiss modal if showing
+                  },
+                  onPlayLoginSuccess: () {
+                    _checkGuestStatus(); // Check guest status to refresh play screen visibility
                   },
                 );
               },
@@ -790,21 +794,35 @@ class _HomeTabState extends State<_HomeTab> {
     return FutureBuilder<HomeBundle>(
       future: widget.bundleFuture,
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
-          return const AppLoader.page();
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            backgroundColor: Colors.white,
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
         }
         if (snap.hasError || !snap.hasData) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('Failed to load home data'),
-                const SizedBox(height: 8),
-                OutlinedButton(
-                  onPressed: widget.onRefresh,
-                  child: const Text('Retry'),
+          return Scaffold(
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              centerTitle: true,
+              title: const Text(
+                'Welfog',
+                style: TextStyle(
+                  color: Color(0xFFFB5404),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 22,
+                  letterSpacing: 0.5,
                 ),
-              ],
+              ),
+            ),
+            body: NoInternetWidget(
+              onRetry: widget.onRefresh,
+              title: 'No Internet Connection',
+              message: 'Failed to load home data. Check your connection.',
             ),
           );
         }
@@ -840,7 +858,6 @@ class _HomeTabState extends State<_HomeTab> {
                   SliverToBoxAdapter(
                     child: BannerWidget(slides: bundle.mobileSlider),
                   ),
-                  const SliverToBoxAdapter(child: TrustStrip()),
                   if (_recentProducts.isNotEmpty)
                     SliverToBoxAdapter(
                       child: Padding(
@@ -884,11 +901,12 @@ class _HomeTabState extends State<_HomeTab> {
                         ),
                       ),
                     ),
+                  const SliverToBoxAdapter(child: TrustStrip()),
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.only(top: 10),
                       child: ProductStrip(
-                        title: 'Today Deals',
+                        title: 'Today Deals 🔥',
                         products: dealList,
                         onProductTap: (p) {
                           Navigator.of(context)

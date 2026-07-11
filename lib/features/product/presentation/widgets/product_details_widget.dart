@@ -5,12 +5,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import '../../../../core/constants/app_routes.dart';
 
 
 class ProductDetailsWidget extends StatefulWidget {
   final Map<String, dynamic> data;
   final String pincode;
   final VoidCallback? onRatingTap;
+  final Future<void> Function(String slug)? onVariantSelected;
 
   // ignore: use_super_parameters
   const ProductDetailsWidget({
@@ -18,6 +20,7 @@ class ProductDetailsWidget extends StatefulWidget {
     required this.data,
     required this.pincode,
     this.onRatingTap,
+    this.onVariantSelected,
   }) : super(key: key);
 
   @override
@@ -35,6 +38,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
   int _apiTotalReviews = 0;
   double _apiRating = 0.0;
   int _totalRatings = 0;
+  String? _loadingVariantSlug;
 
   @override
   void initState() {
@@ -719,9 +723,18 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
 
           // Variants Section
           if (variants != null)
-            ...variants.entries.map((entry) {
+            ...variants.entries.where((entry) {
+              final key = entry.key.toLowerCase().replaceAll(RegExp(r'[\s_-]'), '').replaceAll('colour', 'color');
+              return key != 'colorsizes' && key != 'colorsize';
+            }).map((entry) {
               final String variantKey = entry.key;
-              final List<dynamic> variantValues = entry.value as List? ?? [];
+              final rawVal = entry.value;
+              final List<dynamic> variantValues = [];
+              if (rawVal is List) {
+                variantValues.addAll(rawVal);
+              } else if (rawVal is Map) {
+                variantValues.addAll(rawVal.values);
+              }
               if (variantValues.isEmpty) return const SizedBox.shrink();
 
               return Column(
@@ -739,12 +752,21 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                     ),
                   ),
                   SizedBox(
-                    height: 46,
+                    height: 50,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       itemCount: variantValues.length,
                       itemBuilder: (context, idx) {
-                        final item = variantValues[idx];
+                        final rawItem = variantValues[idx];
+                        if (rawItem == null) return const SizedBox.shrink();
+                        final Map<String, dynamic> item = rawItem is Map
+                            ? Map<String, dynamic>.from(rawItem)
+                            : {
+                                'slug': rawItem.toString(),
+                                'size': rawItem.toString(),
+                                'color': rawItem.toString(),
+                                'color_code': '#ccc',
+                              };
                         final bool isSelected =
                             widget.data['slug'] == item['slug'];
 
@@ -753,7 +775,30 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                             variantKey.toLowerCase() == 'size' ||
                             item['size'] != null) {
                           return GestureDetector(
-                            onTap: null,
+                            onTap: () async {
+                              final targetSlug = item['slug']?.toString();
+                              if (targetSlug != null && targetSlug.isNotEmpty && targetSlug != widget.data['slug']) {
+                                if (widget.onVariantSelected != null) {
+                                  setState(() {
+                                    _loadingVariantSlug = targetSlug;
+                                  });
+                                  try {
+                                    await widget.onVariantSelected!(targetSlug);
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() {
+                                        _loadingVariantSlug = null;
+                                      });
+                                    }
+                                  }
+                                } else {
+                                  Navigator.of(context).pushReplacementNamed(
+                                    AppRoutes.product,
+                                    arguments: targetSlug,
+                                  );
+                                }
+                              }
+                            },
                             child: Container(
                               margin: const EdgeInsets.symmetric(
                                   horizontal: 4, vertical: 4),
@@ -761,22 +806,34 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                                   horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? const Color(0xFFEEEEEE)
+                                    ? const Color(0xFFFEF6F1)
                                     : Colors.white,
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(
                                   color: isSelected
-                                      ? const Color(0xFFF3F4F6)
-                                      : const Color(0xFF9CA3AF),
+                                      ? const Color(0xFFFB5404)
+                                      : const Color(0xFFD1D5DB),
+                                  width: isSelected ? 2 : 1,
                                 ),
                               ),
                               child: Center(
-                                child: Text(
-                                  item['size'] ?? item['name'] ?? '',
-                                  style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500),
-                                ),
+                                child: _loadingVariantSlug == item['slug']
+                                    ? const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.0,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFB5404)),
+                                        ),
+                                      )
+                                    : Text(
+                                        item['size'] ?? item['name'] ?? '',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                          color: isSelected ? const Color(0xFFFB5404) : const Color(0xFF1F2937),
+                                        ),
+                                      ),
                               ),
                             ),
                           );
@@ -793,7 +850,30 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                           final isSelectedColor = isSelected;
 
                           return GestureDetector(
-                            onTap: null,
+                            onTap: () async {
+                              final targetSlug = item['slug']?.toString();
+                              if (targetSlug != null && targetSlug.isNotEmpty && targetSlug != widget.data['slug']) {
+                                if (widget.onVariantSelected != null) {
+                                  setState(() {
+                                    _loadingVariantSlug = targetSlug;
+                                  });
+                                  try {
+                                    await widget.onVariantSelected!(targetSlug);
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() {
+                                        _loadingVariantSlug = null;
+                                      });
+                                    }
+                                  }
+                                } else {
+                                  Navigator.of(context).pushReplacementNamed(
+                                    AppRoutes.product,
+                                    arguments: targetSlug,
+                                  );
+                                }
+                              }
+                            },
                             child: Container(
                               margin: const EdgeInsets.symmetric(
                                   horizontal: 4, vertical: 4),
@@ -813,28 +893,40 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                               ),
                               child: Row(
                                 children: [
-                                  Container(
-                                    width: 20,
-                                    height: 20,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                          color: const Color(0xFFE5E7EB),
-                                          width: 2),
-                                      gradient: isGradient
-                                          ? LinearGradient(
-                                              colors: _parseGradient(
-                                                  colorValue.toString()),
-                                              begin: Alignment.centerLeft,
-                                              end: Alignment.centerRight,
-                                            )
-                                          : null,
-                                      color: !isGradient
-                                          ? _colorFromHex(colorValue.toString())
-                                          : null,
+                                  if (_loadingVariantSlug == item['slug']) ...[
+                                    const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.0,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFB5404)),
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
+                                    const SizedBox(width: 8),
+                                  ] else ...[
+                                    Container(
+                                      width: 20,
+                                      height: 20,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                            color: const Color(0xFFE5E7EB),
+                                            width: 2),
+                                        gradient: isGradient
+                                            ? LinearGradient(
+                                                colors: _parseGradient(
+                                                    colorValue.toString()),
+                                                begin: Alignment.centerLeft,
+                                                end: Alignment.centerRight,
+                                              )
+                                            : null,
+                                        color: !isGradient
+                                            ? _colorFromHex(colorValue.toString())
+                                            : null,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
                                   Text(
                                     colorName,
                                     style: const TextStyle(
@@ -850,7 +942,30 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                         // 3. IMAGE THUMBNAILS
                         if (item['thumb'] != null) {
                           return GestureDetector(
-                            onTap: null,
+                            onTap: () async {
+                              final targetSlug = item['slug']?.toString();
+                              if (targetSlug != null && targetSlug.isNotEmpty && targetSlug != widget.data['slug']) {
+                                if (widget.onVariantSelected != null) {
+                                  setState(() {
+                                    _loadingVariantSlug = targetSlug;
+                                  });
+                                  try {
+                                    await widget.onVariantSelected!(targetSlug);
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() {
+                                        _loadingVariantSlug = null;
+                                      });
+                                    }
+                                  }
+                                } else {
+                                  Navigator.of(context).pushReplacementNamed(
+                                    AppRoutes.product,
+                                    arguments: targetSlug,
+                                  );
+                                }
+                              }
+                            },
                             child: Container(
                               width: 44,
                               height: 44,
@@ -867,11 +982,31 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(5),
-                                child: Image.network(
-                                  'https://d1f02fefkbso7w.cloudfront.net/${item['thumb']}',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      const Icon(Icons.image, size: 20),
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: Image.network(
+                                        'https://d1f02fefkbso7w.cloudfront.net/${item['thumb']}',
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Icon(Icons.image, size: 20),
+                                      ),
+                                    ),
+                                    if (_loadingVariantSlug == item['slug'])
+                                      Container(
+                                        color: Colors.black38,
+                                        child: const Center(
+                                          child: SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.0,
+                                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFB5404)),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),

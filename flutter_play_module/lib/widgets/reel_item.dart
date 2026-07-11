@@ -26,6 +26,7 @@ class ReelItemWidget extends StatefulWidget {
   final ReelsApi api;
   final bool isActive;
   final VoidCallback onClose;
+  final VoidCallback? onRefresh;
   final void Function(String reelId)? onRemoveReel;
 
   const ReelItemWidget({
@@ -35,6 +36,7 @@ class ReelItemWidget extends StatefulWidget {
     required this.api,
     required this.isActive,
     required this.onClose,
+    this.onRefresh,
     this.onRemoveReel,
   });
 
@@ -722,6 +724,16 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
             style: IconButton.styleFrom(backgroundColor: Colors.black45),
           ),
         ),
+        if (widget.onRefresh != null)
+          Positioned(
+            top: layout.safeTop + 8,
+            left: layout.safeLeft + 12,
+            child: IconButton(
+              onPressed: widget.onRefresh,
+              icon: const Icon(Icons.refresh, color: Colors.white, size: 22),
+              style: IconButton.styleFrom(backgroundColor: Colors.black45),
+            ),
+          ),
         Positioned(
           right: layout.safeRight + 10,
           bottom: layout.actionsBottom,

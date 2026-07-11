@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/widgets/app_loader.dart';
+import '../../../core/widgets/no_internet_widget.dart';
+import '../../../core/state/cart_state.dart';
 import '../data/models/product_item.dart';
 import '../data/product_api_service.dart';
 import 'widgets/product_card.dart';
@@ -35,6 +37,7 @@ class _ProductScreenState extends State<ProductScreen> {
   ProductDetailData? _detail;
   List<ProductItem> _related = const [];
 
+  // ignore: unused_field
   bool _loading = true;
   String? _error;
   int _qty = 1;
@@ -55,6 +58,7 @@ class _ProductScreenState extends State<ProductScreen> {
       ProductScreen.currentlyVisibleSlug = slug.trim();
     }
     _load();
+    CartState.loadCartCount();
   }
 
   @override
@@ -138,6 +142,55 @@ class _ProductScreenState extends State<ProductScreen> {
         _error = e.toString().replaceFirst('Exception: ', '');
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _selectVariant(String slug) async {
+    try {
+      final detail = await _api.fetchProductDetail(slugOrId: slug, productId: slug);
+      final related = await _api.fetchRelatedProducts(detail.id);
+
+      final prefs = await SharedPreferences.getInstance();
+      final pincode = prefs.getString('postal_code') ?? '';
+      final userId = prefs.getString('user_id') ?? '';
+
+      final savedWishlistState = prefs.getString('wishlist_state_${detail.id}');
+      bool isWish = savedWishlistState == 'true';
+
+      if (!mounted) return;
+      setState(() {
+        _detail = detail;
+        _related = related.where((p) => p.id != detail.id).take(6).toList();
+        _pincode = pincode;
+        _userId = userId;
+        _isWishlisted = isWish;
+      });
+
+      _saveToRecentlyViewed(detail);
+
+      if (userId.isNotEmpty) {
+        _checkWishlistStatus();
+        _fetchAddress();
+      }
+
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error loading variant: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load variant: $e'),
+            backgroundColor: Colors.red.shade800,
+          ),
+        );
+      }
+      rethrow;
     }
   }
 
@@ -283,6 +336,35 @@ class _ProductScreenState extends State<ProductScreen> {
 
         if (response.statusCode != 200) {
           debugPrint('Wishlist API update failed');
+        } else {
+          if (mounted) {
+            final msg = newState
+                ? 'Item added to wishlist'
+                : 'Item removed from wishlist';
+            final textWidth = (msg.length * 7.5) + 32;
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  msg,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                // ignore: deprecated_member_use
+                backgroundColor: const Color(0xB3111111),
+                behavior: SnackBarBehavior.floating,
+                width: textWidth,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                duration: const Duration(seconds: 1),
+              ),
+            );
+          }
         }
       } catch (e) {
         debugPrint('Wishlist API Error: $e');
@@ -316,30 +398,27 @@ class _ProductScreenState extends State<ProductScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        body: AppLoader.page(),
-      );
-    }
-
-    if (_error != null || _detail == null) {
-      return Scaffold(
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_error ?? 'Product not found'),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: _load,
-                  child: const Text('Retry'),
-                ),
-              ],
+    if (_detail == null) {
+      if (_error != null) {
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black, size: 20),
+              onPressed: () => Navigator.of(context).pop(),
             ),
           ),
-        ),
+          body: NoInternetWidget(
+            onRetry: _load,
+            title: 'Connection Error',
+            message: _error!,
+          ),
+        );
+      }
+      return const Scaffold(
+        body: AppLoader.page(),
       );
     }
 
@@ -353,7 +432,19 @@ class _ProductScreenState extends State<ProductScreen> {
               onBack: () => Navigator.of(context).maybePop(),
               onSearch: () => Navigator.of(context).pushNamed(AppRoutes.search),
               onWishlist: _toggleWishlist,
-              onShare: _onShare,
+              onCartTap: () async {
+                final prefs = await SharedPreferences.getInstance();
+                final token = prefs.getString('access_token') ?? '';
+                if (token.isEmpty) {
+                  if (context.mounted) {
+                    Navigator.of(context).pushNamed(AppRoutes.login);
+                  }
+                  return;
+                }
+                if (context.mounted) {
+                  Navigator.of(context).pushNamed(AppRoutes.cart);
+                }
+              },
               isWishlisted: _isWishlisted,
             ),
             Expanded(
@@ -365,15 +456,41 @@ class _ProductScreenState extends State<ProductScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: ImageGalleryWidget(
-                        images: detail.images,
-                        isWishlisted: _isWishlisted,
-                        onWishlistPress: _toggleWishlist,
-                        name: detail.name,
-                        slug: detail.slug,
-                        productId: detail.id,
-                        userId: _userId,
-                        showFloatingActions: false,
+                      child: Stack(
+                        children: [
+                          ImageGalleryWidget(
+                            images: detail.images,
+                            isWishlisted: _isWishlisted,
+                            onWishlistPress: _toggleWishlist,
+                            name: detail.name,
+                            slug: detail.slug,
+                            productId: detail.id,
+                            userId: _userId,
+                            showFloatingActions: false,
+                          ),
+                          Positioned(
+                            top: 16,
+                            right: 16,
+                            child: GestureDetector(
+                              onTap: _onShare,
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFE5E7EB),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.share_outlined,
+                                    size: 18,
+                                    color: Color(0xFFDC2626),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -381,6 +498,7 @@ class _ProductScreenState extends State<ProductScreen> {
                       data: detail.rawJson,
                       pincode: _pincode,
                       onRatingTap: _scrollToReviews,
+                      onVariantSelected: _selectVariant,
                     ),
                     const SizedBox(height: 4),
                     BuyProductWidget(
@@ -523,14 +641,14 @@ class _ProductHeader extends StatelessWidget {
     required this.onBack,
     required this.onSearch,
     required this.onWishlist,
-    required this.onShare,
+    required this.onCartTap,
     required this.isWishlisted,
   });
 
   final VoidCallback onBack;
   final VoidCallback onSearch;
   final VoidCallback onWishlist;
-  final VoidCallback onShare;
+  final VoidCallback onCartTap;
   final bool isWishlisted;
 
   @override
@@ -554,9 +672,49 @@ class _ProductHeader extends StatelessWidget {
               color: const Color(0xFFDC2626),
             ),
           ),
-          IconButton(
-              onPressed: onShare,
-              icon: const Icon(Icons.share_outlined, color: Color(0xFFDC2626))),
+          ValueListenableBuilder<int>(
+            valueListenable: CartState.cartCountNotifier,
+            builder: (context, cartCount, _) {
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    onPressed: onCartTap,
+                    icon: const Icon(
+                      Icons.shopping_cart_outlined,
+                      color: Color(0xFFDC2626),
+                    ),
+                  ),
+                  if (cartCount > 0)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFDC2626),
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '$cartCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(width: 8),
         ],
       ),
     );

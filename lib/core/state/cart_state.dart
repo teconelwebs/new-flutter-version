@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../features/cart/presentation/cart_screen.dart';
 
 class CartState {
   static final ValueNotifier<int> cartCountNotifier = ValueNotifier<int>(0);
@@ -8,6 +9,7 @@ class CartState {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('cart_count', count.toString());
     cartCountNotifier.value = count;
+    CartScreen.clearCache();
   }
 
   static Future<void> loadCartCount() async {

@@ -208,6 +208,10 @@ class CartScreen extends StatefulWidget {
     refreshTabStream.add(null);
   }
 
+  static void clearCache() {
+    _cartModuleCache = null;
+  }
+
   @override
   State<CartScreen> createState() => _CartScreenState();
 }

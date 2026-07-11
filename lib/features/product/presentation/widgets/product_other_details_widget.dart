@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/constants/app_routes.dart';
 
 class ProductOtherDetailsWidget extends StatefulWidget {
@@ -25,21 +26,20 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
   bool _isAllDetailsExpanded = true;
 
   // Selected tab state inside "All details"
-  String _selectedTab = 'Showcase';
+  String _selectedTab = 'Summary';
 
   // Toggle for truncating long content
   bool _showMore = false;
 
   final List<String> _tabs = [
-    'Showcase',
+    'Summary',
     'Specifications',
     'Description',
-    'Warranty'
   ];
 
   final List<Map<String, dynamic>> _benefitsData = [
     {
-      'emoji': '✅',
+      'svg': '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#FB5404" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>''',
       'text': '5-Days Easy Return Policy.',
       'modalContent': {
         'title': '5-Day Easy Return Policy',
@@ -55,7 +55,7 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
       },
     },
     {
-      'emoji': ' ₹',
+      'svg': '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#FB5404" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>''',
       'text': ' Pay with UPI & Get 10% Off.',
       'modalContent': {
         'title': 'Pay with UPI & Get 10% Off',
@@ -64,7 +64,7 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
       },
     },
     {
-      'emoji': '🚚',
+      'svg': '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#FB5404" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2 2 2 0 0 1 2-2h12v4"></path><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"></path><path d="M18 12a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4v-6z"></path></svg>''',
       'text': 'Shop Now, Pay on Delivery.',
       'modalContent': {
         'title': 'Shop Now, Pay on Delivery',
@@ -80,7 +80,7 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
       },
     },
     {
-      'emoji': '🏭',
+      'svg': '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#FB5404" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20"></path><path d="M5 20V8l7 4V8l7 4v8"></path></svg>''',
       'text': 'Factory Price – Direct Savings.',
       'modalContent': {
         'title': 'Factory Price',
@@ -89,7 +89,7 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
       },
     },
     {
-      'emoji': '📦',
+      'svg': '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#FB5404" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>''',
       'text': 'Free Delivery.',
       'modalContent': {
         'title': 'Free Delivery',
@@ -269,10 +269,10 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
 
   Widget _buildTabContent(String tab) {
     switch (tab) {
-      case 'Showcase':
+      case 'Summary':
         final htmlDesc = widget.data['description']?.toString() ?? '';
         if (htmlDesc.isEmpty) {
-          return const Text('No showcase banner details available.',
+          return const Text('No summary details available.',
               style: TextStyle(color: Colors.grey));
         }
         return Column(
@@ -365,9 +365,9 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
 
       case 'Warranty':
         final warranty = widget.data['warranty']?.toString() ?? '';
-        final textClean =
+        final wClean =
             warranty.replaceAll(RegExp(r'<[^>]*>|&nbsp;'), '').trim();
-        if (textClean.isEmpty) {
+        if (wClean.isEmpty) {
           return const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -388,7 +388,7 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
           );
         }
         return Text(
-          textClean,
+          wClean,
           style: const TextStyle(
             fontSize: 14,
             color: Color(0xFF4B5563),
@@ -509,8 +509,11 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
                     children: [
                       Row(
                         children: [
-                          Text(benefit['emoji'],
-                              style: const TextStyle(fontSize: 20)),
+                          SvgPicture.string(
+                            benefit['svg']!,
+                            width: 22,
+                            height: 22,
+                          ),
                           const SizedBox(width: 12),
                           Text(benefit['text'],
                               style: const TextStyle(

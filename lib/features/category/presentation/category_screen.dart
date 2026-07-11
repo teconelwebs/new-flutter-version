@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/widgets/no_internet_widget.dart';
 import '../../search/presentation/search_screen.dart';
 import '../data/category_api_service.dart';
 
@@ -16,6 +18,7 @@ class CategoryScreen extends StatefulWidget {
 class _CategoryScreenState extends State<CategoryScreen> {
   final _api = CategoryApiService();
   bool _loading = true;
+  String? _error;
   List<MainCategory> _categories = const [];
   
   // Cache of fetched inner category sections for each index
@@ -23,8 +26,10 @@ class _CategoryScreenState extends State<CategoryScreen> {
   
   final ScrollController _leftScrollController = ScrollController();
   final ScrollController _rightScrollController = ScrollController();
+  final GlobalKey _rightListKey = GlobalKey();
   final Map<int, GlobalKey> _blockKeys = {};
   final Set<int> _loadingIndexes = {};
+  final Map<int, Future<void>> _loadingFutures = {};
   
   int _activeIndex = 0;
   String _bannerImage = '';
@@ -45,7 +50,10 @@ class _CategoryScreenState extends State<CategoryScreen> {
   }
 
   Future<void> _loadMain() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final bundle = await _api.fetchMainCategories();
       if (!mounted) return;
@@ -62,30 +70,45 @@ class _CategoryScreenState extends State<CategoryScreen> {
       }
     } catch (e) {
       debugPrint('Error loading main categories: $e');
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  void _lazyLoadInner(int index) async {
-    if (index < 0 || index >= _categories.length) return;
+  Future<void> _lazyLoadInner(int index) {
+    if (index < 0 || index >= _categories.length) return Future.value();
     if (_innerCategories.length != _categories.length) {
       _innerCategories = List<List<InnerSection>?>.filled(_categories.length, null);
     }
-    if (_innerCategories[index] != null || _loadingIndexes.contains(index)) return;
+    if (_innerCategories[index] != null) return Future.value();
     
-    _loadingIndexes.add(index);
-    try {
-      final sections = await _api.fetchInnerSections(_categories[index].id);
-      if (!mounted) return;
-      setState(() {
-        _innerCategories[index] = sections;
-      });
-    } catch (e) {
-      debugPrint('Error lazy loading category $index: $e');
-    } finally {
-      _loadingIndexes.remove(index);
+    if (_loadingFutures.containsKey(index)) {
+      return _loadingFutures[index]!;
     }
+    
+    final future = () async {
+      _loadingIndexes.add(index);
+      try {
+        final sections = await _api.fetchInnerSections(_categories[index].id);
+        if (!mounted) return;
+        setState(() {
+          _innerCategories[index] = sections;
+        });
+      } catch (e) {
+        debugPrint('Error lazy loading category $index: $e');
+      } finally {
+        _loadingIndexes.remove(index);
+        _loadingFutures.remove(index);
+      }
+    }();
+    
+    _loadingFutures[index] = future;
+    return future;
   }
 
   void _scrollToLeftIndex(int index) {
@@ -100,7 +123,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     );
   }
 
-  void _handleCategoryPress(int index) async {
+  void _handleCategoryPress(int index) {
     if (_activeIndex == index) return;
     
     setState(() {
@@ -110,24 +133,61 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
     _scrollToLeftIndex(index);
 
-    // Load category if not already fetched
-    if (_innerCategories[index] == null) {
-      _lazyLoadInner(index);
-    }
-
-    // Scroll right list to selected category block
+    // Scroll to the placeholder/skeleton block immediately for instant visual feedback
     final key = _blockKeys[index];
     if (key != null && key.currentContext != null) {
-      await Scrollable.ensureVisible(
+      Scrollable.ensureVisible(
         key.currentContext!,
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 250),
         curve: Curves.easeInOut,
       );
+    } else {
+      // Fallback post frame callback
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final retryKey = _blockKeys[index];
+        if (retryKey != null && retryKey.currentContext != null) {
+          Scrollable.ensureVisible(
+            retryKey.currentContext!,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
     }
-    
-    setState(() {
-      _isSidebarClick = false;
-    });
+
+    if (_innerCategories[index] == null) {
+      // Fetch data in the background (no await here, so it doesn't block the instant scroll!)
+      _lazyLoadInner(index).then((_) {
+        if (!mounted || _activeIndex != index) return;
+        
+        // Wait a frame to allow the newly loaded UI blocks to build and have their true layout dimensions
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _activeIndex != index) return;
+          final keyAfterLoad = _blockKeys[index];
+          if (keyAfterLoad != null && keyAfterLoad.currentContext != null) {
+            Scrollable.ensureVisible(
+              keyAfterLoad.currentContext!,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+            );
+          }
+          if (mounted && _activeIndex == index) {
+            setState(() {
+              _isSidebarClick = false;
+            });
+          }
+        });
+      });
+    } else {
+      // If already loaded, unlock after the scroll animation finishes (250ms)
+      Future.delayed(const Duration(milliseconds: 250), () {
+        if (mounted && _activeIndex == index) {
+          setState(() {
+            _isSidebarClick = false;
+          });
+        }
+      });
+    }
   }
 
   void _onRightScroll() {
@@ -137,7 +197,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     int? activeIdx;
     
     try {
-      final RenderBox? scrollBox = _rightScrollController.position.context.storageContext.findRenderObject() as RenderBox?;
+      final RenderBox? scrollBox = _rightListKey.currentContext?.findRenderObject() as RenderBox?;
       if (scrollBox != null && scrollBox.hasSize && scrollBox.attached) {
         final scrollGlobalY = scrollBox.localToGlobal(Offset.zero).dy;
 
@@ -154,8 +214,9 @@ class _CategoryScreenState extends State<CategoryScreen> {
             final relativeTop = globalY - scrollGlobalY;
             final height = box.size.height;
             
-            // Match standard category visibility intersections
-            if (relativeTop <= 120 && relativeTop + height > 40) {
+            // Match standard category visibility intersections using a threshold
+            const threshold = 80.0;
+            if (relativeTop <= threshold && relativeTop + height > threshold) {
               activeIdx = i;
               break;
             }
@@ -276,11 +337,22 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFFFB5404)));
-    }
     if (_categories.isEmpty) {
-      return const Center(child: Text('No categories found'));
+      if (_error != null) {
+        return Scaffold(
+          body: NoInternetWidget(
+            onRetry: _loadMain,
+            title: 'Connection Error',
+            message: _error!,
+          ),
+        );
+      }
+      if (_loading) {
+        return const Center(child: CircularProgressIndicator(color: Color(0xFFFB5404)));
+      }
+      return const Scaffold(
+        body: Center(child: Text('No categories found')),
+      );
     }
 
     if (_innerCategories.length != _categories.length) {
@@ -333,8 +405,19 @@ class _CategoryScreenState extends State<CategoryScreen> {
                         ),
                       ),
                       IconButton(
-                        onPressed: () => Navigator.of(context)
-                            .pushNamed('/ProfileScreen/Wishlist'),
+                        onPressed: () async {
+                          final prefs = await SharedPreferences.getInstance();
+                          final token = prefs.getString('access_token') ?? '';
+                          if (token.isEmpty) {
+                            if (context.mounted) {
+                              Navigator.of(context).pushNamed(AppRoutes.login);
+                            }
+                            return;
+                          }
+                          if (context.mounted) {
+                            Navigator.of(context).pushNamed(AppRoutes.wishlist);
+                          }
+                        },
                         icon: const Icon(
                           Icons.favorite_border_outlined,
                           color: Colors.black,
@@ -342,8 +425,19 @@ class _CategoryScreenState extends State<CategoryScreen> {
                         ),
                       ),
                       IconButton(
-                        onPressed: () => Navigator.of(context)
-                            .pushNamed('/(tabs)/Cart'),
+                        onPressed: () async {
+                          final prefs = await SharedPreferences.getInstance();
+                          final token = prefs.getString('access_token') ?? '';
+                          if (token.isEmpty) {
+                            if (context.mounted) {
+                              Navigator.of(context).pushNamed(AppRoutes.login);
+                            }
+                            return;
+                          }
+                          if (context.mounted) {
+                            Navigator.of(context).pushNamed(AppRoutes.cart);
+                          }
+                        },
                         icon: const Icon(
                           Icons.shopping_cart_outlined,
                           color: Colors.black,
@@ -424,18 +518,23 @@ class _CategoryScreenState extends State<CategoryScreen> {
                   
                   // Right subcategory grid content
                   Expanded(
-                    child: ListView.builder(
+                    child: ListView(
+                      key: _rightListKey,
                       controller: _rightScrollController,
+                      // ignore: deprecated_member_use
+                      cacheExtent: 20000.0,
                       padding: const EdgeInsets.all(12),
-                      itemCount: _categories.length,
-                      itemBuilder: (context, i) {
+                      children: List.generate(_categories.length, (i) {
                         final block = _innerCategories[i];
                         final key = _blockKeys.putIfAbsent(i, () => GlobalKey());
                         
                         // Load item lazily if null
                         if (block == null) {
                           _lazyLoadInner(i);
-                          return _CategorySkeletonLoader(key: key);
+                          return Container(
+                            key: key,
+                            child: const _CategorySkeletonLoader(),
+                          );
                         }
 
                         if (i == 0) {
@@ -458,7 +557,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
                           key: key,
                           child: _buildCategoryBlock(i, block),
                         );
-                      },
+                      }),
                     ),
                   ),
                 ],
@@ -472,7 +571,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
 }
 
 class _CategorySkeletonLoader extends StatefulWidget {
-  const _CategorySkeletonLoader({super.key});
+  const _CategorySkeletonLoader();
 
   @override
   State<_CategorySkeletonLoader> createState() => _CategorySkeletonLoaderState();

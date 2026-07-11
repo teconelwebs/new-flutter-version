@@ -188,6 +188,7 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
   }
 
   Future<void> _bootstrap() async {
+    _preloadPool?.disposeAll();
     final gen = ++_bootstrapGen;
     setState(() {
       _loading = true;
@@ -447,6 +448,7 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
             api: _api,
             isActive: index == _currentIndex && _routeVisible && widget.isActive,
             onClose: _handleClose,
+            onRefresh: _bootstrap,
             onRemoveReel: _removeReel,
           );
         },

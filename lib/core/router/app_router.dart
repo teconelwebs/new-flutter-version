@@ -42,6 +42,20 @@ import '../../features/shop/presentation/shop_screen.dart';
 
 class AppRouter {
   static String? lastResolvedSlug;
+  static String? lastHandledSlug;
+  static DateTime? lastHandledSlugTime;
+
+  static bool shouldIgnoreSlug(String slug) {
+    final now = DateTime.now();
+    if (lastHandledSlug == slug &&
+        lastHandledSlugTime != null &&
+        now.difference(lastHandledSlugTime!) < const Duration(seconds: 2)) {
+      return true;
+    }
+    lastHandledSlug = slug;
+    lastHandledSlugTime = now;
+    return false;
+  }
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     final name = settings.name ?? '';
@@ -58,6 +72,10 @@ class AppRouter {
           final trimmed = slug.trim();
           if (trimmed == ProductScreen.currentlyVisibleSlug) {
             debugPrint('DeepLink Router: Slug $trimmed is already visible, ignoring push.');
+            return null;
+          }
+          if (shouldIgnoreSlug(trimmed)) {
+            debugPrint('DeepLink Router: Skip duplicate push for slug: $trimmed');
             return null;
           }
           lastResolvedSlug = trimmed;

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/storage/session_store.dart';
@@ -717,27 +718,48 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                           const SizedBox(height: 30),
 
                           // Footer with rich inline links (T&C, Privacy Policy)
-                          const Center(
+                          Center(
                             child: Text.rich(
                               TextSpan(
                                 text: "By continuing, you agree to our ",
-                                style: TextStyle(fontSize: 12, color: Color(0xFF374151), height: 1.5),
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF374151), height: 1.5),
                                 children: [
                                   TextSpan(
                                     text: "Terms & Conditions",
-                                    style: TextStyle(color: Color(0xFF0A6B69), fontWeight: FontWeight.bold),
+                                    style: const TextStyle(color: Color(0xFF0A6B69), fontWeight: FontWeight.bold),
+                                    recognizer: TapGestureRecognizer()
+                                      ..onTap = () {
+                                        Navigator.of(context).pushNamed(
+                                          AppRoutes.policy,
+                                          arguments: 'terms-and-conditions',
+                                        );
+                                      },
                                   ),
-                                  TextSpan(text: ", "),
+                                  const TextSpan(text: ", "),
                                   TextSpan(
                                     text: "Privacy Policy",
-                                    style: TextStyle(color: Color(0xFF0A6B69), fontWeight: FontWeight.bold),
+                                    style: const TextStyle(color: Color(0xFF0A6B69), fontWeight: FontWeight.bold),
+                                    recognizer: TapGestureRecognizer()
+                                      ..onTap = () {
+                                        Navigator.of(context).pushNamed(
+                                          AppRoutes.policy,
+                                          arguments: 'privacy-policy',
+                                        );
+                                      },
                                   ),
-                                  TextSpan(text: ", and "),
+                                  const TextSpan(text: ", and "),
                                   TextSpan(
                                     text: "Anti-Phishing",
-                                    style: TextStyle(color: Color(0xFF0A6B69), fontWeight: FontWeight.bold),
+                                    style: const TextStyle(color: Color(0xFF0A6B69), fontWeight: FontWeight.bold),
+                                    recognizer: TapGestureRecognizer()
+                                      ..onTap = () {
+                                        Navigator.of(context).pushNamed(
+                                          AppRoutes.policy,
+                                          arguments: 'anti-phishing-defense-policy',
+                                        );
+                                      },
                                   ),
-                                  TextSpan(text: "."),
+                                  const TextSpan(text: "."),
                                 ],
                               ),
                               textAlign: TextAlign.center,

@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'custom_tab_icons.dart';
+import '../../../login/presentation/widgets/login_bottom_sheet.dart';
 
 class TabModel {
   final String label;
@@ -32,6 +33,7 @@ class CustomBottomTabBar extends StatefulWidget {
   final VoidCallback promptLogin;
   final Future<void> Function() clearGuestMode;
   final VoidCallback dismissLoginModal;
+  final VoidCallback onPlayLoginSuccess;
 
   // ignore: use_super_parameters
   const CustomBottomTabBar({
@@ -43,6 +45,7 @@ class CustomBottomTabBar extends StatefulWidget {
     required this.promptLogin,
     required this.clearGuestMode,
     required this.dismissLoginModal,
+    required this.onPlayLoginSuccess,
   }) : super(key: key);
 
   @override
@@ -59,6 +62,26 @@ class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
   Future<void> _handleTabPress(int index, TabModel tab) async {
     _tabPressHaptic();
 
+    if (widget.isGuest &&
+        (tab.route == "/Account" ||
+            tab.route == "/Cart" ||
+            tab.route == "/Play")) {
+      _tabBlockedHaptic();
+      if (tab.route == "/Play") {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => LoginBottomSheet(
+            onLoginSuccess: widget.onPlayLoginSuccess,
+          ),
+        );
+      } else {
+        widget.promptLogin();
+      }
+      return;
+    }
+
     if (tab.screen == "Play") {
       widget.onTap(index);
       return;
@@ -68,12 +91,6 @@ class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
       if (tab.screen != "index") {
         _tabRefreshHaptic();
       }
-      return;
-    }
-
-    if (widget.isGuest && (tab.route == "/Account" || tab.route == "/Cart")) {
-      _tabBlockedHaptic();
-      widget.promptLogin();
       return;
     }
 

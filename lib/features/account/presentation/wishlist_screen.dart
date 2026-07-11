@@ -101,21 +101,25 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
 
   void _showCustomPopup(String message) {
     if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message,
-            style: const TextStyle(
-                fontWeight: FontWeight.w500, letterSpacing: 0.3)),
-        // ignore: deprecated_member_use
-        backgroundColor: const Color(0xFF222222).withOpacity(0.85),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        margin: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom + 80,
-          left: 24,
-          right: 24,
+        content: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
         ),
-        duration: const Duration(seconds: 2),
+        backgroundColor: const Color(0xB3111111),
+        behavior: SnackBarBehavior.floating,
+        width: MediaQuery.sizeOf(context).width * 0.5,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        duration: const Duration(seconds: 1),
       ),
     );
   }
@@ -187,11 +191,25 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
       }
     } else {
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to add item to cart.'),
-            backgroundColor: Color(0xFFEF4444),
+          SnackBar(
+            content: const Text(
+              'You can only add 2 products',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            backgroundColor: const Color(0xB3111111),
             behavior: SnackBarBehavior.floating,
+            width: MediaQuery.sizeOf(context).width * 0.7,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            duration: const Duration(seconds: 2),
           ),
         );
       }

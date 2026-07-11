@@ -16,8 +16,8 @@ import '../models/user_profile.dart';
 import '../utils/share_links.dart';
 import 'device_id_store.dart';
 
-// const _baseUrl = 'https://api.welfog.com/api';
-const  _baseUrl = 'https://unnecessitous-domitila-unbudging.ngrok-free.dev/api';
+const _baseUrl = 'https://api.welfog.com/api';
+// const _baseUrl = 'https://unnecessitous-domitila-unbudging.ngrok-free.dev/api';
 const _secondBaseUrl = 'https://welfogapi.welfog.com/api';
 const _prefetchLimit = 50;
 
@@ -540,6 +540,7 @@ class ReelsApi {
         ? body
         : (body is Map ? body['reels'] ?? body['data'] : null);
     if (reelsRaw is! List)
+      // ignore: curly_braces_in_flow_control_structures
       return (reels: <Reel>[], hasMore: false, rawCount: 0);
     final rawCount = reelsRaw.length;
     final reels = reelsRaw

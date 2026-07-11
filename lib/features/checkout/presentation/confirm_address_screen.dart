@@ -347,6 +347,13 @@ class _ConfirmAddressScreenState extends State<ConfirmAddressScreen>
     await _fetchCartData();
   }
 
+  String _cleanAmount(dynamic value) {
+    if (value == null) return '0';
+    final str = value.toString();
+    final cleanStr = str.replaceAll(RegExp(r'[^0-9.,]'), '').trim();
+    return cleanStr.isEmpty ? '0' : cleanStr;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -701,7 +708,7 @@ class _ConfirmAddressScreenState extends State<ConfirmAddressScreen>
                                   children: [
                                     Text(
                                         'Items Total (${_cartSummary['qty'] ?? 0})'),
-                                    Text('₹${_cartSummary['total'] ?? 0}'),
+                                    Text('₹${_cleanAmount(_cartSummary['total'])}'),
                                   ],
                                 ),
                                 const SizedBox(height: 6),
@@ -711,7 +718,7 @@ class _ConfirmAddressScreenState extends State<ConfirmAddressScreen>
                                   children: [
                                     const Text('Shipping'),
                                     Text(
-                                        '₹${_cartSummary['shipping_cost'] ?? 0}'),
+                                        '₹${_cleanAmount(_cartSummary['shipping_cost'])}'),
                                   ],
                                 ),
                                 const SizedBox(height: 6),
@@ -720,7 +727,7 @@ class _ConfirmAddressScreenState extends State<ConfirmAddressScreen>
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Text('Discount'),
-                                    Text('- ₹${_cartSummary['profit'] ?? 0}',
+                                    Text('- ₹${_cleanAmount(_cartSummary['profit'])}',
                                         style: const TextStyle(
                                             color: Color(0xFF008083))),
                                   ],
@@ -736,7 +743,7 @@ class _ConfirmAddressScreenState extends State<ConfirmAddressScreen>
                                     const Text('Total Amount',
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold)),
-                                    Text('₹${_cartSummary['grand_total'] ?? 0}',
+                                    Text('₹${_cleanAmount(_cartSummary['grand_total'])}',
                                         style: const TextStyle(
                                             fontWeight: FontWeight.bold)),
                                   ],
@@ -749,7 +756,7 @@ class _ConfirmAddressScreenState extends State<ConfirmAddressScreen>
                                   Padding(
                                     padding: const EdgeInsets.only(top: 8),
                                     child: Text(
-                                      '🎉 You’ll save ₹${_cartSummary['profit'] ?? 0} on this order',
+                                      'You’ll save ₹${_cleanAmount(_cartSummary['profit'])} on this order',
                                       style: const TextStyle(
                                           color: Color(0xFF008083),
                                           fontWeight: FontWeight.w500),
@@ -849,7 +856,7 @@ class _ConfirmAddressScreenState extends State<ConfirmAddressScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Payable: ₹${_cartSummary['grand_total'] ?? 0}',
+                      'Payable: ₹${_cleanAmount(_cartSummary['grand_total'])}',
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.bold),
                     ),

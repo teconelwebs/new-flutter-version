@@ -85,17 +85,19 @@ class ProductCard extends StatelessWidget {
                       fontSize: 14,
                     ),
                   ),
-                  const Spacer(),
-                  const Icon(Icons.local_shipping_rounded, color: Color(0xFF6B7280), size: 13),
-                  const SizedBox(width: 4),
-                  Text(
-                    _getDeliveryDaysText(item.durationMinutes),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF4B5563),
+                  if (item.durationMinutes > 0) ...[
+                    const Spacer(),
+                    const Icon(Icons.local_shipping_rounded, color: Color(0xFF6B7280), size: 13),
+                    const SizedBox(width: 4),
+                    Text(
+                      _getDeliveryDaysText(item.durationMinutes),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF4B5563),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ],
@@ -106,12 +108,13 @@ class ProductCard extends StatelessWidget {
   }
 
   String _getDeliveryDaysText(int durationMinutes) {
-    if (durationMinutes <= 0) return '7-8 days';
-    final double daysDouble = durationMinutes / 1440.0;
-    final int days = daysDouble.ceil();
-    if (days <= 1) {
-      return '1-2 days';
-    }
-    return '$days-${days + 1} days';
+    if (durationMinutes <= 0) return '';
+    final days = durationMinutes ~/ 1440;
+    if (days > 0) return '$days - ${days + 1} days';
+    final hours = (durationMinutes % 1440) ~/ 60;
+    final mins = durationMinutes % 60;
+    if (hours > 0) return '$hours hr${hours > 1 ? 's' : ''}';
+    if (mins > 0) return '$mins min${mins > 1 ? 's' : ''}';
+    return '';
   }
 }
