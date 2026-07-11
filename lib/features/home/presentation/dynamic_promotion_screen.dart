@@ -71,15 +71,6 @@ class _DynamicPromotionScreenState extends State<DynamicPromotionScreen> {
     final imageUrl = imagePath.isNotEmpty
         ? (imagePath.startsWith('http') ? imagePath : 'https://d1f02fefkbso7w.cloudfront.net/$imagePath')
         : '';
-    final durationVal = p['duration'];
-    final durationMinVal = p['duration_minute'];
-    final deliveryMinVal = p['delivery_time_minute'];
-    debugPrint('=== BANNER PRODUCT ESTIMATE DELIVERY DEBUG ===');
-    debugPrint('Product Name: ${p['name']}');
-    debugPrint('raw duration: $durationVal');
-    debugPrint('raw duration_minute: $durationMinVal');
-    debugPrint('raw delivery_time_minute: $deliveryMinVal');
-    debugPrint('=============================================');
 
     return ProductItem(
       id: p['id']?.toString() ?? '',

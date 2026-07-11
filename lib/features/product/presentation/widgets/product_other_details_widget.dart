@@ -23,13 +23,15 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
   bool _logoError = false;
 
   // Collapse state for the entire "All details" accordion
-  bool _isAllDetailsExpanded = true;
+  bool _isAllDetailsExpanded = false;
 
   // Selected tab state inside "All details"
   String _selectedTab = 'Summary';
 
   // Toggle for truncating long content
   bool _showMore = false;
+  bool _hasLongContent = false;
+  final GlobalKey _tabContentKey = GlobalKey();
 
   final List<String> _tabs = [
     'Summary',
@@ -403,6 +405,20 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final RenderBox? renderBox = _tabContentKey.currentContext?.findRenderObject() as RenderBox?;
+      if (renderBox != null) {
+        final double height = renderBox.size.height;
+        final bool isLong = height > 130.0;
+        if (isLong != _hasLongContent) {
+          setState(() {
+            _hasLongContent = isLong;
+          });
+        }
+      }
+    });
+
     final shop = widget.data['user']?['shop'] as Map<String, dynamic>?;
 
     return Padding(
@@ -603,8 +619,8 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
                           child: GestureDetector(
                             onTap: () => setState(() {
                               _selectedTab = tab;
-                              _showMore =
-                                  false; // reset show more state on tab change
+                              _showMore = false; // reset show more state on tab change
+                              _hasLongContent = false;
                             }),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -644,11 +660,12 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
                     children: [
                       ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxHeight: _showMore ? double.infinity : 280.0,
+                          maxHeight: (_hasLongContent && !_showMore) ? 130.0 : double.infinity,
                         ),
                         child: SingleChildScrollView(
                           physics: const NeverScrollableScrollPhysics(),
                           child: Column(
+                            key: _tabContentKey,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildTabContent(_selectedTab),
@@ -657,7 +674,7 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
                           ),
                         ),
                       ),
-                      if (!_showMore)
+                      if (_hasLongContent && !_showMore)
                         Container(
                           height: 50,
                           decoration: BoxDecoration(
@@ -678,40 +695,44 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
                   ),
 
                   // Show More / Show Less Button
-                  GestureDetector(
-                    onTap: () => setState(() => _showMore = !_showMore),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                      ),
-                      alignment: Alignment.center,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            _showMore ? 'Show Less' : 'Show More',
-                            style: const TextStyle(
-                              color: Color(0xFF1F2937),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
+                  if (_hasLongContent)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: GestureDetector(
+                        onTap: () => setState(() => _showMore = !_showMore),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
                           ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            _showMore
-                                ? Icons.keyboard_arrow_up_rounded
-                                : Icons.chevron_right_rounded,
-                            color: const Color(0xFF1F2937),
-                            size: 16,
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                _showMore ? 'Show Less' : 'Show More',
+                                style: const TextStyle(
+                                  color: Color(0xFF1F2937),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                _showMore
+                                    ? Icons.keyboard_arrow_up_rounded
+                                    : Icons.chevron_right_rounded,
+                                color: const Color(0xFF1F2937),
+                                size: 16,
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ],
             ),
