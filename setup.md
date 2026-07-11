@@ -59,3 +59,5 @@ Phir target id ke saath run:
 ```powershell
 C:\src\flutter\bin\flutter.bat run -d <DEVICE_ID>
 ```
+
+C:\src\flutter\bin\flutter.bat run

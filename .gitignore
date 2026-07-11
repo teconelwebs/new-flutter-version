@@ -42,6 +42,8 @@ app.*.map.json
 # Signing
 *.jks
 key.properties
+keystore_info.txt
+android/key.properties
 
 # Firebase
 google-services.json
