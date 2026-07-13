@@ -4,6 +4,7 @@ import '../../../core/constants/app_routes.dart';
 import '../../../core/state/cart_state.dart';
 import '../data/account_api_service.dart';
 import '../../product/data/models/product_item.dart';
+import '../../product/data/product_api_service.dart';
 
 class WishlistScreen extends StatefulWidget {
   const WishlistScreen({super.key});
@@ -12,7 +13,8 @@ class WishlistScreen extends StatefulWidget {
   State<WishlistScreen> createState() => _WishlistScreenState();
 }
 
-class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProviderStateMixin {
+class _WishlistScreenState extends State<WishlistScreen>
+    with SingleTickerProviderStateMixin {
   final AccountApiService _apiService = AccountApiService();
   List<WishlistItem> _wishlist = [];
   bool _loading = true;
@@ -135,7 +137,8 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
 
     // Call background API to remove product
     try {
-      final success = await _apiService.removeWishlistItem(item.product.id, item.compareId);
+      final success =
+          await _apiService.removeWishlistItem(item.product.id, item.compareId);
       if (success) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('wishlist_state_${item.product.id}', 'false');
@@ -146,6 +149,13 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
     }
   }
 
+  String _extractSlug(String link) {
+    if (link.isEmpty) return '';
+    final cleanLink = link.split('?').first;
+    final parts = cleanLink.split('/');
+    return parts.isNotEmpty ? parts.last : '';
+  }
+
   Future<void> _handleAddToCart(WishlistItem item) async {
     if (_isOutOfStock(item)) return;
 
@@ -153,7 +163,28 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
       _addingToCartId = item.product.id;
     });
 
-    final success = await _apiService.addToCart(item.product.id);
+    int? correctStockId;
+    try {
+      final productApi = ProductApiService();
+      final slug = _extractSlug(item.product.link);
+      final productDetail = await productApi.fetchProductDetail(
+        slugOrId: slug.isNotEmpty ? slug : item.product.id.toString(),
+        productId: item.product.id.toString(),
+      );
+      if (productDetail.rawJson['stocks'] is List &&
+          (productDetail.rawJson['stocks'] as List).isNotEmpty) {
+        correctStockId = int.tryParse(
+            (productDetail.rawJson['stocks'] as List)[0]['id']?.toString() ??
+                '');
+      }
+    } catch (e) {
+      debugPrint('Error fetching correct stock ID in wishlist: $e');
+    }
+
+    final success = await _apiService.addToCart(
+      item.product.id,
+      stockId: correctStockId ?? item.product.stockId,
+    );
 
     if (mounted) {
       setState(() {
@@ -226,7 +257,8 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
         price: _cleanPrice(item.product.sellingPrice),
         rating: _getRating(item.product.rating),
         color: Colors.transparent,
-        imageUrl: 'https://d1f02fefkbso7w.cloudfront.net/${item.product.thumbnailImage}',
+        imageUrl:
+            'https://d1f02fefkbso7w.cloudfront.net/${item.product.thumbnailImage}',
         slug: item.product.link,
       ),
     );
@@ -238,7 +270,8 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
       builder: (context, child) {
         final opacity = 0.3 + (_shimmerController.value * 0.4);
         final screenWidth = MediaQuery.of(context).size.width;
-        final double childAspectRatio = screenWidth < 360 ? 0.62 : (screenWidth < 400 ? 0.66 : 0.68);
+        final double childAspectRatio =
+            screenWidth < 360 ? 0.62 : (screenWidth < 400 ? 0.66 : 0.68);
         return GridView.builder(
           padding: const EdgeInsets.all(12),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -373,14 +406,18 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: leftColumnItems.map((item) => _buildWishlistCard(item)).toList(),
+              children: leftColumnItems
+                  .map((item) => _buildWishlistCard(item))
+                  .toList(),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: rightColumnItems.map((item) => _buildWishlistCard(item)).toList(),
+              children: rightColumnItems
+                  .map((item) => _buildWishlistCard(item))
+                  .toList(),
             ),
           ),
         ],
@@ -392,7 +429,8 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
     final isOutOfStock = _isOutOfStock(item);
     final basePrice = _cleanPrice(item.product.basePrice);
     final sellingPrice = _cleanPrice(item.product.sellingPrice);
-    final discount = _calculateDiscount(item.product.basePrice, item.product.sellingPrice);
+    final discount =
+        _calculateDiscount(item.product.basePrice, item.product.sellingPrice);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -430,7 +468,8 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
                         child: Image.network(
                           'https://d1f02fefkbso7w.cloudfront.net/${item.product.thumbnailImage}',
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => const Icon(
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(
                             Icons.image_outlined,
                             color: Colors.grey,
                             size: 40,
@@ -467,15 +506,21 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
                       children: [
                         // Cart Action
                         GestureDetector(
-                          onTap: isOutOfStock ? null : () => _handleAddToCart(item),
+                          onTap: isOutOfStock
+                              ? null
+                              : () => _handleAddToCart(item),
                           child: Container(
                             width: 28,
                             height: 28,
                             decoration: BoxDecoration(
-                              color: isOutOfStock ? const Color(0xFFE5E7EB) : const Color(0xFFECFDF5),
+                              color: isOutOfStock
+                                  ? const Color(0xFFE5E7EB)
+                                  : const Color(0xFFECFDF5),
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: isOutOfStock ? const Color(0xFFD1D5DB) : const Color(0xFFBBF7D0),
+                                color: isOutOfStock
+                                    ? const Color(0xFFD1D5DB)
+                                    : const Color(0xFFBBF7D0),
                               ),
                               boxShadow: const [
                                 BoxShadow(
@@ -492,13 +537,17 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
                                       height: 12,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                Color(0xFF16A34A)),
                                       ),
                                     )
                                   : Icon(
                                       Icons.shopping_bag_outlined,
                                       size: 14,
-                                      color: isOutOfStock ? const Color(0xFF9CA3AF) : const Color(0xFF16A34A),
+                                      color: isOutOfStock
+                                          ? const Color(0xFF9CA3AF)
+                                          : const Color(0xFF16A34A),
                                     ),
                             ),
                           ),
@@ -506,14 +555,17 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
                         const SizedBox(width: 6),
                         // Delete Action
                         GestureDetector(
-                          onTap: _removingId == item.id ? null : () => _handleRemoveItem(item),
+                          onTap: _removingId == item.id
+                              ? null
+                              : () => _handleRemoveItem(item),
                           child: Container(
                             width: 28,
                             height: 28,
                             decoration: BoxDecoration(
                               color: Colors.white,
                               shape: BoxShape.circle,
-                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                              border:
+                                  Border.all(color: const Color(0xFFE5E7EB)),
                               boxShadow: const [
                                 BoxShadow(
                                   color: Colors.black12,
@@ -529,7 +581,9 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
                                       height: 12,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEF4444)),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                Color(0xFFEF4444)),
                                       ),
                                     )
                                   : const Icon(
@@ -636,7 +690,8 @@ class _WishlistScreenState extends State<WishlistScreen> with SingleTickerProvid
         ),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: Color(0xFF333333)),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              size: 20, color: Color(0xFF333333)),
           onPressed: () => Navigator.of(context).pop(),
         ),
         bottom: PreferredSize(

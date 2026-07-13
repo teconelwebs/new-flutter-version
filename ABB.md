@@ -71,3 +71,10 @@ C:\xampp\htdocs\welfog-app\new-flutter-version\build\app\outputs\flutter-apk\app
 ```
 
 Play Store ke liye **AAB** use karo, APK nahi.
+
+build command
+
+android : flutter build appbundle --release --build-name=1.1.30 --build-number=66
+ios : flutter build ipa --release --build-name=1.1.37 --build-number=71
+
+

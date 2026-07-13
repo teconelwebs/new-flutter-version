@@ -92,6 +92,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _update() async {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      _showMessage('Please enter your name');
+      return;
+    }
+
     final email = _emailCtrl.text.trim();
     if (email.isNotEmpty) {
       final emailOk = RegExp(r'^[a-zA-Z0-9._+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')

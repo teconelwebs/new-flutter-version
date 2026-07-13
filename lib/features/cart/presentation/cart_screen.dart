@@ -12,9 +12,6 @@ import '../../../core/constants/app_routes.dart';
 import '../../../core/state/cart_state.dart';
 import '../../../core/widgets/app_loader.dart';
 
-// ---------------------------------------------------------------------------
-// CartItem Model
-// ---------------------------------------------------------------------------
 class CartItem {
   final int id;
   final String? slug;
@@ -985,55 +982,15 @@ class _CartScreenState extends State<CartScreen>
                     border:
                         Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
                   ),
-                  child: Row(
-                    children: [
-                      // Back button — always visible
-                      GestureDetector(
-                        onTap: () {
-                          try {
-                            if (Navigator.of(context).canPop()) {
-                              Navigator.of(context).pop();
-                            } else {
-                              Navigator.of(context).pushReplacementNamed('/');
-                            }
-                          } catch (_) {
-                            Navigator.of(context).pushReplacementNamed('/');
-                          }
-                        },
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          alignment: Alignment.center,
-                          child: const Icon(Icons.chevron_left,
-                              size: 24, color: Color(0xFF111111)),
-                        ),
+                  child: const Center(
+                    child: Text(
+                      'Your Cart',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111111),
                       ),
-                      // Title — center
-                      const Expanded(
-                        child: Text(
-                          'Your Cart',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF111111),
-                          ),
-                        ),
-                      ),
-                      // Item count badge
-                      Container(
-                        width: 40,
-                        alignment: Alignment.center,
-                        // child: Text(
-                        //   '${_cartItems.length}',
-                        //   style: const TextStyle(
-                        //     fontSize: 13,
-                        //     fontWeight: FontWeight.w600,
-                        //     color: Color(0xFF666666),
-                        //   ),
-                        // ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -1083,11 +1040,11 @@ class _CartScreenState extends State<CartScreen>
                                         shape: BoxShape.circle,
                                         gradient: LinearGradient(
                                           colors: [
-                                             // ignore: deprecated_member_use
+                                            // ignore: deprecated_member_use
                                             const Color(0xFF0A6B69)
                                                 // ignore: deprecated_member_use
                                                 .withOpacity(0.12),
-                                             // ignore: deprecated_member_use
+                                            // ignore: deprecated_member_use
                                             const Color(0xFF0A6B69)
                                                 // ignore: deprecated_member_use
                                                 .withOpacity(0.01),
@@ -1125,7 +1082,7 @@ class _CartScreenState extends State<CartScreen>
                                                 BoxShadow(
                                                   // ignore: deprecated_member_use
                                                   color: Colors.black
-                                                   // ignore: deprecated_member_use
+                                                      // ignore: deprecated_member_use
                                                       .withOpacity(0.04),
                                                   blurRadius: 10,
                                                   offset: const Offset(0, 4),
@@ -1172,7 +1129,8 @@ class _CartScreenState extends State<CartScreen>
                                   const SizedBox(height: 20),
                                   GestureDetector(
                                     onTap: () {
-                                      Navigator.of(context).pushNamedAndRemoveUntil(
+                                      Navigator.of(context)
+                                          .pushNamedAndRemoveUntil(
                                         AppRoutes.home,
                                         (route) => false,
                                       );

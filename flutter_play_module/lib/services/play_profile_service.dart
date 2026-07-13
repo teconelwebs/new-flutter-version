@@ -19,20 +19,26 @@ class PlayProfileService {
     required String mainUserId,
     required String mobile,
     required String username,
+    String name = '',
   }) async {
     final trimmed = username.trim();
     try {
-      return await _postCreate(mainUserId, mobile, trimmed);
+      return await _postCreate(mainUserId, mobile, trimmed, name: name);
     } catch (e) {
       final msg = e.toString();
       if (msg.contains('(409)') || msg.contains('(400)')) {
-        return _createWithExistingMobile(mainUserId, mobile, trimmed);
+        return _createWithExistingMobile(mainUserId, mobile, trimmed, name: name);
       }
       rethrow;
     }
   }
 
-  Future<String> _postCreate(String mainUserId, String mobile, String username) async {
+  Future<String> _postCreate(
+    String mainUserId,
+    String mobile,
+    String username, {
+    String name = '',
+  }) async {
     final response = await http.post(
       Uri.parse('$_fourthBaseUrl/users/'),
       headers: _headers,
@@ -40,6 +46,7 @@ class PlayProfileService {
         'userid': mainUserId,
         'username': username,
         'mobile': mobile,
+        'name': name.isNotEmpty ? name : username,
       }),
     );
 
@@ -59,8 +66,9 @@ class PlayProfileService {
   Future<String> _createWithExistingMobile(
     String mainUserId,
     String mobile,
-    String username,
-  ) async {
+    String username, {
+    String name = '',
+  }) async {
     final lookup = await http.get(
       Uri.parse('$_fourthBaseUrl/users/bymobile/$mobile'),
       headers: _headers,
@@ -81,7 +89,7 @@ class PlayProfileService {
         Uri.parse('$_fourthBaseUrl/users/$existingId'),
         headers: _headers,
         body: jsonEncode({
-          'name': existing['name'] ?? '',
+          'name': name.isNotEmpty ? name : (existing['name'] ?? ''),
           'username': username,
           'email': existing['email'] ?? '',
           'mobile': existing['mobile'] ?? mobile,

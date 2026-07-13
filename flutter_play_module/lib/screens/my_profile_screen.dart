@@ -25,7 +25,7 @@ class MyProfileScreen extends StatefulWidget {
   State<MyProfileScreen> createState() => _MyProfileScreenState();
 }
 
-class _MyProfileScreenState extends State<MyProfileScreen> {
+class _MyProfileScreenState extends State<MyProfileScreen> with RouteAware {
   UserProfile? _profile;
   List<ProfilePost> _posts = [];
   List<ProfilePost> _pendingPosts = [];
@@ -47,22 +47,47 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
   bool _shareInProgress = false;
   Timer? _preparingPollTimer;
   final _scrollController = ScrollController();
+  bool _routeSubscribed = false;
 
   @override
   void dispose() {
     _preparingPollTimer?.cancel();
     _scrollController.dispose();
     _usernameController.dispose();
+    if (_routeSubscribed) {
+      appRouteObserver.unsubscribe(this);
+    }
     super.dispose();
   }
+
+  String? _lastViewerId;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_initialized) {
-      _initialized = true;
-      _load();
+    if (!_routeSubscribed) {
+      final route = ModalRoute.of(context);
+      if (route is PageRoute) {
+        appRouteObserver.subscribe(this, route);
+        _routeSubscribed = true;
+      }
     }
+    final currentViewerId = PlaySession.apiOf(context).viewerId;
+    if (_lastViewerId != null && _lastViewerId != currentViewerId) {
+      _lastViewerId = currentViewerId;
+      _load(refresh: true);
+    } else {
+      _lastViewerId = currentViewerId;
+      if (!_initialized) {
+        _initialized = true;
+        _load();
+      }
+    }
+  }
+
+  @override
+  void didPopNext() {
+    _load(refresh: true);
   }
 
   void _restoreFromCache(MyProfileCacheEntry cached) {

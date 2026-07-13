@@ -7,6 +7,7 @@ import '../models/search_result.dart';
 import '../services/recent_search_store.dart';
 import '../utils/app_routes.dart';
 import '../utils/flutter_nav.dart';
+import '../utils/play_profile_guard.dart';
 import '../utils/play_session.dart';
 import '../utils/profile_thumbnail_cache.dart';
 import '../widgets/profile_widgets.dart';
@@ -60,7 +61,16 @@ class _SearchScreenState extends State<SearchScreen> {
     super.didChangeDependencies();
     if (_initialized) return;
     _initialized = true;
-    _bootstrap();
+    _checkProfile();
+  }
+
+  Future<void> _checkProfile() async {
+    final hasProfile = await ensurePlayProfileForAction(context);
+    if (!hasProfile && mounted) {
+      Navigator.of(context).pop();
+    } else if (mounted) {
+      _bootstrap();
+    }
   }
 
   @override

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/play_launch_context.dart';
 import '../services/play_profile_service.dart';
 import '../utils/flutter_nav.dart';
+import '../utils/play_profile_helper.dart';
 
 /// Bottom sheet for new users — matches RN PlayProfileSetupSheet UX.
 class PlayProfileSetupSheet extends StatefulWidget {
@@ -83,6 +84,11 @@ class _PlayProfileSetupSheetState extends State<PlayProfileSetupSheet> {
         mainUserId: widget.launchContext.mainUserId,
         mobile: widget.launchContext.mobile,
         username: username,
+        name: widget.launchContext.name,
+      );
+      await PlayProfileHelper.cachePlayProfileCreated(
+        playUserId: playUserId,
+        username: username,
       );
       await notifyPlayProfileCreated(playUserId, username);
       if (!mounted) return;
@@ -149,7 +155,7 @@ class _PlayProfileSetupSheetState extends State<PlayProfileSetupSheet> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Choose a username to enjoy reels, upload videos, and connect with creators.',
+                  'Choose a username to enjoy videos, upload videos, and connect with creators.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,

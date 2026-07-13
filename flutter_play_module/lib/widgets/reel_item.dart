@@ -55,6 +55,7 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
   int _commentCount = 0;
   bool _interestLoading = false;
   bool _shareInProgress = false;
+  bool _profileOpening = false;
   bool _deleteInProgress = false;
   String? _toast;
 
@@ -446,13 +447,19 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
   }
 
   Future<void> _openProfile() async {
-    if (!await ensurePlayProfileForAction(context)) return;
-    final target = widget.reel.user.id;
-    if (target.isEmpty) return;
-    // ignore: use_build_context_synchronously
-    await AppRoutes.openProfile(context, target);
-    if (!mounted) return;
-    _syncFollowFromRegistry();
+    if (_profileOpening) return;
+    _profileOpening = true;
+    try {
+      if (!await ensurePlayProfileForAction(context)) return;
+      final target = widget.reel.user.id;
+      if (target.isEmpty) return;
+      // ignore: use_build_context_synchronously
+      await AppRoutes.openProfile(context, target);
+      if (!mounted) return;
+      _syncFollowFromRegistry();
+    } finally {
+      _profileOpening = false;
+    }
   }
 
   Future<void> _handleShare() async {

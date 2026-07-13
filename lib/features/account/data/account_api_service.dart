@@ -45,7 +45,8 @@ class AccountApiService {
     );
     if (response.statusCode < 200 || response.statusCode >= 300) return [];
     final decoded = jsonDecode(response.body);
-    if (decoded is! Map<String, dynamic> || decoded['success'] != true) return [];
+    if (decoded is! Map<String, dynamic> || decoded['success'] != true)
+      return [];
     final list = decoded['blockedUsers'];
     if (list is! List) return [];
     return list.map((json) => BlockedUser.fromJson(json)).toList();
@@ -123,7 +124,9 @@ class AccountApiService {
       if (decoded is! Map<String, dynamic>) return [];
       final list = decoded['data'];
       if (list is! List) return [];
-      final items = list.map((json) => WishlistItem.fromJson(json as Map<String, dynamic>)).toList();
+      final items = list
+          .map((json) => WishlistItem.fromJson(json as Map<String, dynamic>))
+          .toList();
 
       // Cache individual product wishlist states and compare IDs
       final compareMap = <String, String>{};
@@ -199,7 +202,7 @@ class AccountApiService {
     return false;
   }
 
-  Future<bool> addToCart(int productId) async {
+  Future<bool> addToCart(int productId, {int? stockId, String colorCode = 'default'}) async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('user_id') ?? '';
     if (userId.isEmpty) return false;
@@ -211,11 +214,12 @@ class AccountApiService {
         'Content-Type': 'application/json',
       },
       body: jsonEncode({
+        'color_code': colorCode,
         'delivery_time_minute': '',
         'product_id': productId,
         'quantity': 1,
         'temp_userId': '',
-        'stockId': '1',
+        'stockId': stockId?.toString() ?? '1',
         'user_id': userId,
       }),
     );
@@ -343,7 +347,8 @@ class WishlistItem {
     return WishlistItem(
       id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
       compareId: int.tryParse(json['compare_id']?.toString() ?? '') ?? 0,
-      product: WishlistProduct.fromJson(json['product'] as Map<String, dynamic>? ?? {}),
+      product: WishlistProduct.fromJson(
+          json['product'] as Map<String, dynamic>? ?? {}),
     );
   }
 }
@@ -361,6 +366,7 @@ class WishlistProduct {
     this.stock,
     this.quantity,
     this.isOutOfStock,
+    this.stockId,
   });
 
   final int id;
@@ -374,8 +380,16 @@ class WishlistProduct {
   final String? stock;
   final String? quantity;
   final bool? isOutOfStock;
+  final int? stockId;
 
   factory WishlistProduct.fromJson(Map<String, dynamic> json) {
+    int? parsedStockId;
+    if (json['stocks'] is List && (json['stocks'] as List).isNotEmpty) {
+      parsedStockId = int.tryParse((json['stocks'] as List)[0]['id']?.toString() ?? '');
+    } else if (json['stock_id'] != null) {
+      parsedStockId = int.tryParse(json['stock_id'].toString());
+    }
+
     return WishlistProduct(
       id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
       name: (json['name'] ?? '').toString(),
@@ -388,6 +402,7 @@ class WishlistProduct {
       stock: json['stock']?.toString(),
       quantity: json['quantity']?.toString(),
       isOutOfStock: json['isOutOfStock'] as bool?,
+      stockId: parsedStockId,
     );
   }
 }

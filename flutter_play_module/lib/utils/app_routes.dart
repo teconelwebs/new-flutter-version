@@ -55,8 +55,21 @@ class AppRoutes {
     if (uri == null) return null;
     final path = uri.path;
 
-    if (path.startsWith('/api/plays/r/')) {
+    final isPlayReel =
+        path.startsWith('/api/plays/r/') || path.startsWith('/plays/r/');
+    if (isPlayReel) {
       final reelId = _initialReelIdFromUri(uri);
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => _wrapSession(
+          settings,
+          _reelsScreen(initialReelId: reelId),
+        ),
+      );
+    }
+
+    if (path.startsWith('/sepreel/')) {
+      final reelId = path.replaceFirst('/sepreel/', '').split('/').first;
       return MaterialPageRoute(
         settings: settings,
         builder: (_) => _wrapSession(
@@ -68,13 +81,15 @@ class AppRoutes {
 
     // Profile short link: https://api.welfog.com/api/plays/p/{slug}
     if (path.startsWith('/api/plays/p/')) {
-      final profileSlug = path.replaceFirst('/api/plays/p/', '').split('/').first;
+      final profileSlug =
+          path.replaceFirst('/api/plays/p/', '').split('/').first;
       if (profileSlug.isNotEmpty) {
         return MaterialPageRoute(
           settings: settings,
           builder: (_) => _wrapSession(
             settings,
-            profileScreenWrapper(child: OtherProfileScreen(userId: profileSlug)),
+            profileScreenWrapper(
+                child: OtherProfileScreen(userId: profileSlug)),
           ),
         );
       }
@@ -96,8 +111,7 @@ class AppRoutes {
     }
 
     if (path.startsWith('/OtheruserProfile/')) {
-      final profileId =
-          path.replaceAll('/OtheruserProfile/', ''); 
+      final profileId = path.replaceAll('/OtheruserProfile/', '');
       return MaterialPageRoute(
         settings: settings,
         builder: (_) => _wrapSession(
@@ -218,7 +232,10 @@ class AppRoutes {
     if (qp.containsKey('userId') || qp.containsKey('deviceId')) return true;
     if ((qp['initialReelId'] ?? '').trim().isNotEmpty) return true;
     final path = uri.path;
-    if (path.startsWith('/api/plays/r/') || path.startsWith('/api/plays/p/')) {
+    if (path.startsWith('/api/plays/r/') ||
+        path.startsWith('/plays/r/') ||
+        path.startsWith('/sepreel/') ||
+        path.startsWith('/api/plays/p/')) {
       return true;
     }
     if (path.startsWith('/api/plays/dl/profile/')) return true;
@@ -228,9 +245,10 @@ class AppRoutes {
 
   static Uri? _routeUri(RouteSettings settings) {
     final name = settings.name ?? reels;
-    final normalizedName = name.startsWith('http')
-        ? name
-        : (name.startsWith('/') ? name : '/$name');
+    final normalizedName =
+        (name.startsWith('http') || name.startsWith('welfog://'))
+            ? name
+            : (name.startsWith('/') ? name : '/$name');
     return Uri.tryParse(normalizedName);
   }
 
@@ -239,9 +257,14 @@ class AppRoutes {
     final fromQuery = uri.queryParameters['shareUserId'] ?? '';
     if (fromQuery.isNotEmpty) return fromQuery;
     final path = uri.path;
-    if (!path.startsWith('/api/plays/r/')) return '';
-    final segment = path.replaceFirst('/api/plays/r/', '').split('/').first;
-    final match = RegExp(r'^([0-9a-fA-F]{24})-(\d+)$').firstMatch(segment);
+    final isPlayReel =
+        path.startsWith('/api/plays/r/') || path.startsWith('/plays/r/');
+    if (!isPlayReel) return '';
+    final prefix =
+        path.startsWith('/api/plays/r/') ? '/api/plays/r/' : '/plays/r/';
+    final segment = path.replaceFirst(prefix, '').split('/').first;
+    final match =
+        RegExp(r'^([0-9a-fA-F]{24})-([a-zA-Z0-9]+)$').firstMatch(segment);
     return match?.group(2) ?? '';
   }
 
@@ -250,9 +273,14 @@ class AppRoutes {
     final fromQuery = uri.queryParameters['initialReelId'] ?? '';
     if (fromQuery.isNotEmpty) return fromQuery;
     final path = uri.path;
-    if (!path.startsWith('/api/plays/r/')) return '';
-    final segment = path.replaceFirst('/api/plays/r/', '').split('/').first;
-    final match = RegExp(r'^([0-9a-fA-F]{24})-\d+$').firstMatch(segment);
+    final isPlayReel =
+        path.startsWith('/api/plays/r/') || path.startsWith('/plays/r/');
+    if (!isPlayReel) return '';
+    final prefix =
+        path.startsWith('/api/plays/r/') ? '/api/plays/r/' : '/plays/r/';
+    final segment = path.replaceFirst(prefix, '').split('/').first;
+    final match =
+        RegExp(r'^([0-9a-fA-F]{24})-([a-zA-Z0-9]+)$').firstMatch(segment);
     return match?.group(1) ?? '';
   }
 
@@ -272,7 +300,8 @@ class AppRoutes {
   }
 
   static PlayLaunchContext _launchContextFromSettings(RouteSettings settings) {
-    return PlayLaunchContext.fromQuery(_routeUri(settings)?.queryParameters ?? const {});
+    return PlayLaunchContext.fromQuery(
+        _routeUri(settings)?.queryParameters ?? const {});
   }
 
   static ReelsApi _apiFromSettings(RouteSettings settings) {

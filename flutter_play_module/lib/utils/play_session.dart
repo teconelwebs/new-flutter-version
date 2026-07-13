@@ -196,12 +196,14 @@ class PlaySession extends InheritedWidget {
   }
 
   static ReelsApi apiOf(BuildContext context) => of(context).api;
-  static PlayLaunchContext launchContextOf(BuildContext context) => of(context).launchContext;
+  static PlayLaunchContext launchContextOf(BuildContext context) =>
+      of(context).launchContext;
 
   @override
   bool updateShouldNotify(PlaySession oldWidget) =>
       api.viewerId != oldWidget.api.viewerId ||
-      launchContext.playProfileReady != oldWidget.launchContext.playProfileReady;
+      launchContext.playProfileReady !=
+          oldWidget.launchContext.playProfileReady;
 }
 
 /// Holds mutable play session state (viewer id + profile setup flags).
@@ -263,11 +265,19 @@ class PlaySessionScopeState extends State<PlaySessionScope> {
   }
 
   bool get shouldOfferProfileSetup =>
-      _launchContext.needsSetup && !_setupDismissed && !_launchContext.playProfileReady;
+      _launchContext.needsSetup &&
+      !_setupDismissed &&
+      !_launchContext.playProfileReady;
 
   void dismissProfileSetup() {
     if (_setupDismissed) return;
     setState(() => _setupDismissed = true);
+  }
+
+  void resetSetupDismissed() {
+    if (_setupDismissed) {
+      setState(() => _setupDismissed = false);
+    }
   }
 
   void onProfileCreated(String playUserId) {

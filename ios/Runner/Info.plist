@@ -80,7 +80,7 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Allow Welfog to access your camera to upload product photos, scan QR codes, and add images to reviews.</string>
+	<string>Welfog needs camera access to scan the Supplier QR code and connect your account to the Supplier Panel. Camera is also used for uploading product photos and review images.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Allow Welfog to access your photos so you can upload images for your profile, reviews, and product searches.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

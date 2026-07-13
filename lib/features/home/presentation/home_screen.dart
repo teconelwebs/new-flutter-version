@@ -23,6 +23,7 @@ import '../../search/presentation/search_screen.dart';
 import '../../profile/data/profile_api_service.dart';
 import '../data/home_api_service.dart';
 import '../data/home_models.dart';
+import '../../chat_ai/presentation/chat_ai_screen.dart';
 import 'widgets/home_widgets.dart';
 import 'widgets/custom_bottom_tab_bar.dart';
 import 'widgets/header.dart';
@@ -43,11 +44,14 @@ class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
   int _previousIndex = 0;
+  String _shareReelId = '';
   final HomeApiService _homeApi = HomeApiService();
   late Future<HomeBundle> _bundleFuture;
   String? _loadedPincode;
   String? _displayCity;
   String? _displayPincode;
+  double? _aiX;
+  double? _aiY;
 
   Future<void> _loadActiveAddressFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
@@ -223,7 +227,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-
   // 3. Deep Linking Manager (equivalent to Linking.addEventListener)
   void _initDeepLinkListener() async {
     final appLinks = AppLinks();
@@ -260,7 +263,8 @@ class _HomeScreenState extends State<HomeScreen>
       if (slug.isNotEmpty) {
         final trimmed = slug.trim();
         if (trimmed == ProductScreen.currentlyVisibleSlug) {
-          debugPrint('DeepLink: ProductScreen for slug $trimmed is already visible, skipping push.');
+          debugPrint(
+              'DeepLink: ProductScreen for slug $trimmed is already visible, skipping push.');
           return;
         }
         if (AppRouter.shouldIgnoreSlug(trimmed)) {
@@ -272,6 +276,49 @@ class _HomeScreenState extends State<HomeScreen>
           AppRoutes.product,
           arguments: trimmed,
         );
+      }
+      return;
+    }
+
+    // Play/Video Share deep links:
+    // Pattern 1: /api/plays/r/{reelId}-{shareUserId} or /plays/r/{reelId}-{shareUserId}
+    // Pattern 2: /api/plays/dl/reel/{reelId}/user/{shareUserId}
+    // Pattern 3: /sepreel/{reelId}
+    String parsedReelId = '';
+
+    final playReelIdx = segments.indexOf('r');
+    if (playReelIdx != -1 &&
+        playReelIdx > 0 &&
+        segments[playReelIdx - 1] == 'plays' &&
+        segments.length > playReelIdx + 1) {
+      final slug = segments[playReelIdx + 1];
+      final match =
+          RegExp(r'^([0-9a-fA-F]{24})-([a-zA-Z0-9]+)$').firstMatch(slug);
+      if (match != null) {
+        parsedReelId = match.group(1) ?? '';
+      }
+    } else if (segments.contains('plays') &&
+        segments.contains('dl') &&
+        segments.contains('reel')) {
+      final reelIdx = segments.indexOf('reel');
+      if (reelIdx != -1 && segments.length > reelIdx + 1) {
+        parsedReelId = segments[reelIdx + 1];
+      }
+    } else if (segments.contains('sepreel')) {
+      final sepIdx = segments.indexOf('sepreel');
+      if (sepIdx != -1 && segments.length > sepIdx + 1) {
+        parsedReelId = segments[sepIdx + 1];
+      }
+    }
+
+    if (parsedReelId.isNotEmpty) {
+      debugPrint('DeepLink: Parsed play reel ID: $parsedReelId');
+      if (mounted) {
+        setState(() {
+          _shareReelId = parsedReelId;
+          _currentIndex = 2; // Switch to Play tab
+        });
+        _updateStatusBarColor();
       }
     }
   }
@@ -311,7 +358,8 @@ class _HomeScreenState extends State<HomeScreen>
         Navigator.of(context).pushNamed(AppRoutes.todayDeals);
         break;
       case 'category':
-        final categoryId = data['linkId'] ?? data['categoryId'] ?? data['id'] ?? data['slug'];
+        final categoryId =
+            data['linkId'] ?? data['categoryId'] ?? data['id'] ?? data['slug'];
         if (categoryId != null) {
           Navigator.of(context).pushNamed(
             AppRoutes.searchResults,
@@ -325,7 +373,8 @@ class _HomeScreenState extends State<HomeScreen>
         }
         break;
       case 'product':
-        final productIdentifier = data['linkId'] ?? data['productId'] ?? data['slug'] ?? data['id'];
+        final productIdentifier =
+            data['linkId'] ?? data['productId'] ?? data['slug'] ?? data['id'];
         if (productIdentifier != null) {
           Navigator.of(context).pushNamed(
             AppRoutes.product,
@@ -384,8 +433,7 @@ class _HomeScreenState extends State<HomeScreen>
     final prefs = await SharedPreferences.getInstance();
     final account = prefs.getString('account') ?? 'login';
     final localName = prefs.getString('user_name') ?? '';
-    final isNameSaved =
-        localName.isNotEmpty &&
+    final isNameSaved = localName.isNotEmpty &&
         localName.toLowerCase() != 'user' &&
         localName.trim().isNotEmpty;
 
@@ -458,8 +506,7 @@ class _HomeScreenState extends State<HomeScreen>
           if (addressData is Map<String, dynamic>) {
             final lat = addressData['latitude']?.toString() ?? '0';
             final lng = addressData['longitude']?.toString() ?? '0';
-            final city =
-                addressData['city']?.toString() ??
+            final city = addressData['city']?.toString() ??
                 addressData['city_name']?.toString() ??
                 '';
             final pin = addressData['postal_code']?.toString() ?? '';
@@ -493,130 +540,246 @@ class _HomeScreenState extends State<HomeScreen>
     final bottomPadding = bottomInset > 0 ? bottomInset + 8 : 20.0;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          // Dynamic tab content
-          IndexedStack(
-            index: _currentIndex,
-            children: [
-              _HomeTab(
-                bundleFuture: _bundleFuture,
-                displayCity: _displayCity,
-                displayPincode: _displayPincode,
-                onLocationTap: () {
-                  if (_isGuest) {
-                    Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
-                      _checkGuestStatus();
-                    });
-                    return;
-                  }
-                  Navigator.of(context).pushNamed(AppRoutes.address).then((
-                    _,
-                  ) async {
-                    await _loadActiveAddressFromPrefs();
-                    setState(() {
-                      _bundleFuture = _fetchBundleWithPincodeTracking();
-                    });
-                  });
-                },
-                onRefresh: () async {
-                  await _loadActiveAddressFromPrefs();
-                  setState(() {
-                    _bundleFuture = _fetchBundleWithPincodeTracking();
-                  });
-                  await _bundleFuture;
-                },
-                onSearch: () {
-                  Navigator.of(context).pushNamed(SearchScreen.routeName);
-                },
-                isGuest: _isGuest,
-                promptLogin: () {
-                  Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
-                    _checkGuestStatus();
-                  });
-                },
-                onTabChange: (index) async {
-                  setState(() {
-                    if (_currentIndex != 2) {
-                      _previousIndex = _currentIndex;
-                    }
-                    _currentIndex = index;
-                  });
-                  _updateStatusBarColor();
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final double maxWidth = constraints.maxWidth;
+          final double maxHeight = constraints.maxHeight;
+          const double buttonSize = 56.0;
+          const double padding = 16.0;
 
-                  if (index == 0) {
-                    await _loadActiveAddressFromPrefs();
-                    final prefs = await SharedPreferences.getInstance();
-                    final savedPincode =
-                        prefs.getString('postal_code') ?? '302001';
-                    if (savedPincode != _loadedPincode) {
+          // Default initial position near the bottom right (with bottom padding offset)
+          final double defaultX = maxWidth - buttonSize - padding;
+          final double defaultY = maxHeight - buttonSize - (bottomPadding + 52);
+
+          // Clamped positions ensuring the AI icon remains inside visible bounds
+          final double clampedX = (_aiX ?? defaultX).clamp(0.0, maxWidth - buttonSize);
+          final double clampedY = (_aiY ?? defaultY).clamp(0.0, maxHeight - buttonSize);
+
+          return Stack(
+            children: [
+              // Dynamic tab content
+              IndexedStack(
+                index: _currentIndex,
+                children: [
+                  _HomeTab(
+                    bundleFuture: _bundleFuture,
+                    displayCity: _displayCity,
+                    displayPincode: _displayPincode,
+                    onLocationTap: () {
+                      if (_isGuest) {
+                        Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
+                          _checkGuestStatus();
+                        });
+                        return;
+                      }
+                      Navigator.of(context).pushNamed(AppRoutes.address).then((
+                        _,
+                      ) async {
+                        await _loadActiveAddressFromPrefs();
+                        setState(() {
+                          _bundleFuture = _fetchBundleWithPincodeTracking();
+                        });
+                      });
+                    },
+                    onRefresh: () async {
+                      await _loadActiveAddressFromPrefs();
                       setState(() {
                         _bundleFuture = _fetchBundleWithPincodeTracking();
                       });
-                    }
-                  }
-                },
-              ),
-              const CategoryScreen(embedded: true),
-              play.EmbeddedReelsWrapper(
-                key: ValueKey('play_session_$_userId'),
-                viewerId: _userId,
-                isActive: _currentIndex == 2,
-              ),
-              const CartScreen(embedded: true),
-              AccountScreen(embedded: true, active: _currentIndex == 4),
-            ],
-          ),
+                      await _bundleFuture;
+                    },
+                    onSearch: () {
+                      Navigator.of(context).pushNamed(SearchScreen.routeName);
+                    },
+                    isGuest: _isGuest,
+                    promptLogin: () {
+                      Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
+                        _checkGuestStatus();
+                      });
+                    },
+                    onTabChange: (index) async {
+                      setState(() {
+                        if (_currentIndex != 2) {
+                          _previousIndex = _currentIndex;
+                        }
+                        _currentIndex = index;
+                        if (index != 2) {
+                          _shareReelId =
+                              ''; // Clear shared reel ID when leaving play tab
+                        }
+                      });
+                      _updateStatusBarColor();
 
-          // Custom Network Offline Toast Overlay Banner
-          if (_showOfflineToast)
-            AnimatedBuilder(
-              animation: _offlineAnimController,
-              builder: (context, child) {
-                return Positioned(
-                  left: 20,
-                  right: 20,
-                  bottom: bottomPadding + 65 + _offlineSlideAnim.value,
-                  child: Opacity(
-                    opacity: _offlineAnimController.value,
-                    child: child,
+                      if (index == 0) {
+                        await _loadActiveAddressFromPrefs();
+                        final prefs = await SharedPreferences.getInstance();
+                        final savedPincode =
+                            prefs.getString('postal_code') ?? '302001';
+                        if (savedPincode != _loadedPincode) {
+                          setState(() {
+                            _bundleFuture = _fetchBundleWithPincodeTracking();
+                          });
+                        }
+                      }
+                    },
                   ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE63946),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      // ignore: deprecated_member_use
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
+                  const CategoryScreen(embedded: true),
+                  play.EmbeddedReelsWrapper(
+                    key: ValueKey('play_session_${_userId}_$_shareReelId'),
+                    viewerId: _userId,
+                    isActive: _currentIndex == 2,
+                    initialReelId: _shareReelId,
+                  ),
+                  const CartScreen(embedded: true),
+                  AccountScreen(embedded: true, active: _currentIndex == 4),
+                ],
+              ),
+
+              // Custom Network Offline Toast Overlay Banner
+              if (_showOfflineToast)
+                AnimatedBuilder(
+                  animation: _offlineAnimController,
+                  builder: (context, child) {
+                    return Positioned(
+                      left: 20,
+                      right: 20,
+                      bottom: bottomPadding + 65 + _offlineSlideAnim.value,
+                      child: Opacity(
+                        opacity: _offlineAnimController.value,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 16,
                     ),
-                  ],
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE63946),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          // ignore: deprecated_member_use
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    // ignore: prefer_const_constructors
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Text(
+                          "⚠️  No Internet Connection",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                // ignore: prefer_const_constructors
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Text(
-                      "⚠️  No Internet Connection",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
+              // Floating AI Chat Button Overlay (visible on Home, Category, Cart, and Account tabs)
+              if (_currentIndex != 2)
+                Positioned(
+                  left: clampedX,
+                  top: clampedY,
+                  child: GestureDetector(
+                    onPanUpdate: (details) {
+                      setState(() {
+                        _aiX = (clampedX + details.delta.dx).clamp(0.0, maxWidth - buttonSize);
+                        _aiY = (clampedY + details.delta.dy).clamp(0.0, maxHeight - buttonSize);
+                      });
+                    },
+                    onTap: () {
+                      if (_isGuest) {
+                        Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
+                          _checkGuestStatus();
+                        });
+                        return;
+                      }
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        useSafeArea: true,
+                        backgroundColor: Colors.white,
+                        barrierColor: Colors.white,
+                        builder: (ctx) => ChatAiScreen(
+                          userId: _userId,
+                          isModal: true,
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: buttonSize,
+                      height: buttonSize,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFF5404), Color(0xFFFF8500)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            // ignore: deprecated_member_use
+                            color: const Color(0xFFFF5404).withOpacity(0.35),
+                            blurRadius: 14,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          const Icon(
+                            Icons.chat_bubble_rounded,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                          // "AI" Badge overlay
+                          Positioned(
+                            top: 10,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(6),
+                                boxShadow: [
+                                  BoxShadow(
+                                    // ignore: deprecated_member_use
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              child: const Text(
+                                'AI',
+                                style: TextStyle(
+                                  color: Color(0xFFFF5404),
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-        ],
+            ],
+          );
+        },
       ),
 
       // Custom Bottom Tab Bar Navigation equivalent to RN's CustomBottomTabBar
@@ -640,7 +803,8 @@ class _HomeScreenState extends State<HomeScreen>
                     }
                     if (index == 0) {
                       final prefs = await SharedPreferences.getInstance();
-                      final savedPincode = prefs.getString('postal_code') ?? '302001';
+                      final savedPincode =
+                          prefs.getString('postal_code') ?? '302001';
                       if (savedPincode != _loadedPincode) {
                         setState(() {
                           _bundleFuture = _fetchBundleWithPincodeTracking();
@@ -966,15 +1130,13 @@ class _HomeTabState extends State<_HomeTab> {
                                     .then((_) => _loadRecentlyViewed());
                               },
                               onRightIconTap: () {
-                                Navigator.of(context)
-                                    .pushNamed(
-                                      AppRoutes.searchResults,
-                                      arguments: {
-                                        'query': s.name,
-                                        'categoryId': s.id,
-                                      },
-                                    )
-                                    .then((_) => _loadRecentlyViewed());
+                                Navigator.of(context).pushNamed(
+                                  AppRoutes.searchResults,
+                                  arguments: {
+                                    'query': s.name,
+                                    'categoryId': s.id,
+                                  },
+                                ).then((_) => _loadRecentlyViewed());
                               },
                             ),
                           ),

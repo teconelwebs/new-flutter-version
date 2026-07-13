@@ -18,7 +18,9 @@ class SessionStore {
     final loggedIn = prefs.getBool(_kIsLoggedIn) ?? false;
     final token = prefs.getString(_kAccessToken);
     final userId = prefs.getString(_kUserId);
-    return loggedIn && (token?.isNotEmpty ?? false) && (userId?.isNotEmpty ?? false);
+    return loggedIn &&
+        (token?.isNotEmpty ?? false) &&
+        (userId?.isNotEmpty ?? false);
   }
 
   static Future<void> saveLogin({
@@ -44,7 +46,7 @@ class SessionStore {
     }
     if (mobile.isNotEmpty) {
       await prefs.setString(_kMobile, mobile);
-      
+
       // Auto-create or fetch Play Profile from MongoDB during login
       try {
         final uri = Uri.parse('https://api.welfog.com/api/users/');
@@ -63,13 +65,14 @@ class SessionStore {
             final id = data['_id'].toString();
             final uname = (data['username'] ?? '').toString();
             final name = (data['name'] ?? uname).toString();
-            
+
             await prefs.setString('loginid', id);
             await prefs.setString('cached_user_id', id);
             await prefs.setString('play_profile_id', id);
             await prefs.setString('play_profile_user_name', uname);
             await prefs.setString('play_profile_name', name);
-            await prefs.setString('fourth_userid', (data['userid'] ?? id).toString());
+            await prefs.setString(
+                'fourth_userid', (data['userid'] ?? id).toString());
           }
         }
       } catch (_) {}

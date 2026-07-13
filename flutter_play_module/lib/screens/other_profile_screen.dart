@@ -8,6 +8,7 @@ import '../services/reels_api.dart';
 import '../utils/app_routes.dart';
 import '../utils/format_count.dart';
 import '../utils/flutter_nav.dart';
+import '../utils/play_profile_guard.dart';
 import '../utils/play_session.dart';
 import '../utils/profile_thumbnail_cache.dart';
 import '../widgets/profile_widgets.dart';
@@ -21,7 +22,7 @@ class OtherProfileScreen extends StatefulWidget {
   State<OtherProfileScreen> createState() => _OtherProfileScreenState();
 }
 
-class _OtherProfileScreenState extends State<OtherProfileScreen> {
+class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware {
   UserProfile? _profile;
   List<ProfilePost> _posts = [];
   bool _loading = true;
@@ -39,6 +40,7 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> {
   bool _initialized = false;
   int? _displayFollowersCount;
   int? _displayFollowingCount;
+  bool _routeSubscribed = false;
 
   static const _textPrimary = Color(0xFF1A1A1A);
   static const _textSecondary = Color(0xFF555555);
@@ -47,8 +49,37 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!_routeSubscribed) {
+      final route = ModalRoute.of(context);
+      if (route is PageRoute) {
+        appRouteObserver.subscribe(this, route);
+        _routeSubscribed = true;
+      }
+    }
     if (!_initialized) {
       _initialized = true;
+      _checkProfile();
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_routeSubscribed) {
+      appRouteObserver.unsubscribe(this);
+    }
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    _load(refresh: true);
+  }
+
+  Future<void> _checkProfile() async {
+    final hasProfile = await ensurePlayProfileForAction(context);
+    if (!hasProfile && mounted) {
+      Navigator.of(context).pop();
+    } else if (mounted) {
       _load();
     }
   }
@@ -154,6 +185,10 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> {
     setState(() {
       _isFollowing = next;
       _actionLoading = true;
+      if (_displayFollowersCount != null) {
+        _displayFollowersCount = _displayFollowersCount! + (next ? 1 : -1);
+        if (_displayFollowersCount! < 0) _displayFollowersCount = 0;
+      }
     });
     try {
       await api.toggleFollow(profile.id, follow: next);
@@ -163,7 +198,15 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> {
         userid: profile.userid,
       );
     } catch (_) {
-      if (mounted) setState(() => _isFollowing = !next);
+      if (mounted) {
+        setState(() {
+          _isFollowing = !next;
+          if (_displayFollowersCount != null) {
+            _displayFollowersCount = _displayFollowersCount! + (!next ? 1 : -1);
+            if (_displayFollowersCount! < 0) _displayFollowersCount = 0;
+          }
+        });
+      }
     } finally {
       if (mounted) setState(() => _actionLoading = false);
     }

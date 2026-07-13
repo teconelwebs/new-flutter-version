@@ -51,6 +51,8 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
     super.initState();
   }
 
+  String? _lastViewerId;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -61,7 +63,16 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
         _routeSubscribed = true;
       }
     }
-    _maybeBootstrap();
+
+    final currentViewerId = PlaySession.apiOf(context).viewerId;
+    if (_lastViewerId != null && _lastViewerId != currentViewerId) {
+      _lastViewerId = currentViewerId;
+      _bootstrapStarted = false;
+      _maybeBootstrap();
+    } else {
+      _lastViewerId = currentViewerId;
+      _maybeBootstrap();
+    }
   }
 
   void _maybeBootstrap() {
@@ -71,6 +82,7 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
   }
 
   void _maybeOfferProfileSetup() {
+    if (!widget.isActive) return;
     final scope = playSessionScopeOf(context);
     if (scope == null || !scope.shouldOfferProfileSetup || _setupOffered) return;
     _setupOffered = true;
@@ -95,6 +107,11 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
       if (!widget.isActive) {
         _preloadPool?.pauseAll();
       } else {
+        _setupOffered = false;
+        final scope = playSessionScopeOf(context);
+        scope?.resetSetupDismissed();
+        _maybeOfferProfileSetup();
+
         if (_reels.isNotEmpty) {
           _preloadPool?.prefetchWindowBackground(_reels, _currentIndex);
         }

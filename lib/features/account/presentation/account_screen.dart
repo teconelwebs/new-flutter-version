@@ -18,6 +18,7 @@ class _AccountScreenState extends State<AccountScreen> {
   final _api = AccountApiService();
   bool _loading = true;
   AccountUser? _user;
+  bool _playRouteOpening = false;
 
   final List<_MenuItem> _menu = const [
     _MenuItem(
@@ -158,19 +159,25 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Future<void> _openPlayRoute(String routeName) async {
-    final routeWithSession = await _buildPlayRouteWithSession(routeName);
-    final route = play.AppRoutes.onGenerateRoute(
-      RouteSettings(name: routeWithSession),
-    );
-    if (route == null) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Play module route unavailable')),
+    if (_playRouteOpening) return;
+    _playRouteOpening = true;
+    try {
+      final routeWithSession = await _buildPlayRouteWithSession(routeName);
+      final route = play.AppRoutes.onGenerateRoute(
+        RouteSettings(name: routeWithSession),
       );
-      return;
+      if (route == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Play module route unavailable')),
+        );
+        return;
+      }
+      if (!mounted) return;
+      await Navigator.of(context).push(route);
+    } finally {
+      _playRouteOpening = false;
     }
-    if (!mounted) return;
-    Navigator.of(context).push(route);
   }
 
   Future<String> _buildPlayRouteWithSession(String routeName) async {

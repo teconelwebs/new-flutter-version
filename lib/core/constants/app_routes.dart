@@ -36,5 +36,6 @@ class AppRoutes {
   static const connectSupplier = '/profile/connect-supplier';
   static const notifications = '/profile/notifications';
   static const dynamicPromotion = '/home/dynamic-promotion';
+  static const chatAi = '/chat-ai';
 }
 

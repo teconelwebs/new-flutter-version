@@ -38,6 +38,7 @@ import '../../features/account/presentation/connect_supplier_screen.dart';
 import '../../features/product/presentation/recently_viewed_screen.dart';
 import '../constants/app_routes.dart';
 import '../../features/shop/presentation/shop_screen.dart';
+import '../../features/chat_ai/presentation/chat_ai_screen.dart';
 
 
 class AppRouter {
@@ -59,7 +60,7 @@ class AppRouter {
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     final name = settings.name ?? '';
-    final normalizedName = name.startsWith('http')
+    final normalizedName = (name.startsWith('http') || name.startsWith('welfog://'))
         ? name
         : (name.startsWith('/') ? name : '/$name');
     final uri = Uri.tryParse(normalizedName);
@@ -340,6 +341,12 @@ class AppRouter {
         return MaterialPageRoute(
           settings: settings,
           builder: (_) => DynamicPromotionScreen(slug: slug),
+        );
+      case AppRoutes.chatAi:
+        final userId = settings.arguments as String?;
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => ChatAiScreen(userId: userId),
         );
       default:
         return play.AppRoutes.onGenerateRoute(settings);
