@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:share_plus/share_plus.dart';
+import 'inline_product_video_player.dart';
 
 class ImageGalleryWidget extends StatefulWidget {
   final List<String> images;
@@ -223,6 +224,9 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
       );
     }
 
+    final hasVideo = widget.videoUrl != null && widget.videoUrl!.isNotEmpty;
+    final totalCount = hasVideo ? widget.images.length + 1 : widget.images.length;
+
     return Column(
       children: [
         Container(
@@ -232,20 +236,38 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
             children: [
               // Slider list
               PageView.builder(
-                itemCount: widget.images.length,
+                itemCount: totalCount,
                 onPageChanged: (index) {
                   setState(() {
                     _currentIndex = index;
                   });
                 },
                 itemBuilder: (context, index) {
-                  final imgUrl = widget.images[index];
+                  if (hasVideo && index == 0) {
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.black,
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: InlineProductVideoPlayer(
+                        videoUrl: widget.videoUrl!,
+                        autoPlay: true,
+                        loop: true,
+                        initialMuted: widget.inlineMuted ?? false,
+                      ),
+                    );
+                  }
+
+                  final actualImageIndex = hasVideo ? index - 1 : index;
+                  final imgUrl = widget.images[actualImageIndex];
                   final fullUrl = imgUrl.startsWith('http')
                       ? imgUrl
                       : 'https://d1f02fefkbso7w.cloudfront.net/$imgUrl';
 
                   return GestureDetector(
-                    onTap: () => _openFullscreenGallery(index),
+                    onTap: () => _openFullscreenGallery(actualImageIndex),
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 8),
                       decoration: BoxDecoration(
@@ -313,7 +335,7 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
                                 color: Colors.black.withOpacity(0.1),
                                 blurRadius: 4,
                                 offset: const Offset(0, 2),
-                              ),
+                                                            ),
                             ],
                           ),
                           child: const Icon(
@@ -340,7 +362,7 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              '${_currentIndex + 1} / ${widget.images.length}',
+              '${_currentIndex + 1} / $totalCount',
               style: const TextStyle(
                   color: Colors.white,
                   fontSize: 13,

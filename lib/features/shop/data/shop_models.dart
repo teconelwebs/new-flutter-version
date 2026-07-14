@@ -100,6 +100,8 @@ class ShopProduct {
     required this.durationMinutes,
     required this.brand,
     required this.rating,
+    this.videoUrl,
+    this.videoLink,
   });
 
   final String id;
@@ -111,6 +113,8 @@ class ShopProduct {
   final int durationMinutes;
   final String brand;
   final String rating;
+  final String? videoUrl;
+  final String? videoLink;
 
   static double _toDouble(dynamic val) => val is num
       ? val.toDouble()
@@ -126,6 +130,19 @@ class ShopProduct {
       return '$cdnBase$clean';
     }
 
+    final videoLink = (raw['video_link'] ?? '').toString().trim();
+    String? resolvedVideoUrl;
+    String? resolvedVideoLink;
+    if (videoLink.isNotEmpty && videoLink != 'null') {
+      resolvedVideoLink = videoLink;
+      if (videoLink.startsWith('http')) {
+        resolvedVideoUrl = videoLink;
+      } else {
+        resolvedVideoUrl =
+            'https://d2plk5mvjwgdxq.cloudfront.net/videos/reels/$videoLink/master.m3u8';
+      }
+    }
+
     return ShopProduct(
       id: (raw['id'] ?? '0').toString(),
       name: (raw['name'] ?? '').toString(),
@@ -137,6 +154,8 @@ class ShopProduct {
       durationMinutes: int.tryParse((raw['duration'] ?? '0').toString()) ?? 0,
       brand: (raw['brand'] ?? '').toString(),
       rating: (raw['rating'] ?? '0').toString(),
+      videoUrl: resolvedVideoUrl,
+      videoLink: resolvedVideoLink,
     );
   }
 }

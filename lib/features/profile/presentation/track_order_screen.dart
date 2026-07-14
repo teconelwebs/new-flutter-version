@@ -234,6 +234,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     if (s == 'hold') return Colors.blue;
     if (s.contains('deliver')) return const Color(0xFF22C55E);
     if (s.contains('cancel') || s.contains('fail'))
+      // ignore: curly_braces_in_flow_control_structures
       return const Color(0xFFEF4444);
     return const Color(0xFF6B7280);
   }

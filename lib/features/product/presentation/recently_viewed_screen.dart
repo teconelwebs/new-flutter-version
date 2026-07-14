@@ -80,16 +80,18 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
       Color(0xFFF3E8FF),
     ];
     return ProductItem(
-      id: p.id.toString(),
-      title: p.name,
-      subtitle: p.brand.isEmpty ? 'Fast delivery' : p.brand,
-      price: p.price,
-      rating: p.rating,
-      color: fallbackColors[index % fallbackColors.length],
-      imageUrl: p.image,
-      slug: p.slug,
-      brand: p.brand,
-      durationMinutes: p.duration,
+       id: p.id.toString(),
+       title: p.name,
+       subtitle: p.brand.isEmpty ? 'Fast delivery' : p.brand,
+       price: p.price,
+       rating: p.rating,
+       color: fallbackColors[index % fallbackColors.length],
+       imageUrl: p.image,
+       slug: p.slug,
+       brand: p.brand,
+       durationMinutes: p.duration,
+       videoUrl: p.videoUrl,
+       videoLink: p.videoLink,
     );
   }
 

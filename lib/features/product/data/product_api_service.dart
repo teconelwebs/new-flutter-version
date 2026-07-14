@@ -91,6 +91,20 @@ class ProductApiService {
                     '')
                 .toString(),
           );
+
+          final videoLink = (raw['video_link'] ?? '').toString().trim();
+          String? resolvedVideoUrl;
+          String? resolvedVideoLink;
+          if (videoLink.isNotEmpty && videoLink != 'null') {
+            resolvedVideoLink = videoLink;
+            if (videoLink.startsWith('http')) {
+              resolvedVideoUrl = videoLink;
+            } else {
+              resolvedVideoUrl =
+                  'https://d2plk5mvjwgdxq.cloudfront.net/videos/reels/$videoLink/master.m3u8';
+            }
+          }
+
           return ProductItem(
             id: id,
             title: name,
@@ -103,6 +117,8 @@ class ProductApiService {
             brand: brand,
             durationMinutes:
                 int.tryParse((raw['duration'] ?? '0').toString()) ?? 0,
+            videoUrl: resolvedVideoUrl,
+            videoLink: resolvedVideoLink,
           );
         })
         .where((item) => item.id.isNotEmpty && item.title.isNotEmpty)
@@ -138,6 +154,8 @@ class ProductDetailData {
     required this.features,
     required this.stock,
     this.rawJson = const {},
+    this.videoUrl,
+    this.videoLink,
   });
 
   final String id;
@@ -154,6 +172,8 @@ class ProductDetailData {
   final Map<String, String> features;
   final int stock;
   final Map<String, dynamic> rawJson;
+  final String? videoUrl;
+  final String? videoLink;
 
   factory ProductDetailData.fromJson(
     Map<String, dynamic> json, {
@@ -203,6 +223,19 @@ class ProductDetailData {
         ? (fp['discountPercentage'] as num).round()
         : (mrp > 0 ? (((mrp - sell) / mrp) * 100).round() : 0);
 
+    final videoLink = (json['video_link'] ?? '').toString().trim();
+    String? resolvedVideoUrl;
+    String? resolvedVideoLink;
+    if (videoLink.isNotEmpty && videoLink != 'null') {
+      resolvedVideoLink = videoLink;
+      if (videoLink.startsWith('http')) {
+        resolvedVideoUrl = videoLink;
+      } else {
+        resolvedVideoUrl =
+            'https://d2plk5mvjwgdxq.cloudfront.net/videos/reels/$videoLink/master.m3u8';
+      }
+    }
+
     return ProductDetailData(
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
@@ -228,6 +261,8 @@ class ProductDetailData {
           ) ??
           0,
       rawJson: json,
+      videoUrl: resolvedVideoUrl,
+      videoLink: resolvedVideoLink,
     );
   }
 }

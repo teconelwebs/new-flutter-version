@@ -29,6 +29,8 @@ class HomeProduct {
     required this.duration,
     this.brand = '',
     this.rating = 4.3,
+    this.videoUrl,
+    this.videoLink,
   });
 
   final int id;
@@ -40,18 +42,37 @@ class HomeProduct {
   final int duration;
   final String brand;
   final double rating;
+  final String? videoUrl;
+  final String? videoLink;
 
-  factory HomeProduct.fromJson(Map<String, dynamic> json) => HomeProduct(
-        id: json['id'] ?? 0,
-        name: json['name'] ?? '',
-        price: (json['price'] ?? 0.0).toDouble(),
-        mrp: (json['mrp'] ?? 0.0).toDouble(),
-        image: json['image'] ?? '',
-        slug: json['slug'] ?? '',
-        duration: json['duration'] ?? 0,
-        brand: json['brand'] ?? '',
-        rating: (json['rating'] ?? 4.3).toDouble(),
-      );
+  factory HomeProduct.fromJson(Map<String, dynamic> json) {
+    final videoLink = (json['video_link'] ?? '').toString().trim();
+    String? resolvedVideoUrl;
+    String? resolvedVideoLink;
+    if (videoLink.isNotEmpty && videoLink != 'null') {
+      resolvedVideoLink = videoLink;
+      if (videoLink.startsWith('http')) {
+        resolvedVideoUrl = videoLink;
+      } else {
+        resolvedVideoUrl =
+            'https://d2plk5mvjwgdxq.cloudfront.net/videos/reels/$videoLink/master.m3u8';
+      }
+    }
+
+    return HomeProduct(
+      id: json['id'] ?? 0,
+      name: json['name'] ?? '',
+      price: (json['price'] ?? 0.0).toDouble(),
+      mrp: (json['mrp'] ?? 0.0).toDouble(),
+      image: json['image'] ?? '',
+      slug: json['slug'] ?? '',
+      duration: json['duration'] ?? 0,
+      brand: json['brand'] ?? '',
+      rating: (json['rating'] ?? 4.3).toDouble(),
+      videoUrl: resolvedVideoUrl,
+      videoLink: resolvedVideoLink,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -63,6 +84,7 @@ class HomeProduct {
         'duration': duration,
         'brand': brand,
         'rating': rating,
+        'video_link': videoLink,
       };
 }
 

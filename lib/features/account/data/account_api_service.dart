@@ -46,6 +46,7 @@ class AccountApiService {
     if (response.statusCode < 200 || response.statusCode >= 300) return [];
     final decoded = jsonDecode(response.body);
     if (decoded is! Map<String, dynamic> || decoded['success'] != true)
+      // ignore: curly_braces_in_flow_control_structures
       return [];
     final list = decoded['blockedUsers'];
     if (list is! List) return [];
@@ -367,6 +368,8 @@ class WishlistProduct {
     this.quantity,
     this.isOutOfStock,
     this.stockId,
+    this.videoUrl,
+    this.videoLink,
   });
 
   final int id;
@@ -381,6 +384,8 @@ class WishlistProduct {
   final String? quantity;
   final bool? isOutOfStock;
   final int? stockId;
+  final String? videoUrl;
+  final String? videoLink;
 
   factory WishlistProduct.fromJson(Map<String, dynamic> json) {
     int? parsedStockId;
@@ -388,6 +393,19 @@ class WishlistProduct {
       parsedStockId = int.tryParse((json['stocks'] as List)[0]['id']?.toString() ?? '');
     } else if (json['stock_id'] != null) {
       parsedStockId = int.tryParse(json['stock_id'].toString());
+    }
+
+    final videoLink = (json['video_link'] ?? '').toString().trim();
+    String? resolvedVideoUrl;
+    String? resolvedVideoLink;
+    if (videoLink.isNotEmpty && videoLink != 'null') {
+      resolvedVideoLink = videoLink;
+      if (videoLink.startsWith('http')) {
+        resolvedVideoUrl = videoLink;
+      } else {
+        resolvedVideoUrl =
+            'https://d2plk5mvjwgdxq.cloudfront.net/videos/reels/$videoLink/master.m3u8';
+      }
     }
 
     return WishlistProduct(
@@ -403,6 +421,8 @@ class WishlistProduct {
       quantity: json['quantity']?.toString(),
       isOutOfStock: json['isOutOfStock'] as bool?,
       stockId: parsedStockId,
+      videoUrl: resolvedVideoUrl,
+      videoLink: resolvedVideoLink,
     );
   }
 }

@@ -136,6 +136,8 @@ class _ShopScreenState extends State<ShopScreen> {
       slug: p.slug,
       brand: p.brand,
       durationMinutes: p.durationMinutes,
+      videoUrl: p.videoUrl,
+      videoLink: p.videoLink,
     );
     Navigator.of(context).pushNamed(AppRoutes.product, arguments: item);
   }

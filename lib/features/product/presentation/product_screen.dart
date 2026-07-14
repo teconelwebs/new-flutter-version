@@ -460,6 +460,7 @@ class _ProductScreenState extends State<ProductScreen> {
                         children: [
                           ImageGalleryWidget(
                             images: detail.images,
+                            videoUrl: detail.videoUrl,
                             isWishlisted: _isWishlisted,
                             onWishlistPress: _toggleWishlist,
                             name: detail.name,

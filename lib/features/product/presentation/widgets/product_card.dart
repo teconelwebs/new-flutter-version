@@ -2,14 +2,26 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_routes.dart';
 import '../../data/models/product_item.dart';
+import 'inline_product_video_player.dart';
+import 'inline_video_focus_coordinator.dart';
 
-class ProductCard extends StatelessWidget {
+class ProductCard extends StatefulWidget {
   const ProductCard({super.key, required this.item});
 
   final ProductItem item;
 
   @override
+  State<ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<ProductCard> {
+  @override
   Widget build(BuildContext context) {
+    final hasVideo =
+        widget.item.videoUrl != null && widget.item.videoUrl!.isNotEmpty;
+    final videoId =
+        '${widget.item.id}_${widget.item.videoUrl ?? widget.item.imageUrl}';
+
     return Align(
       alignment: Alignment.topCenter,
       child: InkWell(
@@ -17,7 +29,7 @@ class ProductCard extends StatelessWidget {
         onTap: () {
           Navigator.of(context).pushNamed(
             AppRoutes.product,
-            arguments: item,
+            arguments: widget.item,
           );
         },
         child: Ink(
@@ -42,34 +54,50 @@ class ProductCard extends StatelessWidget {
                   width: double.infinity,
                   clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
-                    color: item.color,
+                    color: widget.item.color,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: item.imageUrl.isEmpty
-                      ? const Center(
-                          child: Icon(Icons.shopping_bag_outlined, size: 34),
+                  child: hasVideo
+                      ? FocusTrackedVideo(
+                          videoId: videoId,
+                          builder: (context, isActive) {
+                            return InlineProductVideoPlayer(
+                              videoUrl: widget.item.videoUrl!,
+                              autoPlay: true,
+                              loop: true,
+                              initialMuted: true,
+                              isActive: isActive,
+                            );
+                          },
                         )
-                      : Image.network(
-                          item.imageUrl,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Center(
-                            child: Icon(Icons.image_not_supported_outlined, size: 26),
-                          ),
-                        ),
+                      : (widget.item.imageUrl.isEmpty
+                          ? const Center(
+                              child:
+                                  Icon(Icons.shopping_bag_outlined, size: 34),
+                            )
+                          : Image.network(
+                              widget.item.imageUrl,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Center(
+                                child: Icon(Icons.image_not_supported_outlined,
+                                    size: 26),
+                              ),
+                            )),
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                item.title,
+                widget.item.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                style:
+                    const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
               ),
-              if (item.brand.trim().isNotEmpty &&
-                  item.brand.trim().toLowerCase() != 'no brand') ...[
+              if (widget.item.brand.trim().isNotEmpty &&
+                  widget.item.brand.trim().toLowerCase() != 'no brand') ...[
                 const SizedBox(height: 4),
                 Text(
-                  item.brand.trim(),
+                  widget.item.brand.trim(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: Color(0xFF6E7380), fontSize: 12),
@@ -79,18 +107,19 @@ class ProductCard extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    'Rs ${item.price.toStringAsFixed(0)}',
+                    'Rs ${widget.item.price.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
                     ),
                   ),
-                  if (item.durationMinutes > 0) ...[
+                  if (widget.item.durationMinutes > 0) ...[
                     const Spacer(),
-                    const Icon(Icons.local_shipping_rounded, color: Color(0xFF6B7280), size: 13),
+                    const Icon(Icons.local_shipping_rounded,
+                        color: Color(0xFF6B7280), size: 13),
                     const SizedBox(width: 4),
                     Text(
-                      _getDeliveryDaysText(item.durationMinutes),
+                      _getDeliveryDaysText(widget.item.durationMinutes),
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,

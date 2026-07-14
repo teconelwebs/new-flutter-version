@@ -50,6 +50,8 @@ class _SearchScreenState extends State<SearchScreen> {
       slug: p.link.isNotEmpty ? p.link : p.id.toString(),
       brand: p.brand,
       durationMinutes: 0,
+      videoUrl: p.videoUrl,
+      videoLink: p.videoLink,
     );
   }
 

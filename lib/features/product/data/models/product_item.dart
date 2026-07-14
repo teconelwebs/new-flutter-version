@@ -12,6 +12,8 @@ class ProductItem {
     this.slug = '',
     this.brand = '',
     this.durationMinutes = 0,
+    this.videoUrl,
+    this.videoLink,
   });
 
   final String id;
@@ -24,4 +26,6 @@ class ProductItem {
   final String slug;
   final String brand;
   final int durationMinutes;
+  final String? videoUrl;
+  final String? videoLink;
 }

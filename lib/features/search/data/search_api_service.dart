@@ -143,6 +143,20 @@ class SearchApiService {
     final slug = (item['slug'] ?? '').toString();
     final duration = int.tryParse((item['duration'] ?? '0').toString()) ?? 0;
     final price = _toDouble(priceRaw);
+
+    final videoLink = (item['video_link'] ?? '').toString().trim();
+    String? resolvedVideoUrl;
+    String? resolvedVideoLink;
+    if (videoLink.isNotEmpty && videoLink != 'null') {
+      resolvedVideoLink = videoLink;
+      if (videoLink.startsWith('http')) {
+        resolvedVideoUrl = videoLink;
+      } else {
+        resolvedVideoUrl =
+            'https://d2plk5mvjwgdxq.cloudfront.net/videos/reels/$videoLink/master.m3u8';
+      }
+    }
+
     return ProductItem(
       id: id,
       title: title,
@@ -154,6 +168,8 @@ class SearchApiService {
       slug: slug,
       brand: brand,
       durationMinutes: duration,
+      videoUrl: resolvedVideoUrl,
+      videoLink: resolvedVideoLink,
     );
   }
 

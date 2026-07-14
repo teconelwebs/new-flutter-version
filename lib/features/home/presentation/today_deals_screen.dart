@@ -103,6 +103,8 @@ class _TodayDealsScreenState extends State<TodayDealsScreen> {
       slug: p.slug,
       brand: p.brand,
       durationMinutes: p.duration,
+      videoUrl: p.videoUrl,
+      videoLink: p.videoLink,
     );
   }
 

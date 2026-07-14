@@ -38,6 +38,15 @@ class HomeScreen extends StatefulWidget {
   final int? initialTab;
   static const routeName = AppRoutes.home;
 
+  static State<HomeScreen>? activeState;
+
+  static void playReel(String reelId) {
+    final state = activeState;
+    if (state is _HomeScreenState) {
+      state.playReel(reelId);
+    }
+  }
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -54,6 +63,16 @@ class _HomeScreenState extends State<HomeScreen>
   String? _displayPincode;
   double? _aiX;
   double? _aiY;
+
+  void playReel(String reelId) {
+    if (mounted) {
+      setState(() {
+        _shareReelId = reelId;
+        _currentIndex = 2; // Switch to Play/Reels tab
+      });
+      _updateStatusBarColor();
+    }
+  }
 
   Future<void> _loadActiveAddressFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
@@ -100,6 +119,7 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
+    HomeScreen.activeState = this;
     if (widget.initialTab != null) {
       _currentIndex = widget.initialTab!;
     }
@@ -162,6 +182,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    if (HomeScreen.activeState == this) {
+      HomeScreen.activeState = null;
+    }
     play.customClosePlayCallback = null;
     PushNotificationService.instance.onNotificationTapped = null;
     _subConnectivity?.cancel();
@@ -963,6 +986,8 @@ class _HomeTabState extends State<_HomeTab> {
       slug: p.slug,
       brand: p.brand,
       durationMinutes: p.duration,
+      videoUrl: p.videoUrl,
+      videoLink: p.videoLink,
     );
   }
 

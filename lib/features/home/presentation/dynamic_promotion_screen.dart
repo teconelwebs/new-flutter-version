@@ -72,6 +72,19 @@ class _DynamicPromotionScreenState extends State<DynamicPromotionScreen> {
         ? (imagePath.startsWith('http') ? imagePath : 'https://d1f02fefkbso7w.cloudfront.net/$imagePath')
         : '';
 
+    final videoLink = (p['video_link'] ?? '').toString().trim();
+    String? resolvedVideoUrl;
+    String? resolvedVideoLink;
+    if (videoLink.isNotEmpty && videoLink != 'null') {
+      resolvedVideoLink = videoLink;
+      if (videoLink.startsWith('http')) {
+        resolvedVideoUrl = videoLink;
+      } else {
+        resolvedVideoUrl =
+            'https://d2plk5mvjwgdxq.cloudfront.net/videos/reels/$videoLink/master.m3u8';
+      }
+    }
+
     return ProductItem(
       id: p['id']?.toString() ?? '',
       title: p['name']?.toString() ?? '',
@@ -83,6 +96,8 @@ class _DynamicPromotionScreenState extends State<DynamicPromotionScreen> {
       slug: p['slug']?.toString() ?? p['id']?.toString() ?? '',
       brand: p['brand']?.toString() ?? '',
       durationMinutes: int.tryParse((p['duration'] ?? p['duration_minute'] ?? p['delivery_time_minute'] ?? '0').toString()) ?? 0,
+      videoUrl: resolvedVideoUrl,
+      videoLink: resolvedVideoLink,
     );
   }
 

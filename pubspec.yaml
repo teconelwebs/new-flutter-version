@@ -11,6 +11,7 @@ dependencies:
     sdk: flutter
   welfog_flutter_play:
     path: ./flutter_play_module
+  video_player: ^2.9.2
   http: ^1.2.0
   shared_preferences: ^2.3.5
   flutter_svg: ^2.3.0
