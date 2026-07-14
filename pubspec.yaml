@@ -1,7 +1,7 @@
 name: welfog
 description: Welfog main Flutter app
 publish_to: "none"
-version: 1.1.29+64
+version: 1.1.38+74
 
 environment:
   sdk: ">=3.2.0 <4.0.0"
@@ -24,6 +24,7 @@ dependencies:
   firebase_core: ^4.11.0
   firebase_messaging: ^16.4.1
   flutter_local_notifications: ^22.0.1
+  package_info_plus: ^8.1.2
 
 
 dev_dependencies:

@@ -6,8 +6,10 @@ import 'package:flutter/gestures.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/storage/session_store.dart';
+import '../../../core/utils/safe_insets.dart';
 import '../../home/presentation/home_screen.dart';
 import '../data/login_service.dart';
+import '../../../core/services/check_app_update.dart';
 
 class LoginScreen extends StatefulWidget {
   // ignore: use_super_parameters
@@ -95,6 +97,13 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     _toastSlideAnimation = Tween<double>(begin: -150.0, end: 0.0).animate(
       CurvedAnimation(parent: _toastAnimController, curve: Curves.easeOutBack),
     );
+
+    // Trigger app update check after a small delay
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        checkAppUpdate(context);
+      }
+    });
   }
 
   @override
@@ -314,6 +323,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     final isSmallDevice = screenHeight < 700;
     final insets = mediaQuery.padding;
     final bool isKeyboardOpen = mediaQuery.viewInsets.bottom > 0;
+    final double systemBottom = systemBottomInset(context);
 
     // Dynamic padding calculations matching React Native calculations
     final double topPadding = min(96.0, max(isSmallDevice ? 22.0 : 34.0, insets.top + screenHeight * 0.06));
@@ -433,7 +443,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                     left: 20,
                     right: 20,
                     top: topPadding,
-                    bottom: 12 + bottomSpacing + insets.bottom,
+                    bottom: 12 + bottomSpacing + systemBottom,
                   ),
               child: Column(
                 children: [

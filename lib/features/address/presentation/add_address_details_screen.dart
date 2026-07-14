@@ -456,6 +456,7 @@ class _AddAddressDetailsScreenState extends State<AddAddressDetailsScreen> {
           // 6. Fixed Sticky Bottom Button Area
           SafeArea(
             top: false,
+            maintainBottomViewPadding: true,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
               child: SizedBox(

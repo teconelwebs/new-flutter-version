@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/safe_insets.dart';
 import '../data/account_api_service.dart';
 
 class FaqScreen extends StatefulWidget {
@@ -194,7 +195,12 @@ class _FaqScreenState extends State<FaqScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        8 + systemBottomInset(context),
+      ),
       itemCount: filtered.length,
       itemBuilder: (context, index) {
         final faq = filtered[index];

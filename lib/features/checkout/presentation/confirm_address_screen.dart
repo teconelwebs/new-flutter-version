@@ -852,6 +852,7 @@ class _ConfirmAddressScreenState extends State<ConfirmAddressScreen>
               ),
               child: SafeArea(
                 top: false,
+                maintainBottomViewPadding: true,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

@@ -8,10 +8,11 @@ import 'shop_models.dart';
 class ShopApiService {
   static const _baseUrl = 'https://welfogapi.welfog.com/api/v2';
   static const _cdnBase = 'https://d1f02fefkbso7w.cloudfront.net/';
-  static const _defaultBanner =
-      'https://welfog.com/_nuxt/img/nobanner.682f53d.png';
-  static const _defaultLogo =
-      'https://welfog.com/_nuxt/img/defaultlogo.b490002.png';
+
+  /// Local defaults — remote `_nuxt/img/nobanner.*.png` URLs are dead (404).
+  static const defaultBannerAsset = 'assets/images/shop_default_banner.png';
+  static const defaultLogoAsset = 'assets/images/shop_default_logo.png';
+  static const defaultProductImageAsset = 'assets/images/shop_default_banner.png';
 
   Future<ShopDetail?> fetchShopDetails({
     required String shopId,
@@ -24,10 +25,16 @@ class ShopApiService {
       final uri = Uri.parse('$_baseUrl/shops/details/$shopId')
           .replace(queryParameters: {'slug': slug, 'id': shopId});
 
+      debugPrint('🟢 [API REQ DETAILS] URL: $uri');
+      debugPrint('🟢 [API REQ DETAILS] TOKEN EXIST: ${token.isNotEmpty}');
+
       final response = await http.get(uri, headers: {
         if (token.isNotEmpty) 'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       });
+
+      debugPrint('🔵 [API RES DETAILS] STATUS CODE: ${response.statusCode}');
+      debugPrint('🔵 [API RES DETAILS] BODY: ${response.body}');
 
       if (response.statusCode < 200 || response.statusCode >= 300) return null;
 
@@ -35,8 +42,14 @@ class ShopApiService {
       final data = decoded['data'];
       if (data is! List || data.isEmpty) return null;
 
-      return ShopDetail.fromJson(data[0] as Map<String, dynamic>, _cdnBase,
-          _defaultBanner, _defaultLogo);
+      final detail = ShopDetail.fromJson(
+        data[0] as Map<String, dynamic>,
+        _cdnBase,
+        defaultBannerAsset,
+        defaultLogoAsset,
+      );
+      debugPrint('🎯 [PARSED DETAILS] BANNER URL: ${detail.bannerUrl}');
+      return detail;
     } catch (e) {
       debugPrint('ShopApiService.fetchShopDetails error: $e');
       return null;
@@ -88,7 +101,6 @@ class ShopApiService {
           (meta is Map ? meta['last_page'] : null) ?? decoded['last_page'];
       final totalPages = int.tryParse((rawLastPage ?? 1).toString()) ?? 1;
 
-      // final totalPages = (meta is Map ? (meta['last_page'] ?? 1) : 1) as int;
       dynamic resolvedList = rawData;
       if (rawData is Map) {
         if (rawData['data'] is List) {
@@ -98,25 +110,16 @@ class ShopApiService {
         }
       }
 
-      // ====================================================================
-      // 🔥 HIGHLIGHT: PRODUCT MAPPING (Using Resolved List)
-      // ====================================================================
-      // Ab hum original functional mapping ko use karenge bina puraane logic ko chhede.
       final products = resolvedList is List
           ? resolvedList
               .whereType<Map>()
-              .map((p) => ShopProduct.fromJson(p, _cdnBase, _defaultBanner))
+              .map((p) =>
+                  ShopProduct.fromJson(p, _cdnBase, defaultProductImageAsset))
               .toList()
           : <ShopProduct>[];
 
-          debugPrint('🎯 [PARSED] PRODUCTS COUNT: ${products.length}, TOTAL PAGES: $totalPages');
-
-      // final products = rawData is List
-      //     ? rawData
-      //         .whereType<Map>()
-      //         .map((p) => ShopProduct.fromJson(p, _cdnBase, _defaultBanner))
-      //         .toList()
-      //     : <ShopProduct>[];
+      debugPrint(
+          '🎯 [PARSED] PRODUCTS COUNT: ${products.length}, TOTAL PAGES: $totalPages');
 
       return ShopProductsResult(products: products, totalPages: totalPages);
     } catch (e) {

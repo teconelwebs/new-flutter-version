@@ -574,6 +574,7 @@ class _AddressScreenState extends State<AddressScreen> {
               },
             ),
       bottomNavigationBar: SafeArea(
+        maintainBottomViewPadding: true,
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,

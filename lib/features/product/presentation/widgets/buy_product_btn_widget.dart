@@ -235,6 +235,7 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: SafeArea(
         top: false,
+        maintainBottomViewPadding: true,
         child: Row(
           children: [
             // ADD TO CART BUTTON

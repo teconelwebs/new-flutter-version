@@ -212,6 +212,7 @@ class _DeleteAccountHelpScreenState extends State<DeleteAccountHelpScreen> {
         ],
       ),
       bottomNavigationBar: SafeArea(
+        maintainBottomViewPadding: true,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: const BoxDecoration(

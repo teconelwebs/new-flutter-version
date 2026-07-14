@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import '../../../core/constants/app_routes.dart';
 import '../../../core/storage/session_store.dart';
 
 class ChatAiScreen extends StatefulWidget {
@@ -39,9 +40,61 @@ class _ChatAiScreenState extends State<ChatAiScreen> {
           onWebResourceError: (WebResourceError error) {
             debugPrint("Chat AI WebView Error: ${error.description}");
           },
+          onNavigationRequest: (NavigationRequest request) {
+            final url = request.url;
+            debugPrint("Chat AI WebView navigating to: $url");
+
+            // 1. Intercept custom app scheme links (e.g. app://product/slug)
+            if (url.startsWith('app://product/')) {
+              final slug = url.replaceFirst('app://product/', '').trim();
+              if (slug.isNotEmpty) {
+                Navigator.of(context).pushNamed(
+                  AppRoutes.product,
+                  arguments: slug,
+                );
+                return NavigationDecision.prevent;
+              }
+            }
+
+            // 2. Intercept standard website links (e.g. https://welfog.com/products/slug or http://.../product/slug)
+            final lowerUrl = url.toLowerCase();
+            if (lowerUrl.contains('/products/') ||
+                lowerUrl.contains('/product/')) {
+              try {
+                final uri = Uri.parse(url);
+                final segments =
+                    uri.pathSegments.where((s) => s.isNotEmpty).toList();
+                if (segments.isNotEmpty) {
+                  final slug = segments.last;
+                  Navigator.of(context).pushNamed(
+                    AppRoutes.product,
+                    arguments: slug,
+                  );
+                  return NavigationDecision.prevent;
+                }
+              } catch (e) {
+                debugPrint("Error parsing product URL: $e");
+              }
+            }
+
+            return NavigationDecision.navigate;
+          },
         ),
+      )
+      ..addJavaScriptChannel(
+        'FlutterNavigation',
+        onMessageReceived: (JavaScriptMessage message) {
+          final slug = message.message.trim();
+          debugPrint("Received navigation command from JS Channel: $slug");
+          if (slug.isNotEmpty) {
+            Navigator.of(context).pushNamed(
+              AppRoutes.product,
+              arguments: slug,
+            );
+          }
+        },
       );
-    
+
     _loadUserIdAndUrl();
   }
 
@@ -53,7 +106,7 @@ class _ChatAiScreenState extends State<ChatAiScreen> {
       if (loggedIn) {
         id = await SessionStore.getUserId();
       }
-      
+
       // Fallback to SharedPreferences if SessionStore is empty
       if (id == null || id.isEmpty) {
         final prefs = await SharedPreferences.getInstance();
@@ -61,12 +114,14 @@ class _ChatAiScreenState extends State<ChatAiScreen> {
       }
     }
 
+    // ignore: unnecessary_null_comparison
     if (id != null && id.isNotEmpty) {
       _resolvedUserId = id;
     }
 
-    final chatUrl = 'https://ai.welfog.com/?user_id=$_resolvedUserId&chat_id=81a964ab89882e1292d67409a5faa8e9';
-    
+    final chatUrl =
+        'https://ai.welfog.com/?user_id=$_resolvedUserId&chat_id=81a964ab89882e1292d67409a5faa8e9';
+
     if (mounted) {
       _controller.loadRequest(Uri.parse(chatUrl));
     }
@@ -82,7 +137,9 @@ class _ChatAiScreenState extends State<ChatAiScreen> {
         scrolledUnderElevation: 0,
         leading: IconButton(
           icon: Icon(
-            widget.isModal ? Icons.close_rounded : Icons.arrow_back_ios_new_rounded,
+            widget.isModal
+                ? Icons.close_rounded
+                : Icons.arrow_back_ios_new_rounded,
             color: Colors.black,
           ),
           onPressed: () => Navigator.of(context).pop(),

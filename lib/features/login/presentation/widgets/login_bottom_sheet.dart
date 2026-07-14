@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/storage/session_store.dart';
+import '../../../../core/utils/safe_insets.dart';
 import '../../data/login_service.dart';
 
 class LoginBottomSheet extends StatefulWidget {
@@ -189,7 +190,8 @@ class _LoginBottomSheetState extends State<LoginBottomSheet> {
         left: 24,
         right: 24,
         top: 14,
-        bottom: MediaQuery.of(context).padding.bottom + (bottomInset > 0 ? bottomInset + 16 : 24.0),
+        bottom: systemBottomInset(context) +
+            (bottomInset > 0 ? bottomInset + 16 : 24.0),
       ),
       child: SingleChildScrollView(
         child: Column(

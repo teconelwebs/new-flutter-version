@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/constants/app_routes.dart';
+import '../../../core/utils/safe_insets.dart';
 
 class HelpCenterScreen extends StatelessWidget {
   const HelpCenterScreen({super.key});
@@ -109,6 +110,7 @@ class HelpCenterScreen extends StatelessWidget {
         ),
       ),
       body: SingleChildScrollView(
+        padding: EdgeInsets.only(bottom: systemBottomInset(context)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

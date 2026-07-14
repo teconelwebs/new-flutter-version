@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
+import '../../../core/utils/safe_insets.dart';
 import '../data/account_api_service.dart';
 
 class ContactSupportScreen extends StatefulWidget {
@@ -236,6 +237,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
         ),
       ),
       body: SingleChildScrollView(
+        padding: EdgeInsets.only(bottom: systemBottomInset(context)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

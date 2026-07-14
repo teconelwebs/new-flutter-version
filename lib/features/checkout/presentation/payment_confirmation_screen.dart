@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/state/cart_state.dart';
+import '../../../core/utils/safe_insets.dart';
 import '../../../core/widgets/app_loader.dart';
 import 'cashfree_webview_page.dart';
 
@@ -668,7 +669,8 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;
     final isSmallScreen = screenHeight < 700;
-    final bottomOffset = 64.0 + mediaQuery.padding.bottom + (isSmallScreen ? 12.0 : 24.0);
+    final bottomOffset =
+        64.0 + systemBottomInset(context) + (isSmallScreen ? 12.0 : 24.0);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F6F6),
@@ -1282,6 +1284,7 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
                             Border(top: BorderSide(color: Color(0xFFEEEEEE)))),
                     child: SafeArea(
                       top: false,
+                      maintainBottomViewPadding: true,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [

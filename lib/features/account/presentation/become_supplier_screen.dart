@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/utils/safe_insets.dart';
+
 class BecomeSupplierScreen extends StatelessWidget {
   const BecomeSupplierScreen({super.key});
 
@@ -52,7 +54,12 @@ class BecomeSupplierScreen extends StatelessWidget {
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            16 + systemBottomInset(context),
+          ),
           child: Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(

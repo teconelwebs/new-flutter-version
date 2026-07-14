@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class ShopDetail {
   const ShopDetail({
     required this.id,
@@ -15,6 +17,12 @@ class ShopDetail {
   final String rating;
   final int productCount;
 
+  bool get hasNetworkBanner =>
+      bannerUrl.startsWith('http://') || bannerUrl.startsWith('https://');
+
+  bool get hasNetworkLogo =>
+      logoUrl.startsWith('http://') || logoUrl.startsWith('https://');
+
   factory ShopDetail.fromJson(
     Map<String, dynamic> json,
     String cdnBase,
@@ -22,9 +30,47 @@ class ShopDetail {
     String defaultLogo,
   ) {
     String resolveUrl(dynamic raw, String fallback) {
-      final s = (raw ?? '').toString().trim();
-      if (s.isEmpty || s == 'null') return fallback;
-      if (s.startsWith('http')) return s;
+      if (raw == null) return fallback;
+
+      // Activeecom sometimes sends JSON-encoded lists as strings: '["a.jpg"]' / '[]'
+      if (raw is String) {
+        final trimmed = raw.trim();
+        if (trimmed.startsWith('[')) {
+          try {
+            raw = jsonDecode(trimmed);
+          } catch (_) {
+            // keep as plain string path
+          }
+        }
+      }
+
+      if (raw is List) {
+        if (raw.isEmpty) return fallback;
+        raw = raw.first;
+      }
+
+      if (raw is Map) {
+        raw = raw['photo'] ??
+            raw['img'] ??
+            raw['image'] ??
+            raw['url'] ??
+            raw['path'] ??
+            raw['slider'];
+      }
+
+      if (raw == null) return fallback;
+
+      final s = raw.toString().trim();
+      if (s.isEmpty ||
+          s == 'null' ||
+          s == '[]' ||
+          s == '{}' ||
+          s.toLowerCase() == 'undefined') {
+        return fallback;
+      }
+      if (s.startsWith('http://') || s.startsWith('https://')) return s;
+      if (s.startsWith('assets/')) return s;
+
       final clean = s.startsWith('/') ? s.substring(1) : s;
       return '$cdnBase$clean';
     }
@@ -33,7 +79,10 @@ class ShopDetail {
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       logoUrl: resolveUrl(json['logo'], defaultLogo),
-      bannerUrl: resolveUrl(json['sliders'], defaultBanner),
+      bannerUrl: resolveUrl(
+        json['sliders'] ?? json['banner'] ?? json['banners'],
+        defaultBanner,
+      ),
       rating: (json['rating'] ?? '0').toString(),
       productCount: int.tryParse((json['product'] ?? '0').toString()) ?? 0,
     );
@@ -63,14 +112,16 @@ class ShopProduct {
   final String brand;
   final String rating;
 
-  static double _toDouble(dynamic val) =>
-      val is num ? val.toDouble() : double.tryParse((val ?? '0').toString()) ?? 0;
+  static double _toDouble(dynamic val) => val is num
+      ? val.toDouble()
+      : double.tryParse((val ?? '0').toString()) ?? 0;
 
-  factory ShopProduct.fromJson(Map raw, String cdnBase, String defaultBanner) {
+  factory ShopProduct.fromJson(Map raw, String cdnBase, String defaultImage) {
     String resolveUrl(dynamic rawPath) {
       final s = (rawPath ?? '').toString().trim();
-      if (s.isEmpty || s == 'null') return defaultBanner;
-      if (s.startsWith('http')) return s;
+      if (s.isEmpty || s == 'null') return defaultImage;
+      if (s.startsWith('http://') || s.startsWith('https://')) return s;
+      if (s.startsWith('assets/')) return s;
       final clean = s.startsWith('/') ? s.substring(1) : s;
       return '$cdnBase$clean';
     }
@@ -79,7 +130,8 @@ class ShopProduct {
       id: (raw['id'] ?? '0').toString(),
       name: (raw['name'] ?? '').toString(),
       slug: (raw['slug'] ?? '').toString(),
-      imageUrl: resolveUrl(raw['thumbnail_image'] ?? raw['thumbnail_img'] ?? raw['image']),
+      imageUrl: resolveUrl(
+          raw['thumbnail_image'] ?? raw['thumbnail_img'] ?? raw['image']),
       newPrice: _toDouble(raw['base_discounted_price'] ?? raw['price']),
       oldPrice: _toDouble(raw['base_price'] ?? raw['mrp'] ?? raw['price']),
       durationMinutes: int.tryParse((raw['duration'] ?? '0').toString()) ?? 0,

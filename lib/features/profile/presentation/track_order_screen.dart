@@ -1,8 +1,11 @@
+// ignore_for_file: valid_regexps
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/constants/app_routes.dart';
+import '../../../core/utils/safe_insets.dart';
 import '../../../core/widgets/app_loader.dart';
 
 class TrackOrderScreen extends StatefulWidget {
@@ -22,7 +25,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   bool _loadingOrders = true;
   bool _dropdownOpen = false;
   String _searchQuery = "";
-  
+
   int _currentPage = 1;
   int _totalPages = 1;
   bool _loadingMore = false;
@@ -41,7 +44,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     _fetchOrders(page: 1);
     _dropdownScrollController.addListener(() {
       if (!_dropdownScrollController.hasClients) return;
-      if (_dropdownScrollController.position.pixels >= _dropdownScrollController.position.maxScrollExtent - 100) {
+      if (_dropdownScrollController.position.pixels >=
+          _dropdownScrollController.position.maxScrollExtent - 100) {
         if (!_loadingMore && _currentPage < _totalPages) {
           _fetchOrders(page: _currentPage + 1, append: true);
         }
@@ -71,7 +75,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
       final userId = prefs.getString('user_id');
       if (userId == null) return;
 
-      final url = 'https://welfogapi.welfog.com/api/v2/order_list/$userId?user_id=$userId&page=$page';
+      final url =
+          'https://welfogapi.welfog.com/api/v2/order_list/$userId?user_id=$userId&page=$page';
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
@@ -79,7 +84,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
         if (data['success'] == true) {
           final newItems = data['data'] as List? ?? [];
           final meta = data['meta'] as Map? ?? {};
-          final lastPage = int.tryParse(meta['last_page']?.toString() ?? '1') ?? 1;
+          final lastPage =
+              int.tryParse(meta['last_page']?.toString() ?? '1') ?? 1;
 
           if (mounted) {
             setState(() {
@@ -141,7 +147,9 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data != null) {
-          if (data['ShipmentData'] != null && data['ShipmentData'] is List && (data['ShipmentData'] as List).isNotEmpty) {
+          if (data['ShipmentData'] != null &&
+              data['ShipmentData'] is List &&
+              (data['ShipmentData'] as List).isNotEmpty) {
             final shipment = data['ShipmentData'][0]['Shipment'];
             if (mounted) {
               setState(() {
@@ -189,7 +197,20 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     if (dateString == null || dateString.isEmpty) return "N/A";
     try {
       final date = DateTime.parse(dateString);
-      final months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      final months = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec"
+      ];
       return "${date.day} ${months[date.month - 1]} ${date.year}";
     } catch (_) {
       return dateString;
@@ -199,7 +220,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   String _getDeliveryStatusString(dynamic status) {
     if (status == null) return '';
     if (status is Map) {
-      final s = status['status'] ?? status['name'] ?? status['delivery_status_string'] ?? '';
+      final s = status['status'] ??
+          status['name'] ??
+          status['delivery_status_string'] ??
+          '';
       return s.toString();
     }
     return status.toString();
@@ -209,7 +233,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     final s = _getDeliveryStatusString(status).toLowerCase();
     if (s == 'hold') return Colors.blue;
     if (s.contains('deliver')) return const Color(0xFF22C55E);
-    if (s.contains('cancel') || s.contains('fail')) return const Color(0xFFEF4444);
+    if (s.contains('cancel') || s.contains('fail'))
+      return const Color(0xFFEF4444);
     return const Color(0xFF6B7280);
   }
 
@@ -218,7 +243,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     final query = _searchQuery.toLowerCase();
     return _orders.where((o) {
       final oidMatch = o['oid']?.toString().contains(query) ?? false;
-      final dateMatch = o['date']?.toString().toLowerCase().contains(query) ?? false;
+      final dateMatch =
+          o['date']?.toString().toLowerCase().contains(query) ?? false;
       final totalMatch = o['grand_total']?.toString().contains(query) ?? false;
       return oidMatch || dateMatch || totalMatch;
     }).toList();
@@ -262,7 +288,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
               children: [
                 // Order Selector Header
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0, vertical: 8.0),
                   child: InkWell(
                     onTap: () => setState(() => _dropdownOpen = !_dropdownOpen),
                     borderRadius: BorderRadius.circular(12),
@@ -282,13 +309,15 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Icon(Icons.shopping_bag_outlined, color: Colors.grey.shade600),
+                            child: Icon(Icons.shopping_bag_outlined,
+                                color: Colors.grey.shade600),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: _selectedOrder != null
                                 ? Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Order ${_selectedOrder!['oid']}',
@@ -309,7 +338,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                                     ],
                                   )
                                 : Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       const Text(
                                         'Select an order',
@@ -331,7 +361,9 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                                   ),
                           ),
                           Icon(
-                            _dropdownOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                            _dropdownOpen
+                                ? Icons.keyboard_arrow_up
+                                : Icons.keyboard_arrow_down,
                             color: Colors.grey.shade600,
                           ),
                         ],
@@ -363,16 +395,21 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                         Padding(
                           padding: const EdgeInsets.all(8.0),
                           child: TextField(
-                            onChanged: (val) => setState(() => _searchQuery = val),
+                            onChanged: (val) =>
+                                setState(() => _searchQuery = val),
                             decoration: InputDecoration(
                               hintText: 'Search orders by ID, date, or amount',
-                              hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                              prefixIcon: Icon(Icons.search, size: 18, color: Colors.grey.shade400),
-                              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                              hintStyle: TextStyle(
+                                  color: Colors.grey.shade400, fontSize: 13),
+                              prefixIcon: Icon(Icons.search,
+                                  size: 18, color: Colors.grey.shade400),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(vertical: 8),
                               isDense: true,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.grey.shade200),
+                                borderSide:
+                                    BorderSide(color: Colors.grey.shade200),
                               ),
                             ),
                           ),
@@ -381,40 +418,52 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                         Expanded(
                           child: ListView.builder(
                             controller: _dropdownScrollController,
-                            itemCount: _filteredOrders.length + (_currentPage < _totalPages ? 1 : 0),
+                            itemCount: _filteredOrders.length +
+                                (_currentPage < _totalPages ? 1 : 0),
                             itemBuilder: (context, idx) {
                               if (idx == _filteredOrders.length) {
                                 return const Padding(
                                   padding: EdgeInsets.symmetric(vertical: 8.0),
                                   child: Center(
-                                    child: AppLoader.button(color: Color(0xFFFB5404)),
+                                    child: AppLoader.button(
+                                        color: Color(0xFFFB5404)),
                                   ),
                                 );
                               }
 
                               final item = _filteredOrders[idx];
-                              final isSelected = _selectedOrder?['oid'] == item['oid'];
+                              final isSelected =
+                                  _selectedOrder?['oid'] == item['oid'];
 
                               return ListTile(
-                                tileColor: isSelected ? const Color(0xFFF0F7FF) : null,
+                                tileColor:
+                                    isSelected ? const Color(0xFFF0F7FF) : null,
                                 title: Text(
                                   '#${item['oid']}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13),
                                 ),
                                 subtitle: Text(
                                   '${_formatDate(item['date'])} • ₹${item['grand_total']}',
                                   style: const TextStyle(fontSize: 11),
                                 ),
                                 trailing: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 3),
                                   decoration: BoxDecoration(
-                                    color: _getStatusColor(item['delivery_status']).withAlpha(26),
+                                    color:
+                                        _getStatusColor(item['delivery_status'])
+                                            .withAlpha(26),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
-                                    _getDeliveryStatusString(item['delivery_status']).toUpperCase(),
+                                    _getDeliveryStatusString(
+                                            item['delivery_status'])
+                                        .toUpperCase(),
                                     style: TextStyle(
-                                      color: _getStatusColor(item['delivery_status']),
+                                      color: _getStatusColor(
+                                          item['delivery_status']),
                                       fontWeight: FontWeight.bold,
                                       fontSize: 9,
                                     ),
@@ -438,21 +487,29 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.local_shipping_outlined, size: 80, color: Colors.grey.shade300),
+                                  Icon(Icons.local_shipping_outlined,
+                                      size: 80, color: Colors.grey.shade300),
                                   const SizedBox(height: 16),
                                   const Text(
                                     'Choose an order to track',
-                                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                                    style: TextStyle(
+                                        color: Colors.grey, fontSize: 14),
                                   ),
                                 ],
                               ),
                             )
                           : RefreshIndicator(
-                              onRefresh: () => _fetchTrackingData(_selectedOrder!['oid'].toString()),
+                              onRefresh: () => _fetchTrackingData(
+                                  _selectedOrder!['oid'].toString()),
                               color: const Color(0xFFFB5404),
                               child: SingleChildScrollView(
                                 physics: const AlwaysScrollableScrollPhysics(),
-                                padding: const EdgeInsets.all(16),
+                                padding: EdgeInsets.fromLTRB(
+                                  16,
+                                  16,
+                                  16,
+                                  16 + systemBottomInset(context),
+                                ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -464,17 +521,22 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                                     if (_trackingLoading)
                                       const Center(
                                         child: Padding(
-                                          padding: EdgeInsets.symmetric(vertical: 24.0),
-                                          child: AppLoader(color: Color(0xFFFB5404)),
+                                          padding: EdgeInsets.symmetric(
+                                              vertical: 24.0),
+                                          child: AppLoader(
+                                              color: Color(0xFFFB5404)),
                                         ),
                                       )
                                     else if (_trackingError.isNotEmpty)
                                       Center(
                                         child: Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 24.0),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 24.0),
                                           child: Text(
                                             _trackingError,
-                                            style: const TextStyle(color: Colors.grey, fontSize: 14),
+                                            style: const TextStyle(
+                                                color: Colors.grey,
+                                                fontSize: 14),
                                           ),
                                         ),
                                       )
@@ -508,24 +570,42 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
           children: [
             const Text(
               'Order Information',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black),
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black),
             ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildInfoGridCell('ORDER ID', _selectedOrder!['oid']?.toString() ?? '', Icons.receipt_long_outlined),
-                _buildInfoGridCell('ORDER DATE', _formatDate(_selectedOrder!['date']?.toString()), Icons.calendar_today_outlined),
+                _buildInfoGridCell(
+                    'ORDER ID',
+                    _selectedOrder!['oid']?.toString() ?? '',
+                    Icons.receipt_long_outlined),
+                _buildInfoGridCell(
+                    'ORDER DATE',
+                    _formatDate(_selectedOrder!['date']?.toString()),
+                    Icons.calendar_today_outlined),
               ],
             ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildInfoGridCell('TOTAL AMOUNT', '₹${_selectedOrder!['grand_total']}', Icons.currency_rupee_outlined),
+                _buildInfoGridCell(
+                    'TOTAL AMOUNT',
+                    // (?i) hata diya aur caseSensitive: false add kar diya
+                    '₹${_selectedOrder!['grand_total']?.toString().replaceAll(RegExp(r'rs\.?\s*', caseSensitive: false), '') ?? ''}',
+                    Icons.currency_rupee_outlined),
+                // _buildInfoGridCell(
+                //     'TOTAL AMOUNT',
+                //     '₹${_selectedOrder!['grand_total']}',
+                //     Icons.currency_rupee_outlined),
                 _buildInfoGridCell(
                   'STATUS',
-                  _getDeliveryStatusString(_selectedOrder!['delivery_status']).toUpperCase(),
+                  _getDeliveryStatusString(_selectedOrder!['delivery_status'])
+                      .toUpperCase(),
                   Icons.local_shipping_outlined,
                   color: _getStatusColor(_selectedOrder!['delivery_status']),
                 ),
@@ -537,7 +617,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     );
   }
 
-  Widget _buildInfoGridCell(String label, String value, IconData icon, {Color? color}) {
+  Widget _buildInfoGridCell(String label, String value, IconData icon,
+      {Color? color}) {
     return SizedBox(
       width: MediaQuery.of(context).size.width * 0.4,
       child: Row(
@@ -600,31 +681,38 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.local_shipping_outlined, color: Colors.blue.shade600, size: 18),
+                      Icon(Icons.local_shipping_outlined,
+                          color: Colors.blue.shade600, size: 18),
                       const SizedBox(width: 8),
                       const Text(
                         'Tracking Information',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       status,
-                      style: TextStyle(color: Colors.blue.shade600, fontWeight: FontWeight.bold, fontSize: 12),
+                      style: TextStyle(
+                          color: Colors.blue.shade600,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12),
                     ),
                   ),
                   const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildTrackTextCell('AWB NUMBER', data['AWB']?.toString() ?? 'N/A'),
+                      _buildTrackTextCell(
+                          'AWB NUMBER', data['AWB']?.toString() ?? 'N/A'),
                       _buildTrackTextCell('CURRENT STATUS', status),
                     ],
                   ),
@@ -632,16 +720,23 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildTrackTextCell('LAST LOCATION', data['Status']?['StatusLocation'] ?? data['Origin'] ?? 'N/A'),
-                      _buildTrackTextCell('LAST UPDATE', _formatDate(data['Status']?['StatusDateTime'])),
+                      _buildTrackTextCell(
+                          'LAST LOCATION',
+                          data['Status']?['StatusLocation'] ??
+                              data['Origin'] ??
+                              'N/A'),
+                      _buildTrackTextCell('LAST UPDATE',
+                          _formatDate(data['Status']?['StatusDateTime'])),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildTrackTextCell('ORIGIN', data['Origin']?.toString() ?? 'N/A'),
-                      _buildTrackTextCell('DESTINATION', data['Destination']?.toString() ?? 'N/A'),
+                      _buildTrackTextCell(
+                          'ORIGIN', data['Origin']?.toString() ?? 'N/A'),
+                      _buildTrackTextCell('DESTINATION',
+                          data['Destination']?.toString() ?? 'N/A'),
                     ],
                   ),
                 ],
@@ -665,7 +760,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                   children: [
                     const Text(
                       'Tracking Timeline',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
                     const Text(
@@ -688,7 +784,9 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                                   width: 12,
                                   height: 12,
                                   decoration: BoxDecoration(
-                                    color: isLast ? Colors.blue.shade600 : Colors.grey.shade300,
+                                    color: isLast
+                                        ? Colors.blue.shade600
+                                        : Colors.grey.shade300,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
@@ -707,21 +805,26 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                                 children: [
                                   Text(
                                     scanDetail['Scan'] ?? 'Update',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     _formatDate(scanDetail['ScanDateTime']),
-                                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                                    style: const TextStyle(
+                                        color: Colors.grey, fontSize: 11),
                                   ),
                                   const SizedBox(height: 2),
                                   Row(
                                     children: [
-                                      const Icon(Icons.location_on_outlined, size: 12, color: Colors.grey),
+                                      const Icon(Icons.location_on_outlined,
+                                          size: 12, color: Colors.grey),
                                       const SizedBox(width: 4),
                                       Text(
                                         scanDetail['ScannedLocation'] ?? 'N/A',
-                                        style: const TextStyle(color: Colors.grey, fontSize: 11),
+                                        style: const TextStyle(
+                                            color: Colors.grey, fontSize: 11),
                                       ),
                                     ],
                                   ),
@@ -730,7 +833,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                                       padding: const EdgeInsets.only(top: 2.0),
                                       child: Text(
                                         scanDetail['Instructions'],
-                                        style: const TextStyle(color: Colors.orange, fontStyle: FontStyle.italic, fontSize: 11),
+                                        style: const TextStyle(
+                                            color: Colors.orange,
+                                            fontStyle: FontStyle.italic,
+                                            fontSize: 11),
                                       ),
                                     ),
                                   const SizedBox(height: 12),
@@ -750,13 +856,16 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     } else {
       // Simple status flow
       final orderStatusDetail = data['order_status_detail'];
-      final orderFlow = Map<String, dynamic>.from(orderStatusDetail?['order_status']?['order_flow'] as Map? ?? {});
+      final orderFlow = Map<String, dynamic>.from(
+          orderStatusDetail?['order_status']?['order_flow'] as Map? ?? {});
       final isReturn = orderStatusDetail?['return_meta']?['is_return'] == true;
 
       List<MapEntry<String, dynamic>> finalSteps = [];
       if (isReturn) {
-        final courierReturn = orderStatusDetail?['order_status']?['courier_return'];
-        final customerReturn = orderStatusDetail?['order_status']?['customer_return'];
+        final courierReturn =
+            orderStatusDetail?['order_status']?['courier_return'];
+        final customerReturn =
+            orderStatusDetail?['order_status']?['customer_return'];
         final returnMeta = orderStatusDetail?['return_meta'];
 
         finalSteps = orderFlow.entries
@@ -767,12 +876,16 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
         final isCourier = returnMeta?['return_by'] == 'courier';
         final returnSteps = isCourier
             ? [
-                MapEntry<String, dynamic>('return_requested', courierReturn?['requested']),
-                MapEntry<String, dynamic>('return_completed', courierReturn?['completed']),
+                MapEntry<String, dynamic>(
+                    'return_requested', courierReturn?['requested']),
+                MapEntry<String, dynamic>(
+                    'return_completed', courierReturn?['completed']),
               ]
             : [
-                MapEntry<String, dynamic>('return_requested', customerReturn?['requested']),
-                MapEntry<String, dynamic>('return_completed', customerReturn?['completed']),
+                MapEntry<String, dynamic>(
+                    'return_requested', customerReturn?['requested']),
+                MapEntry<String, dynamic>(
+                    'return_completed', customerReturn?['completed']),
               ];
         for (var step in returnSteps) {
           if (step.value != null) {
@@ -816,20 +929,32 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.bar_chart_outlined, color: Colors.blue.shade600, size: 18),
+                  Icon(Icons.bar_chart_outlined,
+                      color: Colors.blue.shade600, size: 18),
                   const SizedBox(width: 8),
-                  const Text('Order Status', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const Text('Order Status',
+                      style:
+                          TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 ],
               ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildTrackTextCell('PAYMENT STATUS', data['payment_status'] ?? 'N/A'),
+                  // _buildTrackTextCell('PAYMENT STATUS', data['payment_status'] ?? 'N/A'),
+                  _buildTrackTextCell(
+                      'PAYMENT STATUS',
+                      (data['payment_status'] != null &&
+                              data['payment_status'].toString().isNotEmpty)
+                          ? '${data['payment_status'].toString()[0].toUpperCase()}${data['payment_status'].toString().substring(1).toLowerCase()}'
+                          : 'N/A'),
                   _buildTrackTextCell(
                     'PAYMENT TYPE',
-                    data['payment_type'] ?? data['status']?.toString().toUpperCase() ?? 'N/A',
-                    color: _getStatusColor(data['status'] ?? _selectedOrder?['delivery_status']),
+                    data['payment_type'] ??
+                        data['status']?.toString().toUpperCase() ??
+                        'N/A',
+                    color: _getStatusColor(
+                        data['status'] ?? _selectedOrder?['delivery_status']),
                   ),
                 ],
               ),
@@ -837,8 +962,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildTrackTextCell('TRACKING CODE', data['tracking_code'] ?? 'N/A'),
-                  _buildTrackTextCell('EXPECTED DELIVERY', _getExpectedDeliveryDate(data)),
+                  _buildTrackTextCell(
+                      'TRACKING CODE', data['tracking_code'] ?? 'N/A'),
+                  _buildTrackTextCell(
+                      'EXPECTED DELIVERY', _getExpectedDeliveryDate(data)),
                 ],
               ),
               const SizedBox(height: 16),
@@ -879,7 +1006,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                             child: Image.network(
                               'https://d1f02fefkbso7w.cloudfront.net/${data['product_img']}',
                               fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => const Icon(Icons.image, color: Colors.grey, size: 20),
+                              errorBuilder: (_, __, ___) => const Icon(
+                                  Icons.image,
+                                  color: Colors.grey,
+                                  size: 20),
                             ),
                           ),
                         ),
@@ -905,14 +1035,18 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
 
               // Timeline Header Tag
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade600,
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: const Text(
                   'Order Timeline',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13),
                 ),
               ),
               const SizedBox(height: 16),
@@ -932,7 +1066,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                   if (isCancelledStep) {
                     dotColor = Colors.red;
                   } else if (isReturnStep) {
-                    dotColor = isActive ? Colors.orange : Colors.orange.shade100;
+                    dotColor =
+                        isActive ? Colors.orange : Colors.orange.shade100;
                   } else if (isActive) {
                     dotColor = Colors.green;
                   }
@@ -963,10 +1098,14 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                       Expanded(
                         child: Card(
                           elevation: 0,
-                          color: isActive ? Colors.white : const Color(0xFFF8FAFC),
+                          color:
+                              isActive ? Colors.white : const Color(0xFFF8FAFC),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
-                            side: BorderSide(color: isActive ? Colors.grey.shade200 : Colors.grey.shade100),
+                            side: BorderSide(
+                                color: isActive
+                                    ? Colors.grey.shade200
+                                    : Colors.grey.shade100),
                           ),
                           child: Padding(
                             padding: const EdgeInsets.all(12.0),
@@ -974,17 +1113,23 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  val?['title']?.toString() ?? key.toUpperCase(),
+                                  val?['title']?.toString() ??
+                                      key.toUpperCase(),
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13,
-                                    color: isCancelledStep ? Colors.red : Colors.black,
+                                    color: isCancelledStep
+                                        ? Colors.red
+                                        : Colors.black,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  val?['date'] != null ? _formatDate(val['date']) : 'Pending',
-                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                  val?['date'] != null
+                                      ? _formatDate(val['date'])
+                                      : 'Pending',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Colors.grey),
                                 ),
                               ],
                             ),
@@ -1010,12 +1155,19 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 10, color: Colors.grey.shade400, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+            style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey.shade400,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color ?? Colors.black87),
+            style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: color ?? Colors.black87),
           ),
         ],
       ),
@@ -1081,7 +1233,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                 children: [
                   Text(
                     'Help & Support',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black),
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.black),
                   ),
                   SizedBox(height: 2),
                   Text(

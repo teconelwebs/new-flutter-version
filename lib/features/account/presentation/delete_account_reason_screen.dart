@@ -389,6 +389,7 @@ class _DeleteAccountReasonScreenState extends State<DeleteAccountReasonScreen> {
           ),
           // Footer
           SafeArea(
+            maintainBottomViewPadding: true,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: const BoxDecoration(

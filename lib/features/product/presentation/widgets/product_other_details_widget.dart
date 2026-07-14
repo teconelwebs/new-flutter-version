@@ -459,12 +459,14 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) {
                                     setState(() => _logoError = true);
-                                    return const Icon(Icons.store,
-                                        color: Colors.orange);
+                                    return Image.asset(
+                                      'assets/images/shop_default_logo.png',
+                                      fit: BoxFit.cover,
+                                    );
                                   },
                                 )
-                              : Image.network(
-                                  'https://welfog.com/_nuxt/img/defaultlogo.b490002.png',
+                              : Image.asset(
+                                  'assets/images/shop_default_logo.png',
                                   fit: BoxFit.cover,
                                 ),
                         ),

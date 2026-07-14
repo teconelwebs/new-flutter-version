@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
 import '../../../core/services/push_notification_service.dart';
+import '../../../core/services/check_app_update.dart';
+import '../../../core/utils/safe_insets.dart';
 import '../../../core/widgets/app_loader.dart';
 import '../../../core/widgets/no_internet_widget.dart';
 
@@ -149,6 +151,13 @@ class _HomeScreenState extends State<HomeScreen>
         _updateStatusBarColor();
       }
     };
+
+    // Trigger app update check after a small delay
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        checkAppUpdate(context);
+      }
+    });
   }
 
   @override
@@ -196,6 +205,10 @@ class _HomeScreenState extends State<HomeScreen>
         statusBarBrightness: barIconBrightness == Brightness.light
             ? Brightness.dark
             : Brightness.light,
+        // Keep nav bar transparent so edge-to-edge insets stay correct on Android.
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
       ),
     );
   }
@@ -536,7 +549,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final bottomInset = systemBottomInset(context);
     final bottomPadding = bottomInset > 0 ? bottomInset + 8 : 20.0;
 
     return Scaffold(

@@ -29,7 +29,7 @@ class _ShopScreenState extends State<ShopScreen> {
   bool _loadingDetail = true;
   bool _loadingProducts = true;
   bool _refreshing = false;
-  double _bannerAspectRatio = 16 / 7;
+  double _bannerAspectRatio = 1024 / 273;
 
   @override
   void initState() {
@@ -53,7 +53,14 @@ class _ShopScreenState extends State<ShopScreen> {
         _loadingDetail = false;
       });
       if (detail != null && detail.bannerUrl.isNotEmpty) {
-        _loadBannerAspectRatio(detail.bannerUrl);
+        if (detail.hasNetworkBanner) {
+          _loadBannerAspectRatio(detail.bannerUrl);
+        } else {
+          // Local default banner aspect (1024x273)
+          if (mounted && _bannerAspectRatio != 1024 / 273) {
+            setState(() => _bannerAspectRatio = 1024 / 273);
+          }
+        }
       }
     }
   }
@@ -61,12 +68,17 @@ class _ShopScreenState extends State<ShopScreen> {
   void _loadBannerAspectRatio(String url) {
     final image = NetworkImage(url);
     image.resolve(const ImageConfiguration()).addListener(
-      ImageStreamListener((ImageInfo info, bool _) {
-        final ratio = info.image.width / info.image.height;
-        if (mounted && ratio > 0 && ratio != _bannerAspectRatio) {
-          setState(() => _bannerAspectRatio = ratio);
-        }
-      }),
+      ImageStreamListener(
+        (ImageInfo info, bool _) {
+          final ratio = info.image.width / info.image.height;
+          if (mounted && ratio > 0 && ratio != _bannerAspectRatio) {
+            setState(() => _bannerAspectRatio = ratio);
+          }
+        },
+        onError: (exception, stackTrace) {
+          debugPrint('Error loading banner aspect ratio: $exception');
+        },
+      ),
     );
   }
 
@@ -264,6 +276,77 @@ class _ShopScreenState extends State<ShopScreen> {
     );
   }
 
+  Widget _buildShopBannerImage(String url, double screenWidth) {
+    Widget fallback() => Image.asset(
+          ShopApiService.defaultBannerAsset,
+          width: screenWidth,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            width: screenWidth,
+            color: const Color(0xFFFFF6F2),
+            child: const Center(
+              child: Icon(Icons.storefront_outlined,
+                  size: 48, color: Color(0xFFFB5404)),
+            ),
+          ),
+        );
+
+    if (url.isEmpty || url.startsWith('assets/')) {
+      return Image.asset(
+        url.isEmpty ? ShopApiService.defaultBannerAsset : url,
+        width: screenWidth,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback(),
+      );
+    }
+
+    return Image.network(
+      url,
+      width: screenWidth,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => fallback(),
+    );
+  }
+
+  Widget _buildShopLogoImage(String url) {
+    Widget fallback() => Image.asset(
+          ShopApiService.defaultLogoAsset,
+          width: 60,
+          height: 60,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            width: 60,
+            height: 60,
+            color: const Color(0xFFFFF7ED),
+            child: const Center(
+              child: Icon(
+                Icons.store_outlined,
+                color: Color(0xFFFB5404),
+                size: 30,
+              ),
+            ),
+          ),
+        );
+
+    if (url.isEmpty || url.startsWith('assets/')) {
+      return Image.asset(
+        url.isEmpty ? ShopApiService.defaultLogoAsset : url,
+        width: 60,
+        height: 60,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback(),
+      );
+    }
+
+    return Image.network(
+      url,
+      width: 60,
+      height: 60,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => fallback(),
+    );
+  }
+
   Widget _buildShopHeader(double screenWidth) {
     final detail = _shopDetail!;
     return Column(
@@ -276,18 +359,7 @@ class _ShopScreenState extends State<ShopScreen> {
             // Banner image
             AspectRatio(
               aspectRatio: _bannerAspectRatio,
-              child: Image.network(
-                detail.bannerUrl,
-                width: screenWidth,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: screenWidth,
-                  color: const Color(0x1FFB5404),
-                  child: const Center(
-                    child: Icon(Icons.store, size: 48, color: Color(0xFFFB5404)),
-                  ),
-                ),
-              ),
+              child: _buildShopBannerImage(detail.bannerUrl, screenWidth),
             ),
             // Logo circle
             Positioned(
@@ -307,18 +379,7 @@ class _ShopScreenState extends State<ShopScreen> {
                 padding: const EdgeInsets.all(3),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(40),
-                  child: Image.network(
-                    detail.logoUrl,
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 60,
-                      height: 60,
-                      color: const Color(0xFFF3F4F6),
-                      child: const Icon(Icons.store, color: Color(0xFFFB5404)),
-                    ),
-                  ),
+                  child: _buildShopLogoImage(detail.logoUrl),
                 ),
               ),
             ),
@@ -459,17 +520,29 @@ class _ShopScreenState extends State<ShopScreen> {
                     child: ClipRRect(
                       borderRadius:
                           const BorderRadius.vertical(top: Radius.circular(10)),
-                      child: Image.network(
-                        p.imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFFF2F4F7),
-                          child: const Center(
-                            child: Icon(Icons.shopping_bag_outlined,
-                                color: Color(0xFFCCCCCC)),
-                          ),
-                        ),
-                      ),
+                      child: p.imageUrl.startsWith('assets/')
+                          ? Image.asset(
+                              p.imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: const Color(0xFFF2F4F7),
+                                child: const Center(
+                                  child: Icon(Icons.shopping_bag_outlined,
+                                      color: Color(0xFFCCCCCC)),
+                                ),
+                              ),
+                            )
+                          : Image.network(
+                              p.imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: const Color(0xFFF2F4F7),
+                                child: const Center(
+                                  child: Icon(Icons.shopping_bag_outlined,
+                                      color: Color(0xFFCCCCCC)),
+                                ),
+                              ),
+                            ),
                     ),
                   ),
                   if (discountPct > 0)

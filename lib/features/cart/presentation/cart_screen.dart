@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/constants/app_routes.dart';
 import '../../../core/state/cart_state.dart';
+import '../../../core/utils/safe_insets.dart';
 import '../../../core/widgets/app_loader.dart';
 
 class CartItem {
@@ -1335,7 +1336,7 @@ class _CartScreenState extends State<CartScreen>
                         left: 16,
                         right: 16,
                         top: 12,
-                        bottom: MediaQuery.of(context).padding.bottom + 12,
+                        bottom: systemBottomInset(context) + 12,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white,

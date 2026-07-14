@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'custom_tab_icons.dart';
 import '../../../login/presentation/widgets/login_bottom_sheet.dart';
+import '../../../../core/utils/safe_insets.dart';
 
 class TabModel {
   final String label;
@@ -105,7 +106,7 @@ class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
     // ignore: dead_code
     if (isPlayScreenActive) return const SizedBox.shrink();
 
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final bottomPadding = systemBottomInset(context);
 
     return Stack(
       children: [
