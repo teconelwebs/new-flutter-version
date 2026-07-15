@@ -157,6 +157,7 @@ class _ChatAiScreenState extends State<ChatAiScreen> {
       }
     }
 
+    // ignore: dead_null_aware_expression
     final resolved = (id ?? '').trim();
     if (resolved.isNotEmpty) {
       _resolvedUserId = resolved;
