@@ -28,6 +28,7 @@ class _LoginBottomSheetState extends State<LoginBottomSheet> {
 
   bool _otpSent = false;
   bool _loading = false;
+  bool _acceptedTerms = false;
   int _resendTimer = 0;
   Timer? _timer;
   String? _errorText;
@@ -59,6 +60,12 @@ class _LoginBottomSheetState extends State<LoginBottomSheet> {
   }
 
   Future<void> _sendOtp() async {
+    if (!_acceptedTerms) {
+      setState(() {
+        _errorText = "Please accept the Terms & Conditions to proceed.";
+      });
+      return;
+    }
     final phone = _phoneController.text.trim();
     if (phone.length != 10 || int.tryParse(phone) == null) {
       setState(() {
@@ -109,6 +116,12 @@ class _LoginBottomSheetState extends State<LoginBottomSheet> {
   }
 
   Future<void> _verifyOtp() async {
+    if (!_acceptedTerms) {
+      setState(() {
+        _errorText = "Please accept the Terms & Conditions to proceed.";
+      });
+      return;
+    }
     final phone = _phoneController.text.trim();
     final otp = _otpController.text.trim();
     if (otp.length != 6) {
@@ -426,53 +439,75 @@ class _LoginBottomSheetState extends State<LoginBottomSheet> {
 
             const SizedBox(height: 20),
             
-            // Inline Terms & Policy Links
-            Center(
-              child: Text.rich(
-                TextSpan(
-                  text: "By continuing, you agree to our ",
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280), height: 1.4),
-                  children: [
-                    TextSpan(
-                      text: "Terms & Conditions",
-                      style: const TextStyle(color: Color(0xFFFB5404), fontWeight: FontWeight.bold),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () {
-                          Navigator.of(context).pushNamed(
-                            AppRoutes.policy,
-                            arguments: 'terms-and-conditions',
-                          );
-                        },
-                    ),
-                    const TextSpan(text: ", "),
-                    TextSpan(
-                      text: "Privacy Policy",
-                      style: const TextStyle(color: Color(0xFFFB5404), fontWeight: FontWeight.bold),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () {
-                          Navigator.of(context).pushNamed(
-                            AppRoutes.policy,
-                            arguments: 'privacy-policy',
-                          );
-                        },
-                    ),
-                    const TextSpan(text: ", and "),
-                    TextSpan(
-                      text: "Anti-Phishing",
-                      style: const TextStyle(color: Color(0xFFFB5404), fontWeight: FontWeight.bold),
-                      recognizer: TapGestureRecognizer()
-                        ..onTap = () {
-                          Navigator.of(context).pushNamed(
-                            AppRoutes.policy,
-                            arguments: 'anti-phishing-defense-policy',
-                          );
-                        },
-                    ),
-                    const TextSpan(text: "."),
-                  ],
+            // Inline Terms & Policy Links with Checkbox
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
+                    value: _acceptedTerms,
+                    activeColor: const Color(0xFFFB5404),
+                    checkColor: Colors.white,
+                    materialTapTargetSize:
+                        MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    onChanged: (val) {
+                      setState(() {
+                        _acceptedTerms = val ?? false;
+                      });
+                    },
+                  ),
                 ),
-                textAlign: TextAlign.center,
-              ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      text: "I agree to the ",
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280), height: 1.4),
+                      children: [
+                        TextSpan(
+                          text: "Terms & Conditions",
+                          style: const TextStyle(color: Color(0xFFFB5404), fontWeight: FontWeight.bold),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () {
+                              Navigator.of(context).pushNamed(
+                                AppRoutes.policy,
+                                arguments: 'terms-and-conditions',
+                              );
+                            },
+                        ),
+                        const TextSpan(text: ", "),
+                        TextSpan(
+                          text: "Privacy Policy",
+                          style: const TextStyle(color: Color(0xFFFB5404), fontWeight: FontWeight.bold),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () {
+                              Navigator.of(context).pushNamed(
+                                AppRoutes.policy,
+                                arguments: 'privacy-policy',
+                              );
+                            },
+                        ),
+                        const TextSpan(text: ", and "),
+                        TextSpan(
+                          text: "Anti-Phishing",
+                          style: const TextStyle(color: Color(0xFFFB5404), fontWeight: FontWeight.bold),
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () {
+                              Navigator.of(context).pushNamed(
+                                AppRoutes.policy,
+                                arguments: 'anti-phishing-defense-policy',
+                              );
+                            },
+                        ),
+                        const TextSpan(text: "."),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
