@@ -355,12 +355,12 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
           // Brand Label
           if (brandName.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: 2),
               child: Text(
                 'Brand: $brandName',
                 style: const TextStyle(
                   color: Color(0xFF71717A),
-                  fontSize: 14,
+                  fontSize: 10,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -368,13 +368,14 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
 
           // Title
           Padding(
-            padding: EdgeInsets.only(top: brandName.isNotEmpty ? 2 : 4),
+            padding: EdgeInsets.only(top: brandName.isNotEmpty ? 1 : 2),
             child: Text(
               widget.data['name'] ?? widget.data['product']?['name'] ?? '',
               style: const TextStyle(
                 color: Color(0xFF2B2B2B),
-                fontSize: 20,
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
+                height: 1.15,
               ),
             ),
           ),
@@ -385,13 +386,13 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
               onTap: widget.onRatingTap,
               behavior: HitTestBehavior.opaque,
               child: Padding(
-                padding: const EdgeInsets.only(top: 4, bottom: 6),
+                padding: const EdgeInsets.only(top: 2, bottom: 4),
                 child: Row(
                   children: [
                     // Green capsule rating badge
                     Container(
                       padding:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
                         color: const Color(0xFF16A34A), // Emerald Green
                         borderRadius: BorderRadius.circular(16),
@@ -404,12 +405,12 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                                 : '0.0',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 13,
+                              fontSize: 11,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(width: 3),
-                          const Icon(Icons.star, color: Colors.white, size: 13),
+                          const Icon(Icons.star, color: Colors.white, size: 11),
                         ],
                       ),
                     ),
@@ -419,7 +420,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                     Text(
                       '$_totalRatings Ratings | $_apiTotalReviews Reviews',
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 11,
                         color: Color(0xFF4B5563),
                         fontWeight: FontWeight.w500,
                       ),
@@ -428,7 +429,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                     const Icon(
                       Icons.chevron_right_rounded,
                       color: Color(0xFF9CA3AF),
-                      size: 18,
+                      size: 14,
                     ),
                   ],
                 ),
@@ -437,7 +438,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
 
           // Price info
           Padding(
-            padding: const EdgeInsets.only(top: 4, bottom: 6),
+            padding: const EdgeInsets.only(top: 2, bottom: 4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -447,7 +448,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                       '₹$sellPrice',
                       style: const TextStyle(
                         color: Color(0xFF333333),
-                        fontSize: 24,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -457,7 +458,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                         '₹$mrpPrice',
                         style: const TextStyle(
                           color: Colors.grey,
-                          fontSize: 20,
+                          fontSize: 14,
                           fontWeight: FontWeight.w500,
                           decoration: TextDecoration.lineThrough,
                         ),
@@ -470,22 +471,23 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                             '$discountPercentage% ',
                             style: const TextStyle(
                               color: Colors.green,
-                              fontSize: 20,
+                              fontSize: 14,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           const Icon(Icons.arrow_downward,
-                              color: Colors.green, size: 16),
+                              color: Colors.green, size: 12),
                         ],
                       ),
                   ],
                 ),
+                const SizedBox(height: 1),
                 const Text(
                   'Inclusive of all taxes',
                   style: TextStyle(
                     color: Colors.green,
                     fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    fontSize: 11,
                   ),
                 ),
               ],

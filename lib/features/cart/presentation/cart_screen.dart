@@ -12,6 +12,7 @@ import '../../../core/constants/app_routes.dart';
 import '../../../core/state/cart_state.dart';
 import '../../../core/utils/safe_insets.dart';
 import '../../../core/widgets/app_loader.dart';
+import '../../home/presentation/home_screen.dart';
 
 class CartItem {
   final int id;
@@ -724,7 +725,7 @@ class _CartScreenState extends State<CartScreen>
         border: Border.all(color: const Color(0xFFE5E5E5)),
       ),
       padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -965,39 +966,38 @@ class _CartScreenState extends State<CartScreen>
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F6F6),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.chevron_left, color: Colors.black, size: 28),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              HomeScreen.goBackTab();
+            }
+          },
+        ),
+        title: const Text(
+          'Your Cart',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF111111),
+          ),
+        ),
+        centerTitle: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            color: const Color(0xFFEEEEEE),
+            height: 1,
+          ),
+        ),
+      ),
       body: Column(
         children: [
-          // ─── Header — Responsive Android & iOS ────────────────────────
-          Container(
-            color: Colors.white,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Status bar spacer — picks up correct height on both platforms
-                SizedBox(height: MediaQuery.of(context).padding.top),
-                Container(
-                  height: 52,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    border:
-                        Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'Your Cart',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF111111),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
           // ─── Main Content ────────────────────────────────────────────────
           Expanded(
             child: Stack(
@@ -1181,7 +1181,7 @@ class _CartScreenState extends State<CartScreen>
                       else
                         // ─── Cart Items + Saved + Summary ─────────────────
                         SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(10, 6, 10, 100),
+                          padding: const EdgeInsets.fromLTRB(10, 8, 10, 100),
                           sliver: SliverList(
                             delegate: SliverChildListDelegate([
                               // Cart items grouped by seller
@@ -1193,7 +1193,7 @@ class _CartScreenState extends State<CartScreen>
                               // Saved for Later
                               if (_savedForLater.isNotEmpty)
                                 Padding(
-                                  padding: const EdgeInsets.only(top: 24),
+                                  padding: const EdgeInsets.only(top: 0),
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
@@ -1227,7 +1227,7 @@ class _CartScreenState extends State<CartScreen>
                               // Order Summary
                               if (_cartItems.isNotEmpty)
                                 Container(
-                                  margin: const EdgeInsets.only(top: 6),
+                                  margin: EdgeInsets.zero,
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
                                     color: Colors.white,

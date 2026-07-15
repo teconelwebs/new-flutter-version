@@ -384,7 +384,7 @@ class _ConfirmAddressScreenState extends State<ConfirmAddressScreen>
             onRefresh: _onRefresh,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(bottom: 24, top: 4),
+              padding: const EdgeInsets.only(bottom: 24, top: 12),
               child: _loading
                   ? const Padding(
                       padding: EdgeInsets.only(top: 80),
@@ -455,10 +455,12 @@ class _ConfirmAddressScreenState extends State<ConfirmAddressScreen>
                             ),
                           ),
 
+                          const SizedBox(height: 12),
+
                           // ─── Delivery Address card ─────────────────────────
                           Container(
-                            margin: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
+                            margin: const EdgeInsets.only(
+                                left: 14, right: 14, bottom: 12),
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: Colors.white,
@@ -547,8 +549,8 @@ class _ConfirmAddressScreenState extends State<ConfirmAddressScreen>
 
                           // ─── Your Items list card ──────────────────────────
                           Container(
-                            margin: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
+                            margin: const EdgeInsets.only(
+                                left: 14, right: 14, bottom: 12),
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: Colors.white,
@@ -674,8 +676,8 @@ class _ConfirmAddressScreenState extends State<ConfirmAddressScreen>
 
                           // ─── Order Summary card ────────────────────────────
                           Container(
-                            margin: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
+                            margin: const EdgeInsets.only(
+                                left: 14, right: 14, bottom: 12),
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: Colors.white,

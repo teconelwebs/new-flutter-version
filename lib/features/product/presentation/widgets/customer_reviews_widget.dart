@@ -227,7 +227,7 @@ class _CustomerReviewsWidgetState extends State<CustomerReviewsWidget> {
     ];
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      margin: const EdgeInsets.only(left: 20, right: 20, bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,

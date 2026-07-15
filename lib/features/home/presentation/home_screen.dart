@@ -47,6 +47,13 @@ class HomeScreen extends StatefulWidget {
     }
   }
 
+  static void goBackTab() {
+    final state = activeState;
+    if (state is _HomeScreenState) {
+      state.goBackTab();
+    }
+  }
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -69,6 +76,15 @@ class _HomeScreenState extends State<HomeScreen>
       setState(() {
         _shareReelId = reelId;
         _currentIndex = 2; // Switch to Play/Reels tab
+      });
+      _updateStatusBarColor();
+    }
+  }
+
+  void goBackTab() {
+    if (mounted) {
+      setState(() {
+        _currentIndex = _previousIndex;
       });
       _updateStatusBarColor();
     }

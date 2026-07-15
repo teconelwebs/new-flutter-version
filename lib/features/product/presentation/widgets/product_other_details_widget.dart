@@ -429,7 +429,7 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
           // Sold By shop banner card
           if (shop != null)
             Container(
-              margin: const EdgeInsets.only(top: 4, bottom: 8),
+              margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(4),
@@ -509,7 +509,7 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
 
           // Benefits checkmarks
           Container(
-            margin: const EdgeInsets.symmetric(vertical: 5),
+            margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -554,7 +554,7 @@ class _ProductOtherDetailsWidgetState extends State<ProductOtherDetailsWidget> {
 
           // "All details" Accordion Dropdown
           Container(
-            margin: const EdgeInsets.only(top: 4, bottom: 4),
+            margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,

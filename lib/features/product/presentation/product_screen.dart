@@ -494,14 +494,14 @@ class _ProductScreenState extends State<ProductScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 12),
                     ProductDetailsWidget(
                       data: detail.rawJson,
                       pincode: _pincode,
                       onRatingTap: _scrollToReviews,
                       onVariantSelected: _selectVariant,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 12),
                     BuyProductWidget(
                       data: detail.rawJson,
                       quantity: _qty,
@@ -511,11 +511,11 @@ class _ProductScreenState extends State<ProductScreen> {
                         });
                       },
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 12),
                     ProductOtherDetailsWidget(
                       data: detail.rawJson,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 12),
                     CustomerReviewsWidget(
                       key: _reviewsKey,
                       data: detail.rawJson,

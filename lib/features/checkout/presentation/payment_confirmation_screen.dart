@@ -693,12 +693,11 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
           : Stack(
               children: [
                 ListView(
-                  padding: EdgeInsets.only(bottom: bottomOffset, top: 4),
+                  padding: EdgeInsets.only(bottom: bottomOffset, top: 12),
                   children: [
                     // Step layout bar
                     Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 16, vertical: isSmallScreen ? 4 : 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
                         children: [
                           Row(
@@ -755,11 +754,14 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
                       ),
                     ),
 
+                    const SizedBox(height: 12),
+
                     // Order summary panel
                     Container(
-                      margin: EdgeInsets.symmetric(
-                          horizontal: isSmallScreen ? 10 : 14,
-                          vertical: isSmallScreen ? 5 : 8),
+                      margin: EdgeInsets.only(
+                          left: isSmallScreen ? 10 : 14,
+                          right: isSmallScreen ? 10 : 14,
+                          bottom: isSmallScreen ? 8 : 12),
                       padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
                       decoration: BoxDecoration(
                           color: Colors.white,
@@ -874,9 +876,10 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
 
                     // Apply Coupon Container
                     Container(
-                      margin: EdgeInsets.symmetric(
-                          horizontal: isSmallScreen ? 10 : 14,
-                          vertical: isSmallScreen ? 5 : 8),
+                      margin: EdgeInsets.only(
+                          left: isSmallScreen ? 10 : 14,
+                          right: isSmallScreen ? 10 : 14,
+                          bottom: isSmallScreen ? 8 : 12),
                       padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
                       decoration: BoxDecoration(
                           color: Colors.white,
@@ -999,9 +1002,10 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
 
                     // Payment selection list
                     Container(
-                      margin: EdgeInsets.symmetric(
-                          horizontal: isSmallScreen ? 10 : 14,
-                          vertical: isSmallScreen ? 5 : 8),
+                      margin: EdgeInsets.only(
+                          left: isSmallScreen ? 10 : 14,
+                          right: isSmallScreen ? 10 : 14,
+                          bottom: isSmallScreen ? 8 : 12),
                       padding: EdgeInsets.all(isSmallScreen ? 10 : 16),
                       decoration: BoxDecoration(
                           color: Colors.white,
@@ -1120,9 +1124,10 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
 
                     // Pricing summary panel
                     Container(
-                      margin: EdgeInsets.symmetric(
-                          horizontal: isSmallScreen ? 10 : 14,
-                          vertical: isSmallScreen ? 5 : 8),
+                      margin: EdgeInsets.only(
+                          left: isSmallScreen ? 10 : 14,
+                          right: isSmallScreen ? 10 : 14,
+                          bottom: isSmallScreen ? 8 : 12),
                       padding: EdgeInsets.all(isSmallScreen ? 10 : 16),
                       decoration: BoxDecoration(
                         color: Colors.white,
