@@ -22,7 +22,8 @@ class OtherProfileScreen extends StatefulWidget {
   State<OtherProfileScreen> createState() => _OtherProfileScreenState();
 }
 
-class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware {
+class _OtherProfileScreenState extends State<OtherProfileScreen>
+    with RouteAware {
   UserProfile? _profile;
   List<ProfilePost> _posts = [];
   bool _loading = true;
@@ -88,7 +89,7 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware
     if (!refresh) setState(() => _loading = true);
     final api = PlaySession.apiOf(context);
     try {
-      if (refresh) PlaySessionRegistry.resetBlockedListCache();
+      PlaySessionRegistry.resetBlockedListCache();
       await PlaySessionRegistry.ensureBlockedListLoaded(api);
       final profile = await api.fetchUserProfile(widget.userId);
       final blocked = PlaySessionRegistry.isProfileBlocked(
@@ -215,14 +216,27 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware
   Future<void> _runBlockAction(String action) async {
     final profile = _profile;
     if (profile == null || _actionLoading) return;
+    final scope = PlaySessionRegistry.scope;
+    await scope?.refreshViewerFromSession();
+    if (!mounted) return;
     final api = PlaySession.apiOf(context);
     setState(() => _actionLoading = true);
     try {
-      final ok = action == 'block'
-          ? await api.blockUser(profile.id)
-          : await api.unblockUser(profile.id);
+      final targetId = profile.id.trim().isNotEmpty
+          ? profile.id
+          : (profile.userid ?? widget.userId);
+      final result = action == 'block'
+          ? await api.blockUser(targetId)
+          : await api.unblockUser(targetId);
       if (!mounted) return;
-      if (ok) {
+      final alreadyUnblocked = action == 'unblock' &&
+          !result.ok &&
+          result.message.toLowerCase().contains('not currently block');
+      if (result.ok || alreadyUnblocked) {
+        if (scope != null && result.message.isNotEmpty && result.ok) {
+          // Keep session viewer id in sync after successful block/unblock.
+          await scope.refreshViewerFromSession();
+        }
         if (action == 'block') {
           PlaySessionRegistry.markProfileBlocked(
             id: profile.id,
@@ -246,17 +260,24 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware
             id: profile.id,
             userid: profile.userid,
           );
+          PlaySessionRegistry.resetBlockedListCache();
+          await PlaySessionRegistry.ensureBlockedListLoaded(api);
+          if (!mounted) return;
           setState(() {
             _isBlocked = false;
             _posts = [];
             _postsSkip = 0;
             _hasMore = true;
           });
-          _showToast('User unblocked');
+          _showToast(alreadyUnblocked ? 'User is already unblocked' : 'User unblocked');
           await _fetchPosts(reset: true);
         }
       } else {
-        _showToast('Action failed. Please try again.');
+        _showToast(
+          result.message.isNotEmpty
+              ? result.message
+              : 'Action failed. Please try again.',
+        );
       }
     } catch (_) {
       _showToast('Something went wrong');
@@ -275,16 +296,19 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware
       if (!ReelsApi.isPlayProfileMongoId(shareId)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('This profile cannot be shared right now.')),
+            const SnackBar(
+                content: Text('This profile cannot be shared right now.')),
           );
         }
         return;
       }
-      final msg = await PlaySession.apiOf(context).getProfileShareMessage(shareId);
+      final msg =
+          await PlaySession.apiOf(context).getProfileShareMessage(shareId);
       if (msg.isEmpty || !msg.contains('api/plays/p/')) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not generate profile share link.')),
+            const SnackBar(
+                content: Text('Could not generate profile share link.')),
           );
         }
         return;
@@ -371,7 +395,8 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(_isBlocked ? Icons.lock_open : Icons.block, color: _isBlocked ? Colors.green : Colors.red),
+              leading: Icon(_isBlocked ? Icons.lock_open : Icons.block,
+                  color: _isBlocked ? Colors.green : Colors.red),
               title: Text(
                 _isBlocked ? 'Unblock' : 'Block',
                 style: TextStyle(
@@ -404,76 +429,89 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware
         if (!didPop) _handleBack();
       },
       child: Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('Profile'),
-        leading: IconButton(
-          icon: const Icon(Icons.chevron_left),
-          onPressed: _handleBack,
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: const Text('Profile'),
+          leading: IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: _handleBack,
+          ),
+          actions: [
+            if (!isSelf && _profile != null)
+              IconButton(
+                  icon: const Icon(Icons.more_vert),
+                  onPressed: _showBlockSheet),
+          ],
         ),
-        actions: [
-          if (!isSelf && _profile != null)
-            IconButton(icon: const Icon(Icons.more_vert), onPressed: _showBlockSheet),
-        ],
-      ),
-      body: Stack(
-        children: [
-          _loading
-              ? const ProfileScreenSkeleton()
-              : _error != null
-                  ? _errorView()
-                  : NotificationListener<ScrollNotification>(
-                      onNotification: (notification) {
-                        if (notification is ScrollEndNotification &&
-                            notification.metrics.extentAfter < 300 &&
-                            _hasMore &&
-                            !_loadingMore) {
-                          setState(() => _loadingMore = true);
-                          _fetchPosts();
-                        }
-                        return false;
-                      },
-                      child: RefreshIndicator(
-                        color: const Color(0xFFfb5404),
-                        onRefresh: () => _load(refresh: true),
-                        child: CustomScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          slivers: [
-                            if (_profile != null)
-                              SliverToBoxAdapter(child: _buildHeader(_profile!, isSelf)),
-                            const SliverToBoxAdapter(
-                              child: Divider(height: 1, color: Color(0xFFEEEEEE)),
-                            ),
-                            if (_isBlocked)
+        body: Stack(
+          children: [
+            _loading
+                ? const ProfileScreenSkeleton()
+                : _error != null
+                    ? _errorView()
+                    : NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          if (notification is ScrollEndNotification &&
+                              notification.metrics.extentAfter < 300 &&
+                              _hasMore &&
+                              !_loadingMore) {
+                            setState(() => _loadingMore = true);
+                            _fetchPosts();
+                          }
+                          return false;
+                        },
+                        child: RefreshIndicator(
+                          color: const Color(0xFFfb5404),
+                          onRefresh: () => _load(refresh: true),
+                          child: CustomScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            slivers: [
+                              if (_profile != null)
+                                SliverToBoxAdapter(
+                                    child: _buildHeader(_profile!, isSelf)),
                               const SliverToBoxAdapter(
-                                child: Padding(
-                                  padding: EdgeInsets.all(32),
-                                  child: Column(
-                                    children: [
-                                      Icon(Icons.block, size: 48, color: Color(0xFF9CA3AF)),
-                                      SizedBox(height: 12),
-                                      Text('You blocked this user', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: _textPrimary)),
-                                      SizedBox(height: 6),
-                                      Text('Unblock to see their posts again', style: TextStyle(color: _textMuted)),
-                                    ],
-                                  ),
-                                ),
-                              )
-                            else
-                              ProfilePostsSliverGrid(
-                                posts: _posts,
-                                loadingMore: _loadingMore,
-                                loadingInitial: _loadingPosts && _posts.isEmpty,
-                                onPostTap: _openPost,
+                                child: Divider(
+                                    height: 1, color: Color(0xFFEEEEEE)),
                               ),
-                            const SliverToBoxAdapter(child: SizedBox(height: 24)),
-                          ],
+                              if (_isBlocked)
+                                const SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(32),
+                                    child: Column(
+                                      children: [
+                                        Icon(Icons.block,
+                                            size: 48, color: Color(0xFF9CA3AF)),
+                                        SizedBox(height: 12),
+                                        Text('You blocked this user',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 16,
+                                                color: _textPrimary)),
+                                        SizedBox(height: 6),
+                                        Text('Unblock to see their posts again',
+                                            style:
+                                                TextStyle(color: _textMuted)),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              else
+                                ProfilePostsSliverGrid(
+                                  posts: _posts,
+                                  loadingMore: _loadingMore,
+                                  loadingInitial:
+                                      _loadingPosts && _posts.isEmpty,
+                                  onPostTap: _openPost,
+                                ),
+                              const SliverToBoxAdapter(
+                                  child: SizedBox(height: 24)),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-          if (_toast != null) _toastWidget(),
-        ],
-      ),
+            if (_toast != null) _toastWidget(),
+          ],
+        ),
       ),
     );
   }
@@ -485,14 +523,21 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware
         children: [
           const Icon(Icons.error_outline, color: Colors.red, size: 48),
           const SizedBox(height: 12),
-          const Text('Profile Not Available', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _textPrimary)),
+          const Text('Profile Not Available',
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: _textPrimary)),
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: _textSecondary)),
+            child: Text(_error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: _textSecondary)),
           ),
           FilledButton(
             onPressed: () => Navigator.maybePop(context),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFfb5404)),
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFfb5404)),
             child: const Text('Go Back'),
           ),
         ],
@@ -537,7 +582,8 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware
             children: [
               ProfileAvatar(
                 imageUrl: profile.profilePicture,
-                onTap: profile.profilePicture != null && profile.profilePicture!.isNotEmpty
+                onTap: profile.profilePicture != null &&
+                        profile.profilePicture!.isNotEmpty
                     ? () => _showImage(profile.profilePicture!)
                     : null,
               ),
@@ -583,7 +629,10 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware
             const SizedBox(height: 12),
             Text(
               '@${profile.username}',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: _textPrimary),
+              style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: _textPrimary),
             ),
           ],
           if (!isSelf) ...[
@@ -592,15 +641,18 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: _actionLoading ? null : () => _runBlockAction('unblock'),
+                  onPressed:
+                      _actionLoading ? null : () => _runBlockAction('unblock'),
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFFEF4444),
                     padding: const EdgeInsets.symmetric(vertical: 11),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
                   child: Text(
                     _actionLoading ? '...' : 'Unblock',
-                    style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, color: Colors.white),
                   ),
                 ),
               )
@@ -611,14 +663,20 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware
                     child: FilledButton(
                       onPressed: _actionLoading ? null : _toggleFollow,
                       style: FilledButton.styleFrom(
-                        backgroundColor: _isFollowing ? const Color(0xFFE8E8E8) : const Color(0xFFfb5404),
-                        foregroundColor: _isFollowing ? _textPrimary : Colors.white,
+                        backgroundColor: _isFollowing
+                            ? const Color(0xFFE8E8E8)
+                            : const Color(0xFFfb5404),
+                        foregroundColor:
+                            _isFollowing ? _textPrimary : Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 11),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                         elevation: 0,
                       ),
                       child: Text(
-                        _actionLoading ? '...' : (_isFollowing ? 'Following' : 'Follow'),
+                        _actionLoading
+                            ? '...'
+                            : (_isFollowing ? 'Following' : 'Follow'),
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
@@ -633,7 +691,8 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware
                       child: const SizedBox(
                         width: 46,
                         height: 46,
-                        child: Icon(Icons.share_outlined, color: Color(0xFFfb5404)),
+                        child: Icon(Icons.share_outlined,
+                            color: Color(0xFFfb5404)),
                       ),
                     ),
                   ),
@@ -649,7 +708,8 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware
                   profile.bio!,
                   maxLines: _showFullBio ? null : 3,
                   overflow: _showFullBio ? null : TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14, height: 1.45, color: _textSecondary),
+                  style: const TextStyle(
+                      fontSize: 14, height: 1.45, color: _textSecondary),
                 ),
                 if (profile.bio!.length > 100)
                   GestureDetector(
@@ -658,14 +718,18 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> with RouteAware
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         _showFullBio ? 'Read less' : 'Read more',
-                        style: const TextStyle(color: Color(0xFFfb5204), fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                            color: Color(0xFFfb5204),
+                            fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
               ],
             )
           else if (!_isBlocked)
-            const Text('No bio available.', style: TextStyle(color: _textMuted, fontStyle: FontStyle.italic)),
+            const Text('No bio available.',
+                style:
+                    TextStyle(color: _textMuted, fontStyle: FontStyle.italic)),
         ],
       ),
     );

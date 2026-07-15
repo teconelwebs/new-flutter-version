@@ -5,6 +5,7 @@ export 'models/play_launch_context.dart';
 export 'utils/app_routes.dart';
 export 'utils/flutter_nav.dart';
 export 'utils/play_profile_helper.dart';
+export 'services/play_profile_service.dart';
 export 'screens/reels_screen.dart';
 export 'utils/play_session.dart';
 export 'services/device_id_store.dart';
@@ -55,7 +56,8 @@ class _EmbeddedReelsWrapperState extends State<EmbeddedReelsWrapper> {
 
   Future<void> _resolveViewer() async {
     setState(() => _loading = true);
-    final id = await PlayProfileHelper.resolveReelsViewerId();
+    final id = await PlayProfileHelper.ensurePlayProfileMongoId() ??
+        await PlayProfileHelper.resolveReelsViewerId();
     final data = await PlayProfileHelper.getPlayProfileUserData();
     final hasProfile = await PlayProfileHelper.hasPlayProfile();
     if (mounted) {

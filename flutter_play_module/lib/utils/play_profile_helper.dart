@@ -35,12 +35,14 @@ class PlayProfileHelper {
 
   static Future<String?> getStoredPlayUserId() async {
     final prefs = await SharedPreferences.getInstance();
-    final cached = prefs.getString('cached_user_id');
-    if (isValidObjectId(cached)) return cached;
-
-    final loginid = prefs.getString('loginid');
-    if (isValidObjectId(loginid)) return loginid;
-
+    for (final key in [
+      'cached_user_id',
+      'loginid',
+      'play_profile_id',
+    ]) {
+      final value = prefs.getString(key);
+      if (isValidObjectId(value)) return value;
+    }
     return null;
   }
 
@@ -58,16 +60,30 @@ class PlayProfileHelper {
     return body is Map<String, dynamic> ? body : null;
   }
 
+  static Future<String?> _mobileFromSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final fromPrefs = (prefs.getString('mobile') ?? '').trim();
+    if (fromPrefs.isNotEmpty) return fromPrefs;
+
+    final mainUserId = prefs.getString('user_id') ?? '';
+    final accessToken = prefs.getString('access_token') ?? '';
+    if (mainUserId.isEmpty || accessToken.isEmpty) return null;
+
+    final data = await _getSessionUserData(accessToken, mainUserId);
+    final phone = (data?['phone'] ?? data?['mobile'] ?? '').toString().trim();
+    return phone.isEmpty ? null : phone;
+  }
+
   static Future<PlayProfileUserData?> getPlayProfileUserData() async {
     final prefs = await SharedPreferences.getInstance();
     final mainUserId = prefs.getString('user_id') ?? '';
     final accessToken = prefs.getString('access_token') ?? '';
     if (mainUserId.isEmpty || accessToken.isEmpty) return null;
 
-    final data = await _getSessionUserData(accessToken, mainUserId);
-    final mobile = (data?['phone'] ?? '').toString().trim();
-    if (mobile.isEmpty) return null;
+    final mobile = await _mobileFromSession();
+    if (mobile == null || mobile.isEmpty) return null;
 
+    final data = await _getSessionUserData(accessToken, mainUserId);
     final name =
         (data?['name'] ?? prefs.getString('user_name') ?? '').toString().trim();
 
@@ -75,44 +91,119 @@ class PlayProfileHelper {
         mainUserId: mainUserId, mobile: mobile, name: name);
   }
 
+  /// Looks up Play Mongo `_id` by mobile (ignores stale guest cache).
+  static Future<String?> resolvePlayUserIdByMobile() async {
+    final mobile = await _mobileFromSession();
+    if (mobile == null || mobile.isEmpty) return null;
+
+    try {
+      final headers = await _playHeaders();
+      final candidates = <String>{
+        mobile,
+        if (mobile.startsWith('+')) mobile.substring(1),
+        if (mobile.startsWith('91') && mobile.length > 10) mobile.substring(2),
+        if (!mobile.startsWith('+') && !mobile.startsWith('91')) '91$mobile',
+      };
+
+      for (final m in candidates) {
+        final mobileRes = await http.get(
+          Uri.parse('$_playApi/users/bymobile/$m'),
+          headers: headers,
+        );
+        if (mobileRes.statusCode < 200 || mobileRes.statusCode >= 300) {
+          continue;
+        }
+        final body = jsonDecode(mobileRes.body);
+        if (body is! Map) continue;
+        final finalUserId = (body['_id'] ?? '').toString();
+        if (!isValidObjectId(finalUserId)) continue;
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cached_user_id', finalUserId);
+        await prefs.setString('loginid', finalUserId);
+        await prefs.setString('play_profile_id', finalUserId);
+        await prefs.setString(
+          'fourth_userid',
+          (body['userid'] ?? finalUserId).toString(),
+        );
+        return finalUserId;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   static Future<String?> resolvePlayUserIdFromSession() async {
     final stored = await getStoredPlayUserId();
     if (stored != null) return stored;
+    return resolvePlayUserIdByMobile();
+  }
 
-    final prefs = await SharedPreferences.getInstance();
-    final accessToken = prefs.getString('access_token') ?? '';
-    final mainUserId = prefs.getString('user_id') ?? '';
-    if (accessToken.isEmpty || mainUserId.isEmpty) return null;
-
+  /// Confirms a mongo id is a real Play user (not a guest hash).
+  ///
+  /// Note: GET `/users/:id` often expects numeric `userid`, so we also try
+  /// `/users/userpost/:mongoId` which accepts the profile `_id`.
+  static Future<bool> _isRealPlayProfile(String id) async {
+    if (!isValidObjectId(id)) return false;
     try {
-      final userData = await _getSessionUserData(accessToken, mainUserId);
-      final mobile = (userData?['phone'] ?? '').toString().trim();
-      if (mobile.isEmpty) return null;
-
       final headers = await _playHeaders();
-      final mobileRes = await http.get(
-        Uri.parse('$_playApi/users/bymobile/$mobile'),
+
+      final userpost = await http.get(
+        Uri.parse('$_playApi/users/userpost/$id'),
         headers: headers,
       );
-      if (mobileRes.statusCode == 404) {
-        return null;
-      }
-      if (mobileRes.statusCode == 429 ||
-          mobileRes.statusCode < 200 ||
-          mobileRes.statusCode >= 300) {
-        return null;
+      if (userpost.statusCode >= 200 && userpost.statusCode < 300) {
+        final body = jsonDecode(userpost.body);
+        if (body is Map && body['user'] is Map) return true;
       }
 
-      final body = jsonDecode(mobileRes.body);
-      if (body is! Map<String, dynamic>) return null;
-      final finalUserId = (body['_id'] ?? '').toString();
-      if (!isValidObjectId(finalUserId)) return null;
+      final direct = await http.get(
+        Uri.parse('$_playApi/users/$id'),
+        headers: headers,
+      );
+      if (direct.statusCode >= 200 && direct.statusCode < 300) {
+        final body = jsonDecode(direct.body);
+        if (body is Map && (body['_id'] != null || body['userid'] != null)) {
+          return true;
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
 
-      await prefs.setString('cached_user_id', finalUserId);
-      return finalUserId;
-    } catch (_) {
-      return null;
+  /// Returns a verified Play Mongo `_id` for api.welfog.com actions (block, etc.).
+  static Future<String?> ensurePlayProfileMongoId({String? preferredId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final candidates = <String>[];
+
+    void addCandidate(String? raw) {
+      final id = raw?.trim() ?? '';
+      if (!isValidObjectId(id)) return;
+      if (!candidates.contains(id)) candidates.add(id);
     }
+
+    addCandidate(preferredId);
+    addCandidate(await getStoredPlayUserId());
+    addCandidate(prefs.getString('play_profile_id'));
+    addCandidate(prefs.getString('loginid'));
+    addCandidate(prefs.getString('cached_user_id'));
+
+    for (final id in candidates) {
+      if (await _isRealPlayProfile(id)) {
+        await prefs.setString('cached_user_id', id);
+        await prefs.setString('loginid', id);
+        await prefs.setString('play_profile_id', id);
+        return id;
+      }
+    }
+
+    // Cached guest ObjectIds look valid but aren't in DB — resolve by mobile.
+    final fromMobile = await resolvePlayUserIdByMobile();
+    if (fromMobile != null && await _isRealPlayProfile(fromMobile)) {
+      return fromMobile;
+    }
+    if (fromMobile != null) return fromMobile;
+
+    return null;
   }
 
   static Future<String> getOrCreateGuestViewerId() async {
@@ -150,16 +241,29 @@ class PlayProfileHelper {
     final isGuest = prefs.getString('is_guest') == 'true';
     if (isGuest) return true;
 
-    final loginid = prefs.getString('loginid');
-    if (loginid != null && loginid.isNotEmpty && loginid != mainUserId) {
+    final loginid = prefs.getString('loginid') ??
+        prefs.getString('play_profile_id') ??
+        prefs.getString('cached_user_id');
+    if (loginid != null &&
+        loginid.isNotEmpty &&
+        loginid != mainUserId &&
+        isValidObjectId(loginid)) {
       try {
         final headers = await _playHeaders();
         final res = await http.get(
-          Uri.parse('$_playApi/users/$loginid'),
+          Uri.parse('$_playApi/users/userpost/$loginid'),
           headers: headers,
         );
         if (res.statusCode >= 200 && res.statusCode < 300) {
           final body = jsonDecode(res.body);
+          if (body is Map && body['user'] is Map) return true;
+        }
+        final direct = await http.get(
+          Uri.parse('$_playApi/users/$loginid'),
+          headers: headers,
+        );
+        if (direct.statusCode >= 200 && direct.statusCode < 300) {
+          final body = jsonDecode(direct.body);
           if (body is Map && body['_id'] != null) return true;
         }
       } catch (_) {}

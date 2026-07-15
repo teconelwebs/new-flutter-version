@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart' as p;
@@ -14,12 +15,20 @@ import '../models/reel.dart';
 import '../models/search_result.dart';
 import '../models/user_profile.dart';
 import '../utils/share_links.dart';
+import '../utils/play_profile_helper.dart';
 import 'device_id_store.dart';
 
 const _baseUrl = 'https://api.welfog.com/api';
 // const _baseUrl = 'https://unnecessitous-domitila-unbudging.ngrok-free.dev/api';
 const _secondBaseUrl = 'https://welfogapi.welfog.com/api';
 const _prefetchLimit = 50;
+
+class UserBlockResult {
+  final bool ok;
+  final String message;
+
+  const UserBlockResult({required this.ok, this.message = ''});
+}
 
 class UploadReelResult {
   final String message;
@@ -722,28 +731,124 @@ class ReelsApi {
     }
   }
 
-  Future<bool> blockUser(String targetUserId) async {
+  Future<UserBlockResult> blockUser(String targetUserId) async {
+    final blockerId =
+        await PlayProfileHelper.ensurePlayProfileMongoId(preferredId: viewerId);
+    debugPrint(
+      'blockUser: viewerId=$viewerId blockerId=$blockerId target=$targetUserId',
+    );
+    if (blockerId == null || blockerId.isEmpty) {
+      return const UserBlockResult(
+        ok: false,
+        message:
+            'Play profile not found. Please open Play tab once, then try again.',
+      );
+    }
+
+    final targetId = await _resolveBlockTargetUserId(targetUserId);
+    debugPrint('blockUser: resolved targetId=$targetId');
+    if (targetId.isEmpty) {
+      return const UserBlockResult(
+        ok: false,
+        message: 'Could not resolve user to block.',
+      );
+    }
+
     final response = await http.post(
       Uri.parse('$_baseUrl/userblocks/block-user'),
       headers: _jsonHeaders,
-      body: jsonEncode({'blockerId': viewerId, 'targetUserId': targetUserId}),
+      body: jsonEncode({'blockerId': blockerId, 'targetUserId': targetId}),
     );
-    final body = response.body.isNotEmpty ? jsonDecode(response.body) : {};
-    return response.statusCode >= 200 &&
-        response.statusCode < 300 &&
-        (body is! Map || body['success'] != false);
+    debugPrint(
+      'blockUser: status=${response.statusCode} body=${response.body}',
+    );
+    return _parseBlockResponse(response);
   }
 
-  Future<bool> unblockUser(String targetUserId) async {
+  Future<UserBlockResult> unblockUser(String targetUserId) async {
+    final unblockerId =
+        await PlayProfileHelper.ensurePlayProfileMongoId(preferredId: viewerId);
+    if (unblockerId == null || unblockerId.isEmpty) {
+      return const UserBlockResult(
+        ok: false,
+        message:
+            'Play profile not found. Please complete your Play profile setup first.',
+      );
+    }
+
+    final targetId = await _resolveBlockTargetUserId(targetUserId);
+    if (targetId.isEmpty) {
+      return const UserBlockResult(
+        ok: false,
+        message: 'Could not resolve user to unblock.',
+      );
+    }
+
     final response = await http.post(
       Uri.parse('$_baseUrl/userblocks/unblock-user'),
       headers: _jsonHeaders,
-      body: jsonEncode({'unblockerId': viewerId, 'targetUserId': targetUserId}),
+      body: jsonEncode({
+        'unblockerId': unblockerId,
+        'targetUserId': targetId,
+      }),
     );
-    final body = response.body.isNotEmpty ? jsonDecode(response.body) : {};
-    return response.statusCode >= 200 &&
+    return _parseBlockResponse(response);
+  }
+
+  Future<String> _resolveBlockTargetUserId(String userId) async {
+    final trimmed = userId.trim();
+    if (trimmed.isEmpty) return '';
+
+    if (isPlayProfileMongoId(trimmed)) {
+      try {
+        final res = await http.get(
+          Uri.parse('$_baseUrl/users/$trimmed'),
+          headers: _headers,
+        );
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          final body = jsonDecode(res.body);
+          if (body is Map) {
+            final id = body['_id']?.toString();
+            if (id != null && id.isNotEmpty) return id;
+          }
+          return trimmed;
+        }
+      } catch (_) {}
+    }
+
+    final resolved = await resolveFollowListUserId(trimmed);
+    if (isPlayProfileMongoId(resolved)) return resolved;
+    return trimmed;
+  }
+
+  UserBlockResult _parseBlockResponse(http.Response response) {
+    Map<String, dynamic>? body;
+    if (response.body.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) body = decoded;
+        if (decoded is Map) body = Map<String, dynamic>.from(decoded);
+      } catch (_) {}
+    }
+
+    final message = body?['message']?.toString() ?? '';
+    final ok = response.statusCode >= 200 &&
         response.statusCode < 300 &&
-        (body is! Map || body['success'] != false);
+        body?['success'] != false;
+
+    if (ok) {
+      return UserBlockResult(
+        ok: true,
+        message: message.isNotEmpty ? message : 'Success',
+      );
+    }
+
+    return UserBlockResult(
+      ok: false,
+      message: message.isNotEmpty
+          ? message
+          : 'Action failed (${response.statusCode})',
+    );
   }
 
   /// GET /userblocks/blocked-users/{viewerId} — all ids the viewer has blocked.
@@ -766,9 +871,20 @@ class ReelsApi {
       if (item is! Map) continue;
       final map =
           item is Map<String, dynamic> ? item : Map<String, dynamic>.from(item);
-      for (final key in ['_id', 'id', 'userid', 'userId']) {
-        final value = map[key]?.toString().trim();
-        if (value != null && value.isNotEmpty) ids.add(value);
+      final sources = <Map<String, dynamic>>[map];
+      final nested = map['user'];
+      if (nested is Map) {
+        sources.add(
+          nested is Map<String, dynamic>
+              ? nested
+              : Map<String, dynamic>.from(nested),
+        );
+      }
+      for (final src in sources) {
+        for (final key in ['_id', 'id', 'userid', 'userId']) {
+          final value = src[key]?.toString().trim();
+          if (value != null && value.isNotEmpty) ids.add(value);
+        }
       }
     }
     return ids;

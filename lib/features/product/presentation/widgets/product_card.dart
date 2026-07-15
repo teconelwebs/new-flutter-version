@@ -67,6 +67,7 @@ class _ProductCardState extends State<ProductCard> {
                               loop: true,
                               initialMuted: true,
                               isActive: isActive,
+                              showControls: false,
                             );
                           },
                         )

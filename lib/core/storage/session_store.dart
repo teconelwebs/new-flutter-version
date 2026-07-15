@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
 
@@ -47,35 +45,33 @@ class SessionStore {
     if (mobile.isNotEmpty) {
       await prefs.setString(_kMobile, mobile);
 
-      // Auto-create or fetch Play Profile from MongoDB during login
+      // Create or fetch Play profile on api.welfog.com (same as RN flow).
       try {
-        final uri = Uri.parse('https://api.welfog.com/api/users/');
-        final res = await http.post(
-          uri,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'userid': userId,
-            'username': userId,
-            'mobile': mobile,
-          }),
+        final deviceId = await play.DeviceIdStore.getOrCreate();
+        final service = play.PlayProfileService(deviceId: deviceId);
+        final playUserId = await service.createPlayProfile(
+          mainUserId: userId,
+          mobile: mobile,
+          username: userId,
+          name: userName,
         );
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          final data = jsonDecode(res.body);
-          if (data is Map<String, dynamic> && data['_id'] != null) {
-            final id = data['_id'].toString();
-            final uname = (data['username'] ?? '').toString();
-            final name = (data['name'] ?? uname).toString();
-
-            await prefs.setString('loginid', id);
-            await prefs.setString('cached_user_id', id);
-            await prefs.setString('play_profile_id', id);
-            await prefs.setString('play_profile_user_name', uname);
-            await prefs.setString('play_profile_name', name);
-            await prefs.setString(
-                'fourth_userid', (data['userid'] ?? id).toString());
+        await play.PlayProfileHelper.cachePlayProfileCreated(
+          playUserId: playUserId,
+          username: userName,
+        );
+      } catch (_) {
+        // Fallback: resolve existing profile by mobile after prefs are saved.
+        try {
+          final resolved =
+              await play.PlayProfileHelper.resolvePlayUserIdFromSession();
+          if (resolved != null && resolved.isNotEmpty) {
+            await play.PlayProfileHelper.cachePlayProfileCreated(
+              playUserId: resolved,
+              username: userName,
+            );
           }
-        }
-      } catch (_) {}
+        } catch (_) {}
+      }
     }
   }
 

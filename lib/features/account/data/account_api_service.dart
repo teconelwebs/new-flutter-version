@@ -1,12 +1,35 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
 
 class AccountApiService {
   static const String _mainApi = 'https://welfogapi.welfog.com/api/v2';
   static const String _secondApi = 'https://welfogapi.welfog.com/api';
   static const String _fourthApi = 'https://api.welfog.com/api';
+
+  Future<Map<String, String>> _playHeaders({bool json = false}) async {
+    final deviceId = await play.DeviceIdStore.getOrCreate();
+    return {
+      'Accept': 'application/json',
+      if (json) 'Content-Type': 'application/json',
+      if (deviceId.isNotEmpty) 'x-android-id': deviceId,
+    };
+  }
+
+  Future<String?> _resolvePlayUserId() async {
+    final id = await play.PlayProfileHelper.ensurePlayProfileMongoId();
+    if (id != null && id.isNotEmpty) return id;
+
+    final prefs = await SharedPreferences.getInstance();
+    for (final key in ['cached_user_id', 'loginid', 'play_profile_id']) {
+      final value = prefs.getString(key)?.trim() ?? '';
+      if (value.isNotEmpty) return value;
+    }
+    return null;
+  }
 
   Future<AccountUser?> fetchUser() async {
     final prefs = await SharedPreferences.getInstance();
@@ -34,41 +57,47 @@ class AccountApiService {
   }
 
   Future<List<BlockedUser>> fetchBlockedUsers() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('user_id') ?? '';
-    if (userId.isEmpty) return [];
+    final playUserId = await _resolvePlayUserId();
+    if (playUserId == null || playUserId.isEmpty) {
+      debugPrint('fetchBlockedUsers: no play profile id');
+      return [];
+    }
 
-    final uri = Uri.parse('$_fourthApi/userblocks/blocked-users/$userId');
+    final uri = Uri.parse('$_fourthApi/userblocks/blocked-users/$playUserId');
     final response = await http.get(
       uri,
-      headers: {'Accept': 'application/json'},
+      headers: await _playHeaders(),
+    );
+    debugPrint(
+      'fetchBlockedUsers: id=$playUserId status=${response.statusCode} body=${response.body}',
     );
     if (response.statusCode < 200 || response.statusCode >= 300) return [];
     final decoded = jsonDecode(response.body);
-    if (decoded is! Map<String, dynamic> || decoded['success'] != true)
-      // ignore: curly_braces_in_flow_control_structures
-      return [];
+    if (decoded is! Map || decoded['success'] != true) return [];
     final list = decoded['blockedUsers'];
     if (list is! List) return [];
-    return list.map((json) => BlockedUser.fromJson(json)).toList();
+    return list
+        .whereType<Map>()
+        .map((json) => BlockedUser.fromJson(Map<String, dynamic>.from(json)))
+        .where((u) => u.id.isNotEmpty)
+        .toList();
   }
 
   Future<bool> unblockUser(String targetUserId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('user_id') ?? '';
-    if (userId.isEmpty || targetUserId.isEmpty) return false;
+    final userId = await _resolvePlayUserId();
+    if (userId == null || userId.isEmpty || targetUserId.isEmpty) return false;
 
     final uri = Uri.parse('$_fourthApi/userblocks/unblock-user');
     final response = await http.post(
       uri,
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
+      headers: await _playHeaders(json: true),
       body: jsonEncode({
         'unblockerId': userId,
         'targetUserId': targetUserId,
       }),
+    );
+    debugPrint(
+      'account.unblockUser: status=${response.statusCode} body=${response.body}',
     );
     if (response.statusCode < 200 || response.statusCode >= 300) return false;
     final decoded = jsonDecode(response.body);
@@ -203,7 +232,8 @@ class AccountApiService {
     return false;
   }
 
-  Future<bool> addToCart(int productId, {int? stockId, String colorCode = 'default'}) async {
+  Future<bool> addToCart(int productId,
+      {int? stockId, String colorCode = 'default'}) async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('user_id') ?? '';
     if (userId.isEmpty) return false;
@@ -313,22 +343,53 @@ class AccountUser {
 class BlockedUser {
   const BlockedUser({
     required this.id,
+    required this.relatedIds,
     required this.username,
     required this.name,
     required this.profilePicture,
   });
 
   final String id;
+  /// All known id variants for this user (_id, userid, etc.).
+  final Set<String> relatedIds;
   final String username;
   final String name;
   final String profilePicture;
 
   factory BlockedUser.fromJson(Map<String, dynamic> json) {
+    final nested = json['user'];
+    final src = nested is Map
+        ? Map<String, dynamic>.from(nested)
+        : json;
+
+    final relatedIds = <String>{};
+    for (final map in [src, json]) {
+      for (final key in ['_id', 'id', 'userid', 'userId']) {
+        final value = map[key]?.toString().trim();
+        if (value != null && value.isNotEmpty) relatedIds.add(value);
+      }
+    }
+
+    final id = (src['_id'] ??
+            src['id'] ??
+            src['userid'] ??
+            src['userId'] ??
+            json['_id'] ??
+            json['id'] ??
+            relatedIds.firstOrNull ??
+            '')
+        .toString()
+        .trim();
+
+    if (id.isNotEmpty) relatedIds.add(id);
+
     return BlockedUser(
-      id: (json['_id'] ?? '').toString(),
-      username: (json['username'] ?? '').toString(),
-      name: (json['name'] ?? '').toString(),
-      profilePicture: (json['profilePicture'] ?? '').toString(),
+      id: id,
+      relatedIds: relatedIds,
+      username: (src['username'] ?? json['username'] ?? '').toString(),
+      name: (src['name'] ?? json['name'] ?? src['username'] ?? '').toString(),
+      profilePicture:
+          (src['profilePicture'] ?? json['profilePicture'] ?? '').toString(),
     );
   }
 }
@@ -390,7 +451,8 @@ class WishlistProduct {
   factory WishlistProduct.fromJson(Map<String, dynamic> json) {
     int? parsedStockId;
     if (json['stocks'] is List && (json['stocks'] as List).isNotEmpty) {
-      parsedStockId = int.tryParse((json['stocks'] as List)[0]['id']?.toString() ?? '');
+      parsedStockId =
+          int.tryParse((json['stocks'] as List)[0]['id']?.toString() ?? '');
     } else if (json['stock_id'] != null) {
       parsedStockId = int.tryParse(json['stock_id'].toString());
     }

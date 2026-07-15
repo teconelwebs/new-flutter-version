@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:welfog_flutter_play/welfog_flutter_play.dart';
+
 import '../data/account_api_service.dart';
 
 class BlockedUsersScreen extends StatefulWidget {
@@ -8,11 +10,13 @@ class BlockedUsersScreen extends StatefulWidget {
   State<BlockedUsersScreen> createState() => _BlockedUsersScreenState();
 }
 
-class _BlockedUsersScreenState extends State<BlockedUsersScreen> with SingleTickerProviderStateMixin {
+class _BlockedUsersScreenState extends State<BlockedUsersScreen>
+    with SingleTickerProviderStateMixin {
   final _api = AccountApiService();
   List<BlockedUser> _blockedUsers = [];
   bool _loading = true;
   String? _unblockingId;
+  String? _toast;
   late AnimationController _fadeController;
 
   @override
@@ -45,39 +49,64 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> with SingleTick
     }
   }
 
-  Future<void> _handleUnblock(BlockedUser user) async {
-    setState(() => _unblockingId = user.id);
-    // Optimistic UI update: temporarily remove from local state
-    final backup = List<BlockedUser>.from(_blockedUsers);
-    setState(() {
-      _blockedUsers.removeWhere((u) => u.id == user.id);
+  void _showToast(String msg) {
+    setState(() => _toast = msg);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted && _toast == msg) setState(() => _toast = null);
     });
+  }
+
+  Future<void> _handleUnblock(BlockedUser user) async {
+    // Only one unblock at a time — ignore rapid taps.
+    if (_unblockingId != null) return;
+
+    setState(() => _unblockingId = user.id);
 
     try {
       final success = await _api.unblockUser(user.id);
       if (!success) {
         throw Exception('Unblock failed');
       }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unblocked @${user.username}')),
-        );
-      }
+      PlaySessionRegistry.markIdsUnblocked(user.relatedIds);
+      await PlaySessionRegistry.syncBlockedListAfterExternalChange();
+      if (!mounted) return;
+      setState(() {
+        _blockedUsers.removeWhere((u) => u.id == user.id);
+      });
+      final label =
+          user.username.isNotEmpty ? '@${user.username}' : 'User';
+      _showToast('Unblocked $label');
     } catch (_) {
-      // Revert if failed
       if (mounted) {
-        setState(() {
-          _blockedUsers = backup;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to unblock user at this time.')),
-        );
+        _showToast('Unable to unblock user at this time.');
       }
     } finally {
       if (mounted) {
         setState(() => _unblockingId = null);
       }
     }
+  }
+
+  Widget _toastWidget() {
+    return Positioned(
+      bottom: 24,
+      left: 24,
+      right: 24,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Text(
+            _toast!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildShimmerLoader() {
@@ -192,6 +221,8 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
+    final isBusy = _unblockingId != null;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -211,93 +242,136 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> with SingleTick
           ),
         ),
       ),
-      body: _loading
-          ? _buildShimmerLoader()
-          : _blockedUsers.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _blockedUsers.length,
-                  itemBuilder: (ctx, index) {
-                    final user = _blockedUsers[index];
-                    final hasImage = user.profilePicture.trim().isNotEmpty;
-                    final isUnblocking = _unblockingId == user.id;
+      body: Stack(
+        children: [
+          _loading
+              ? _buildShimmerLoader()
+              : RefreshIndicator(
+                  color: const Color(0xFFFB5404),
+                  onRefresh: isBusy ? () async {} : _loadBlockedUsers,
+                  child: _blockedUsers.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.sizeOf(context).height * 0.55,
+                              child: _buildEmptyState(),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _blockedUsers.length,
+                          itemBuilder: (ctx, index) {
+                            final user = _blockedUsers[index];
+                            final hasImage =
+                                user.profilePicture.trim().isNotEmpty;
+                            final isUnblocking = _unblockingId == user.id;
+                            final canTap = !isBusy;
 
-                    return Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 22,
-                            backgroundColor: const Color(0xFFF3F4F6),
-                            backgroundImage: hasImage ? NetworkImage(user.profilePicture) : null,
-                            child: !hasImage
-                                ? const Icon(Icons.person, color: Color(0xFF999999), size: 24)
-                                : null,
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  user.username.isNotEmpty ? '@${user.username}' : 'Unknown User',
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF1F2937),
+                            return Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: const Color(0xFFF3F4F6),
+                                    backgroundImage: hasImage
+                                        ? NetworkImage(user.profilePicture)
+                                        : null,
+                                    child: !hasImage
+                                        ? const Icon(Icons.person,
+                                            color: Color(0xFF999999), size: 24)
+                                        : null,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                if (user.name.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    user.name,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF6B7280),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          user.username.isNotEmpty
+                                              ? '@${user.username}'
+                                              : 'Unknown User',
+                                          style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF1F2937),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        if (user.name.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            user.name,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Color(0xFF6B7280),
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ],
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  OutlinedButton(
+                                    onPressed: canTap
+                                        ? () => _handleUnblock(user)
+                                        : null,
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor:
+                                          const Color(0xFFFB5404),
+                                      disabledForegroundColor:
+                                          const Color(0xFFFB5404)
+                                              .withValues(alpha: 0.45),
+                                      side: BorderSide(
+                                        color: canTap
+                                            ? const Color(0xFFFB5404)
+                                            : const Color(0xFFFB5404)
+                                                .withValues(alpha: 0.35),
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(16),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 6),
+                                    ),
+                                    child: isUnblocking
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<
+                                                      Color>(
+                                                Color(0xFFFB5404),
+                                              ),
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Unblock',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
                                   ),
                                 ],
-                              ],
-                            ),
-                          ),
-                          OutlinedButton(
-                            onPressed: isUnblocking ? null : () => _handleUnblock(user),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFFFB5404),
-                              side: const BorderSide(color: Color(0xFFFB5404)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
                               ),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                            ),
-                            child: isUnblocking
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFB5404)),
-                                    ),
-                                  )
-                                : const Text(
-                                    'Unblock',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                            );
+                          },
+                        ),
                 ),
+          if (_toast != null) _toastWidget(),
+        ],
+      ),
     );
   }
 }

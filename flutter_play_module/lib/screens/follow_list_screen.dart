@@ -94,20 +94,31 @@ class _FollowListScreenState extends State<FollowListScreen> {
     setState(() => _processingUserId = _userKey(user));
 
     try {
-      final ok = await api.unblockUser(targetId);
+      await PlaySessionRegistry.scope?.refreshViewerFromSession();
+      final result = await api.unblockUser(targetId);
       if (!mounted) return;
-      if (ok) {
+      if (result.ok) {
         PlaySessionRegistry.markProfileUnblocked(
           id: user.id.isNotEmpty ? user.id : targetId,
           userid: user.userid,
         );
         setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User unblocked')),
+          SnackBar(
+            content: Text(
+              result.message.isNotEmpty ? result.message : 'User unblocked',
+            ),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to unblock user')),
+          SnackBar(
+            content: Text(
+              result.message.isNotEmpty
+                  ? result.message
+                  : 'Unable to unblock user',
+            ),
+          ),
         );
       }
     } catch (e) {

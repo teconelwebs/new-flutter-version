@@ -11,6 +11,10 @@ class InlineProductVideoPlayer extends StatefulWidget {
   /// Defaults to true so gallery / standalone usages keep autoplay.
   final bool isActive;
 
+  /// Progress bar, play/pause, and mute controls.
+  /// Suggested product cards pass false.
+  final bool showControls;
+
   const InlineProductVideoPlayer({
     super.key,
     required this.videoUrl,
@@ -18,6 +22,7 @@ class InlineProductVideoPlayer extends StatefulWidget {
     this.loop = true,
     this.initialMuted = false,
     this.isActive = true,
+    this.showControls = true,
   });
 
   @override
@@ -168,6 +173,19 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer> {
       );
     }
 
+    final video = Center(
+      child: AspectRatio(
+        aspectRatio: _controller.value.aspectRatio == 0
+            ? 1
+            : _controller.value.aspectRatio,
+        child: VideoPlayer(_controller),
+      ),
+    );
+
+    if (!widget.showControls) {
+      return video;
+    }
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -177,14 +195,7 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Center(
-            child: AspectRatio(
-              aspectRatio: _controller.value.aspectRatio == 0
-                  ? 1
-                  : _controller.value.aspectRatio,
-              child: VideoPlayer(_controller),
-            ),
-          ),
+          video,
           AnimatedOpacity(
             opacity: _showControls ? 1.0 : 0.0,
             duration: const Duration(milliseconds: 250),

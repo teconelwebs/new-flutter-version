@@ -5,6 +5,7 @@ import '../models/search_result.dart';
 import '../services/device_id_store.dart';
 import '../services/reels_api.dart';
 import 'my_profile_cache.dart';
+import 'play_profile_helper.dart';
 import 'viewer_id_helper.dart';
 
 /// Global handle so pushed routes (profile, edit, search) can access the active session.
@@ -47,7 +48,10 @@ class PlaySessionRegistry {
     _loadFuture = () async {
       try {
         final serverIds = await api.fetchBlockedUserIds();
-        blockedUserIds.addAll(serverIds);
+        // Replace with server snapshot so stale ids drop after external unblock.
+        blockedUserIds
+          ..clear()
+          ..addAll(serverIds);
         _loadedForViewer = viewer;
         _hasLoaded = true;
       } catch (_) {
@@ -92,6 +96,21 @@ class PlaySessionRegistry {
     markUserUnblocked(id);
     final uid = userid?.trim();
     if (uid != null && uid.isNotEmpty) markUserUnblocked(uid);
+  }
+
+  static void markIdsUnblocked(Iterable<String> ids) {
+    for (final raw in ids) {
+      markUserUnblocked(raw);
+    }
+  }
+
+  /// Call after block/unblock from Account settings so Play UI stays in sync.
+  static Future<void> syncBlockedListAfterExternalChange() async {
+    resetBlockedListCache();
+    final activeScope = scope;
+    if (activeScope != null) {
+      await ensureBlockedListLoaded(activeScope.api);
+    }
   }
 
   static bool isProfileBlocked({
@@ -295,6 +314,16 @@ class PlaySessionScopeState extends State<PlaySessionScope> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PlaySessionRegistry.ensureBlockedListLoaded(api);
     });
+  }
+
+  /// Reload play profile mongo id from login cache / mobile lookup.
+  Future<void> refreshViewerFromSession() async {
+    final id = await PlayProfileHelper.ensurePlayProfileMongoId(
+      preferredId: _viewerId,
+    );
+    if (id == null || id.isEmpty || id == _viewerId) return;
+    if (!mounted) return;
+    setState(() => _viewerId = id);
   }
 
   ReelsApi get api => ReelsApi(

@@ -7,17 +7,28 @@ import '../../../core/storage/session_store.dart';
 class ChatAiScreen extends StatefulWidget {
   final String? userId;
   final bool isModal;
+  final VoidCallback? onClose;
 
-  const ChatAiScreen({super.key, this.userId, this.isModal = false});
+  const ChatAiScreen({
+    super.key,
+    this.userId,
+    this.isModal = false,
+    this.onClose,
+  });
 
   @override
   State<ChatAiScreen> createState() => _ChatAiScreenState();
 }
 
 class _ChatAiScreenState extends State<ChatAiScreen> {
+  static const _prefsChatIdKey = 'ai_chat_last_chat_id';
+  static const _aiBaseUrl = 'https://ai.welfog.com/';
+
   late final WebViewController _controller;
   bool _isLoading = true;
+  bool _didLoadUrl = false;
   String _resolvedUserId = 'guest';
+  String? _lastChatId;
 
   @override
   void initState() {
@@ -28,14 +39,19 @@ class _ChatAiScreenState extends State<ChatAiScreen> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) {
-            setState(() {
-              _isLoading = true;
-            });
+            if (mounted) {
+              setState(() => _isLoading = true);
+            }
           },
           onPageFinished: (String url) {
-            setState(() {
-              _isLoading = false;
-            });
+            if (mounted) {
+              setState(() => _isLoading = false);
+            }
+            _persistChatIdFromUrl(url);
+          },
+          onUrlChange: (UrlChange change) {
+            final url = change.url;
+            if (url != null) _persistChatIdFromUrl(url);
           },
           onWebResourceError: (WebResourceError error) {
             debugPrint("Chat AI WebView Error: ${error.description}");
@@ -56,7 +72,7 @@ class _ChatAiScreenState extends State<ChatAiScreen> {
               }
             }
 
-            // 2. Intercept standard website links (e.g. https://welfog.com/products/slug or http://.../product/slug)
+            // 2. Intercept standard website links
             final lowerUrl = url.toLowerCase();
             if (lowerUrl.contains('/products/') ||
                 lowerUrl.contains('/product/')) {
@@ -98,79 +114,142 @@ class _ChatAiScreenState extends State<ChatAiScreen> {
     _loadUserIdAndUrl();
   }
 
+  @override
+  void didUpdateWidget(covariant ChatAiScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If logged-in user changes, reload AI session for that user.
+    final nextId = widget.userId?.trim() ?? '';
+    final prevId = oldWidget.userId?.trim() ?? '';
+    if (nextId.isNotEmpty &&
+        nextId != prevId &&
+        nextId != _resolvedUserId &&
+        nextId != 'guest') {
+      _resolvedUserId = nextId;
+      _reloadForCurrentUser();
+    }
+  }
+
+  Future<void> _persistChatIdFromUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      final chatId = (uri.queryParameters['chat_id'] ??
+              uri.queryParameters['chatId'] ??
+              '')
+          .trim();
+      if (chatId.isEmpty || chatId == _lastChatId) return;
+      _lastChatId = chatId;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsChatIdKey, chatId);
+    } catch (_) {}
+  }
+
   Future<void> _loadUserIdAndUrl() async {
     String? id = widget.userId;
     if (id == null || id.isEmpty) {
-      // Try from SessionStore
       final loggedIn = await SessionStore.isLoggedIn();
       if (loggedIn) {
         id = await SessionStore.getUserId();
       }
 
-      // Fallback to SharedPreferences if SessionStore is empty
       if (id == null || id.isEmpty) {
         final prefs = await SharedPreferences.getInstance();
         id = prefs.getString('user_id') ?? '';
       }
     }
 
-    // ignore: unnecessary_null_comparison
-    if (id != null && id.isNotEmpty) {
-      _resolvedUserId = id;
+    final resolved = (id ?? '').trim();
+    if (resolved.isNotEmpty) {
+      _resolvedUserId = resolved;
     }
 
-    final chatUrl =
-        'https://ai.welfog.com/?user_id=$_resolvedUserId&chat_id=81a964ab89882e1292d67409a5faa8e9';
+    final prefs = await SharedPreferences.getInstance();
+    _lastChatId = prefs.getString(_prefsChatIdKey);
 
-    if (mounted) {
-      _controller.loadRequest(Uri.parse(chatUrl));
+    if (!mounted || _didLoadUrl) return;
+    _didLoadUrl = true;
+    _controller.loadRequest(Uri.parse(_buildChatUrl()));
+  }
+
+  String _buildChatUrl() {
+    final params = <String, String>{
+      'user_id': _resolvedUserId,
+    };
+    final chatId = _lastChatId?.trim();
+    if (chatId != null && chatId.isNotEmpty) {
+      params['chat_id'] = chatId;
+    }
+    return Uri.parse(_aiBaseUrl).replace(queryParameters: params).toString();
+  }
+
+  Future<void> _reloadForCurrentUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    _lastChatId = prefs.getString(_prefsChatIdKey);
+    if (!mounted) return;
+    await _controller.loadRequest(Uri.parse(_buildChatUrl()));
+  }
+
+  void _handleClose() {
+    if (widget.onClose != null) {
+      widget.onClose!();
+      return;
+    }
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return PopScope(
+      canPop: !widget.isModal,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && widget.isModal) {
+          _handleClose();
+        }
+      },
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            widget.isModal
-                ? Icons.close_rounded
-                : Icons.arrow_back_ios_new_rounded,
-            color: Colors.black,
-          ),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Welfog AI Assistant',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1.0),
-          child: Container(
-            color: const Color(0xFFEEEEEE),
-            height: 1.0,
-          ),
-        ),
-      ),
-      body: Stack(
-        children: [
-          WebViewWidget(controller: _controller),
-          if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFFFF6A00),
-              ),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: IconButton(
+            icon: Icon(
+              widget.isModal
+                  ? Icons.close_rounded
+                  : Icons.arrow_back_ios_new_rounded,
+              color: Colors.black,
             ),
-        ],
+            onPressed: _handleClose,
+          ),
+          title: const Text(
+            'Welfog AI Assistant',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          centerTitle: true,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1.0),
+            child: Container(
+              color: const Color(0xFFEEEEEE),
+              height: 1.0,
+            ),
+          ),
+        ),
+        body: Stack(
+          children: [
+            WebViewWidget(controller: _controller),
+            if (_isLoading)
+              const Center(
+                child: CircularProgressIndicator(
+                  color: Color(0xFFFF6A00),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -106,6 +106,8 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isGuest = true;
   // ignore: unused_field
   String _userId = 'guest';
+  bool _aiChatVisible = false;
+  bool _aiChatMounted = false;
 
   // Stream/Timer references for events
   StreamSubscription? _subConnectivity;
@@ -575,7 +577,16 @@ class _HomeScreenState extends State<HomeScreen>
     final bottomInset = systemBottomInset(context);
     final bottomPadding = bottomInset > 0 ? bottomInset + 8 : 20.0;
 
-    return Scaffold(
+    return PopScope(
+      canPop: !_aiChatVisible,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _aiChatVisible) {
+          setState(() => _aiChatVisible = false);
+        }
+      },
+      child: Stack(
+        children: [
+          Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
           final double maxWidth = constraints.maxWidth;
@@ -720,7 +731,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
               // Floating AI Chat Button Overlay (visible on Home, Category, Cart, and Account tabs)
-              if (_currentIndex != 2)
+              if (_currentIndex != 2 && !_aiChatVisible)
                 Positioned(
                   left: clampedX,
                   top: clampedY,
@@ -738,17 +749,12 @@ class _HomeScreenState extends State<HomeScreen>
                         });
                         return;
                       }
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        useSafeArea: true,
-                        backgroundColor: Colors.white,
-                        barrierColor: Colors.white,
-                        builder: (ctx) => ChatAiScreen(
-                          userId: _userId,
-                          isModal: true,
-                        ),
-                      );
+                      // Keep WebView mounted so current chat stays when reopened.
+                      // Close only via the AI screen cross icon (no drag-dismiss).
+                      setState(() {
+                        _aiChatMounted = true;
+                        _aiChatVisible = true;
+                      });
                     },
                     child: Container(
                       width: buttonSize,
@@ -867,6 +873,28 @@ class _HomeScreenState extends State<HomeScreen>
                 );
               },
             ),
+          ),
+          // Full-screen AI overlay (covers bottom nav). WebView stays alive when hidden.
+          if (_aiChatMounted && !_isGuest)
+            Positioned.fill(
+              child: Offstage(
+                offstage: !_aiChatVisible,
+                child: Material(
+                  color: Colors.white,
+                  child: SafeArea(
+                    child: ChatAiScreen(
+                      userId: _userId,
+                      isModal: true,
+                      onClose: () {
+                        setState(() => _aiChatVisible = false);
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
