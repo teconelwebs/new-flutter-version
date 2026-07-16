@@ -4,7 +4,6 @@ import '../../../core/constants/app_routes.dart';
 import '../../../core/storage/session_store.dart';
 import '../../home/presentation/home_screen.dart';
 import '../../login/presentation/login_screen.dart';
-import '../../../core/services/push_notification_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -23,9 +22,6 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      PushNotificationService.instance.initialize();
-    });
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),

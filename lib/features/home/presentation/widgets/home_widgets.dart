@@ -446,9 +446,11 @@ class ProductStrip extends StatelessWidget {
     required this.products,
     required this.onProductTap,
     this.onRightIconTap,
+    this.titleIcon,
   });
 
   final String title;
+  final Widget? titleIcon;
   final List<HomeProduct> products;
   final void Function(HomeProduct product) onProductTap;
   final VoidCallback? onRightIconTap;
@@ -468,9 +470,17 @@ class ProductStrip extends StatelessWidget {
           child: Row(
             children: [
               Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                child: Row(
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                    ),
+                    if (titleIcon != null) ...[
+                      const SizedBox(width: 6),
+                      titleIcon!,
+                    ],
+                  ],
                 ),
               ),
               GestureDetector(

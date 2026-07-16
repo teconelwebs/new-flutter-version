@@ -35,7 +35,7 @@ class PushNotificationService {
   bool _initialized = false;
   void Function(Map<String, dynamic> data)? onNotificationTapped;
 
-  Future<void> initialize() async {
+  Future<void> initialize({BuildContext? context}) async {
     if (_initialized) return;
 
     try {
@@ -47,16 +47,36 @@ class PushNotificationService {
         return;
       }
 
-      // 1. Request user permission
-      final settings = await fcm.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-        provisional: false,
-      );
-      debugPrint(
-        "Push permission status: ${settings.authorizationStatus}",
-      );
+      bool shouldPrompt = true;
+
+      // On iOS, if we have context, check if we need to show rationale first
+      if (Platform.isIOS && context != null) {
+        final settings = await fcm.getNotificationSettings();
+        if (context.mounted && settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+          final allowed = await showModalBottomSheet<bool>(
+            context: context,
+            backgroundColor: Colors.transparent,
+            isScrollControlled: true,
+            builder: (ctx) => const NotificationPermissionRationaleSheet(),
+          );
+          if (allowed != true) {
+            shouldPrompt = false;
+          }
+        }
+      }
+
+      if (shouldPrompt) {
+        // 1. Request user permission
+        final settings = await fcm.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+          provisional: false,
+        );
+        debugPrint(
+          "Push permission status: ${settings.authorizationStatus}",
+        );
+      }
 
       // iOS: show system banners while app is in foreground
       await fcm.setForegroundNotificationPresentationOptions(
@@ -306,5 +326,139 @@ class PushNotificationService {
     } catch (e) {
       debugPrint("FCM Sync Error: $e");
     }
+  }
+}
+
+class NotificationPermissionRationaleSheet extends StatelessWidget {
+  const NotificationPermissionRationaleSheet({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0E0E0),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // Bell icon with orange glow
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              // ignore: deprecated_member_use
+              color: const Color(0xFFFF6A00).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.notifications_active_rounded,
+              color: Color(0xFFFF6A00),
+              size: 38,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Title
+          const Text(
+            'Enable Notifications',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF111111),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+
+          // Main explanation
+          const Text(
+            'Stay updated with your orders, delivery status, and exclusive offers.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF555555),
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+
+          // Benefit points
+          _buildPoint(Icons.local_shipping_outlined, 'Real-time order and delivery tracking'),
+          _buildPoint(Icons.local_offer_outlined, 'Exclusive deals and discount offers'),
+          _buildPoint(Icons.chat_bubble_outline_rounded, 'Instant updates on customer support'),
+          const SizedBox(height: 28),
+
+          // Action buttons
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFFB5404),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Allow Notifications',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text(
+              'Maybe Later',
+              style: TextStyle(
+                color: Color(0xFF888888),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPoint(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: const Color(0xFFFB5404)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF333333),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import 'package:welfog_flutter_play/welfog_flutter_play.dart' show appRouteObserver;
 
 class InlineProductVideoPlayer extends StatefulWidget {
   final String videoUrl;
@@ -30,19 +31,24 @@ class InlineProductVideoPlayer extends StatefulWidget {
       _InlineProductVideoPlayerState();
 }
 
-class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer> {
+class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer>
+    with RouteAware, WidgetsBindingObserver {
   late VideoPlayerController _controller;
   bool _isInitialized = false;
   bool _isMuted = false;
   bool _showControls = false;
   bool _userPaused = false;
   String? _errorMessage;
+  bool _routeSubscribed = false;
+  bool _routeVisible = true;
+  bool _appActive = true;
 
   @override
   void initState() {
     super.initState();
     _isMuted = widget.initialMuted;
     _initializeController();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   void _initializeController() {
@@ -93,7 +99,8 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer> {
 
   void _syncPlayback() {
     if (!_isInitialized) return;
-    final shouldPlay = widget.autoPlay && widget.isActive && !_userPaused;
+    final shouldPlay =
+        widget.autoPlay && widget.isActive && !_userPaused && _routeVisible && _appActive;
     if (shouldPlay) {
       if (!_controller.value.isPlaying) {
         _controller.play();
@@ -108,7 +115,52 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_routeSubscribed) {
+      final route = ModalRoute.of(context);
+      if (route is PageRoute) {
+        appRouteObserver.subscribe(this, route);
+        _routeSubscribed = true;
+      }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final nextActive = state == AppLifecycleState.resumed;
+    if (nextActive != _appActive) {
+      _appActive = nextActive;
+      _syncPlayback();
+    }
+  }
+
+  @override
+  void didPushNext() {
+    if (mounted) {
+      setState(() {
+        _routeVisible = false;
+      });
+      _syncPlayback();
+    }
+  }
+
+  @override
+  void didPopNext() {
+    if (mounted) {
+      setState(() {
+        _routeVisible = true;
+      });
+      _syncPlayback();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    if (_routeSubscribed) {
+      appRouteObserver.unsubscribe(this);
+    }
     _controller.dispose();
     super.dispose();
   }
@@ -121,7 +173,7 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer> {
         _controller.pause();
       } else {
         _userPaused = false;
-        if (widget.isActive) {
+        if (widget.isActive && _routeVisible && _appActive) {
           _controller.play();
         }
       }

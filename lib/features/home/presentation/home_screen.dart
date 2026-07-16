@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
@@ -179,7 +180,7 @@ class _HomeScreenState extends State<HomeScreen>
         _handleNotificationRouting(data);
       }
     };
-    PushNotificationService.instance.initialize();
+    PushNotificationService.instance.initialize(context: context);
 
     play.customClosePlayCallback = () {
       if (mounted) {
@@ -1152,7 +1153,10 @@ class _HomeTabState extends State<_HomeTab> {
                     child: Padding(
                       padding: const EdgeInsets.only(top: 10),
                       child: ProductStrip(
-                        title: 'Today Deals 🔥',
+                        title: 'Today Deals',
+                        titleIcon: SvgPicture.string(
+                          '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FB5404" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>''',
+                        ),
                         products: dealList,
                         onProductTap: (p) {
                           Navigator.of(context)

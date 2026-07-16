@@ -239,14 +239,6 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
   // Verify OTP Logic
   Future<void> _verifyOtp() async {
-    if (!_acceptedTerms) {
-      _showToast(
-        title: "Terms & Conditions",
-        message: "Please accept the Terms & Conditions to proceed.",
-        isError: true,
-      );
-      return;
-    }
     final phone = _phoneController.text.trim();
     final otp = _otpController.text.trim();
     if (otp.length != 6) {
@@ -742,78 +734,80 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             ),
                           ],
 
-                          const SizedBox(height: 12),
+                          if (!_otpSent) ...[
+                            const SizedBox(height: 12),
 
-                          // Footer with rich inline checkbox and links (T&C, Privacy Policy)
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: Checkbox(
-                                  value: _acceptedTerms,
-                                  activeColor: const Color(0xFF0A6B69),
-                                  checkColor: Colors.white,
-                                  materialTapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  visualDensity: VisualDensity.compact,
-                                  onChanged: (val) {
-                                    setState(() {
-                                      _acceptedTerms = val ?? false;
-                                    });
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text.rich(
-                                  TextSpan(
-                                    text: "I agree to the ",
-                                    style: const TextStyle(fontSize: 12, color: Color(0xFF374151), height: 1.5),
-                                    children: [
-                                      TextSpan(
-                                        text: "Terms & Conditions",
-                                        style: const TextStyle(color: Color(0xFF0A6B69), fontWeight: FontWeight.bold),
-                                        recognizer: TapGestureRecognizer()
-                                          ..onTap = () {
-                                            Navigator.of(context).pushNamed(
-                                              AppRoutes.policy,
-                                              arguments: 'terms-and-conditions',
-                                            );
-                                          },
-                                      ),
-                                      const TextSpan(text: ", "),
-                                      TextSpan(
-                                        text: "Privacy Policy",
-                                        style: const TextStyle(color: Color(0xFF0A6B69), fontWeight: FontWeight.bold),
-                                        recognizer: TapGestureRecognizer()
-                                          ..onTap = () {
-                                            Navigator.of(context).pushNamed(
-                                              AppRoutes.policy,
-                                              arguments: 'privacy-policy',
-                                            );
-                                          },
-                                      ),
-                                      const TextSpan(text: ", and "),
-                                      TextSpan(
-                                        text: "Anti-Phishing",
-                                        style: const TextStyle(color: Color(0xFF0A6B69), fontWeight: FontWeight.bold),
-                                        recognizer: TapGestureRecognizer()
-                                          ..onTap = () {
-                                            Navigator.of(context).pushNamed(
-                                              AppRoutes.policy,
-                                              arguments: 'anti-phishing-defense-policy',
-                                            );
-                                          },
-                                      ),
-                                      const TextSpan(text: "."),
-                                    ],
+                            // Footer with rich inline checkbox and links (T&C, Privacy Policy)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: Checkbox(
+                                    value: _acceptedTerms,
+                                    activeColor: const Color(0xFF0A6B69),
+                                    checkColor: Colors.white,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    visualDensity: VisualDensity.compact,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        _acceptedTerms = val ?? false;
+                                      });
+                                    },
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text.rich(
+                                    TextSpan(
+                                      text: "I agree to the ",
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFF374151), height: 1.5),
+                                      children: [
+                                        TextSpan(
+                                          text: "Terms & Conditions",
+                                          style: const TextStyle(color: Color(0xFF0A6B69), fontWeight: FontWeight.bold),
+                                          recognizer: TapGestureRecognizer()
+                                            ..onTap = () {
+                                              Navigator.of(context).pushNamed(
+                                                AppRoutes.policy,
+                                                arguments: 'terms-and-conditions',
+                                              );
+                                            },
+                                        ),
+                                        const TextSpan(text: ", "),
+                                        TextSpan(
+                                          text: "Privacy Policy",
+                                          style: const TextStyle(color: Color(0xFF0A6B69), fontWeight: FontWeight.bold),
+                                          recognizer: TapGestureRecognizer()
+                                            ..onTap = () {
+                                              Navigator.of(context).pushNamed(
+                                                AppRoutes.policy,
+                                                arguments: 'privacy-policy',
+                                              );
+                                            },
+                                        ),
+                                        const TextSpan(text: ", and "),
+                                        TextSpan(
+                                          text: "Anti-Phishing",
+                                          style: const TextStyle(color: Color(0xFF0A6B69), fontWeight: FontWeight.bold),
+                                          recognizer: TapGestureRecognizer()
+                                            ..onTap = () {
+                                              Navigator.of(context).pushNamed(
+                                                AppRoutes.policy,
+                                                arguments: 'anti-phishing-defense-policy',
+                                              );
+                                            },
+                                        ),
+                                        const TextSpan(text: "."),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),
