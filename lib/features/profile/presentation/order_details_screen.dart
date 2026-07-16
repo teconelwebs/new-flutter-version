@@ -44,6 +44,66 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   int _captchaNum2 = 0;
   bool _isSubmittingCancel = false;
 
+  StateSetter? _cancelModalState;
+
+  void _showCustomPopup(String message) {
+    if (!mounted) return;
+
+    // Clear any active snackbars immediately so new one shows up instantly on repeated clicks
+    ScaffoldMessenger.of(context).clearSnackBars();
+
+    final screenHeight = MediaQuery.of(context).size.height;
+    final topPadding = MediaQuery.of(context).padding.top;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 1), // 1 second duration
+        margin: EdgeInsets.only(
+          bottom: screenHeight - topPadding - 80,
+          left: 20,
+          right: 20,
+        ),
+        content: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              // ignore: deprecated_member_use
+              color: const Color(0xFF222222).withOpacity(0.9),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  // ignore: deprecated_member_use
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _updateCancelModalState() {
+    if (_cancelModalState != null) {
+      _cancelModalState!(() {});
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -161,39 +221,33 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to open invoice download link: $e')),
-        );
+        _showCustomPopup('Failed to open invoice download link: $e');
       }
     }
   }
 
   Future<void> _submitCancelRequest() async {
     if (_selectedReason == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a reason for cancellation.')),
-      );
+      _showCustomPopup('Please select a reason for cancellation.');
       return;
     }
 
     if (_selectedReason == "Other" && _customReasonController.text.trim().length < 5) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please briefly type your reason (min 5 chars).')),
-      );
+      _showCustomPopup('Please briefly type your reason (min 5 chars).');
       return;
     }
 
     final correctAnswer = _captchaNum1 + _captchaNum2;
     final userAnswer = int.tryParse(_captchaController.text);
     if (userAnswer == null || userAnswer != correctAnswer) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter the correct sum to verify.')),
-      );
+      _showCustomPopup('Please enter the correct sum to verify.');
       _generateCaptcha();
+      _updateCancelModalState();
       return;
     }
 
     setState(() => _isSubmittingCancel = true);
+    _updateCancelModalState();
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -216,9 +270,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Your order has been cancelled successfully.'), backgroundColor: Colors.green),
-          );
+          _showCustomPopup('Your order has been cancelled successfully.');
           Navigator.pop(context); // Close the cancel dialog
         }
         _fetchOrderDetails(); // Refresh details screen
@@ -226,20 +278,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         final body = jsonDecode(response.body);
         final msg = body['message'] ?? 'Failed to cancel order.';
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg)),
-          );
+          _showCustomPopup(msg);
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to cancel order. Please try again later.')),
-        );
+        _showCustomPopup('Failed to cancel order. Please try again later.');
       }
     } finally {
       if (mounted) {
         setState(() => _isSubmittingCancel = false);
+        _updateCancelModalState();
       }
     }
   }
@@ -260,6 +309,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            _cancelModalState = setModalState;
             return Padding(
               padding: EdgeInsets.only(
                 top: 16.0,
@@ -389,7 +439,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           },
         );
       },
-    );
+    ).then((_) {
+      _cancelModalState = null;
+    });
   }
 
   String _formatDateString(String? dateStr) {

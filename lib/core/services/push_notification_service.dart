@@ -74,7 +74,9 @@ class PushNotificationService {
           provisional: false,
         );
         debugPrint(
-          "Push permission status: ${settings.authorizationStatus}",
+          "\n🔔 ================================================\n"
+          "🔔 PUSH PERMISSION STATUS: ${settings.authorizationStatus}\n"
+          "🔔 ================================================\n",
         );
       }
 
@@ -161,14 +163,27 @@ class PushNotificationService {
       });
 
       _initialized = true;
-      debugPrint("PushNotificationService initialized successfully.");
+      debugPrint(
+        "\n🔔 ================================================\n"
+        "🔔 PushNotificationService initialized successfully.\n"
+        "🔔 ================================================\n",
+      );
 
       // Log token so we can verify in device logs
       final token = await getFcmToken();
       if (token != null) {
-        debugPrint("FCM token ready: ${token.substring(0, 12)}...");
+        debugPrint(
+          "\n🔑 ================================================\n"
+          "🔑 MY DEVICE FCM TOKEN:\n"
+          "🔑 $token\n"
+          "🔑 ================================================\n",
+        );
       } else {
-        debugPrint("FCM token is null (check APNs / Play Services).");
+        debugPrint(
+          "\n🔔 ================================================\n"
+          "🔔 FCM TOKEN IS NULL (Check APNs / Play Services)\n"
+          "🔔 ================================================\n",
+        );
       }
     } catch (e, st) {
       debugPrint("PushNotificationService initialization warning/failed: $e");
@@ -313,15 +328,37 @@ class PushNotificationService {
           'user_id': userId,
           'device_id': deviceId,
           'push_token': token,
+          'expo_push_token': token,
           'platform': platform,
           'app_version': '1.2.0',
         }),
       );
       debugPrint(
-        "FCM sync save status=${saveRes.statusCode} body=${saveRes.body}",
+        "\n🚀 ================================================\n"
+        "🚀 FCM TOKEN SYNC DETAILS:\n"
+        "🚀 URL: $saveUrl\n"
+        "🚀 User ID: $userId\n"
+        "🚀 Device ID: $deviceId\n"
+        "🚀 Response Status Code: ${saveRes.statusCode}\n"
+        "🚀 Response Body: ${saveRes.body}\n"
+        "🚀 ================================================\n",
       );
       if (saveRes.statusCode >= 200 && saveRes.statusCode < 300) {
-        await prefs.setString('last_push_token', token);
+        try {
+          final Map<String, dynamic> resData = jsonDecode(saveRes.body);
+          if (resData['status'] == 200 || resData['status'] == null) {
+            await prefs.setString('last_push_token', token);
+          } else {
+            debugPrint(
+              "\n❌ ================================================\n"
+              "❌ SERVER REJECTED TOKEN SYNC:\n"
+              "❌ Body: ${saveRes.body}\n"
+              "❌ ================================================\n",
+            );
+          }
+        } catch (_) {
+          await prefs.setString('last_push_token', token);
+        }
       }
     } catch (e) {
       debugPrint("FCM Sync Error: $e");

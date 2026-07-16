@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
+import '../services/push_notification_service.dart';
 
 class SessionStore {
   static const _kIsLoggedIn = 'is_logged_in';
@@ -73,6 +74,11 @@ class SessionStore {
         } catch (_) {}
       }
     }
+
+    // Sync FCM Token with backend immediately on login
+    try {
+      await PushNotificationService.instance.syncTokenWithBackend();
+    } catch (_) {}
   }
 
   static Future<void> clearLogin() async {

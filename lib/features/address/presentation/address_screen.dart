@@ -302,7 +302,7 @@ class _AddressScreenState extends State<AddressScreen> {
       }
     }
 
-    if (activeAddress != null && activeAddress['using_this'] == 1) {
+    if (activeAddress != null && activeAddress['using_this']?.toString() == '1') {
       _showCustomPopup('Default address cannot be deleted.');
       return;
     }
@@ -472,7 +472,7 @@ class _AddressScreenState extends State<AddressScreen> {
                         _realName.isNotEmpty
                     ? _realName
                     : addrName;
-                final bool isDefault = item['using_this'] == 1;
+                final bool isDefault = item['using_this']?.toString() == '1';
 
                 return Card(
                   color: Colors.white,

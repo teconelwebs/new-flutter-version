@@ -322,12 +322,19 @@ class _CartScreenState extends State<CartScreen>
       if (token == null || userId == null) return;
 
       final cartUri =
-          Uri.parse('https://welfogapi.welfog.com/api/v2/carts/$userId');
+          Uri.parse('https://welfogapi.welfog.com/api/v2/carts/$userId').replace(
+        queryParameters: {
+          't': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+      );
       final cartResponse = await http.post(
         cartUri,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
         },
         body: jsonEncode({
           'user_latitude': lat,
@@ -354,11 +361,18 @@ class _CartScreenState extends State<CartScreen>
 
       Map<String, dynamic> summaryData = {};
       final summaryUri =
-          Uri.parse('https://welfogapi.welfog.com/api/v2/cart-summary/$userId');
+          Uri.parse('https://welfogapi.welfog.com/api/v2/cart-summary/$userId').replace(
+        queryParameters: {
+          't': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+      );
       final summaryResponse = await http.get(
         summaryUri,
         headers: {
           'Authorization': 'Bearer $token',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
         },
       );
 
@@ -605,8 +619,9 @@ class _CartScreenState extends State<CartScreen>
     await _loadSaved();
   }
 
-  void _handleCheckoutPress() {
-    Navigator.of(context).pushNamed(AppRoutes.confirmAddress);
+  void _handleCheckoutPress() async {
+    await Navigator.of(context).pushNamed(AppRoutes.confirmAddress);
+    _fetchCartData();
   }
 
   void _showCustomPopup(String message) {
@@ -724,111 +739,108 @@ class _CartScreenState extends State<CartScreen>
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: const Color(0xFFE5E5E5)),
       ),
-      padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          // Image + Quantity Section
-          SizedBox(
-            width: 90,
-            child: Column(
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                GestureDetector(
-                  onTap: () {
-                    if (item.slug != null) {
-                      Navigator.of(context).pushNamed('/products/${item.slug}');
-                    }
-                  },
-                  child: Image.network(
-                    '$_cdnBaseUrl${item.productThumbnailImage}',
-                    width: 90,
-                    height: 90,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 90,
-                      height: 90,
-                      color: Colors.grey.shade200,
-                      child: const Icon(Icons.image_outlined),
-                    ),
+                // Image + Quantity Section
+                SizedBox(
+                  width: 90,
+                  child: Column(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          if (item.slug != null) {
+                            Navigator.of(context).pushNamed('/products/${item.slug}');
+                          }
+                        },
+                        child: Image.network(
+                          '$_cdnBaseUrl${item.productThumbnailImage}',
+                          width: 90,
+                          height: 90,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 90,
+                            height: 90,
+                            color: Colors.grey.shade200,
+                            child: const Icon(Icons.image_outlined),
+                          ),
+                        ),
+                      ),
+                      if (!saved)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 5),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  final currentQty =
+                                      item.quantity < 1 ? 1 : item.quantity;
+                                  _changeQuantity(
+                                      item, (currentQty - 1).clamp(1, 99));
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 9, vertical: 4),
+                                  decoration: BoxDecoration(
+                                      color: const Color(0xFFF5F5F5),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border:
+                                          Border.all(color: const Color(0xFFDDDDDD))),
+                                  child: const Text('-',
+                                      style: TextStyle(
+                                          fontSize: 15, color: Color(0xFF333333))),
+                                ),
+                              ),
+                              Container(
+                                constraints: const BoxConstraints(minWidth: 22),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  '${item.quantity < 1 ? 1 : item.quantity}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600, fontSize: 13),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  final currentQty =
+                                      item.quantity < 1 ? 1 : item.quantity;
+                                  _changeQuantity(item, currentQty + 1);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 9, vertical: 4),
+                                  margin: const EdgeInsets.only(left: 5),
+                                  decoration: BoxDecoration(
+                                      color: const Color(0xFFF5F5F5),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border:
+                                          Border.all(color: const Color(0xFFDDDDDD))),
+                                  child:
+                                      const Text('+', style: TextStyle(fontSize: 15)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                if (!saved)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 5),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+
+                // Details Section
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 10, right: 28),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         GestureDetector(
-                          onTap: () {
-                            final currentQty =
-                                item.quantity < 1 ? 1 : item.quantity;
-                            _changeQuantity(
-                                item, (currentQty - 1).clamp(1, 99));
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 9, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF5F5F5),
-                              borderRadius: BorderRadius.circular(4),
-                              border:
-                                  Border.all(color: const Color(0xFFDDDDDD)),
-                            ),
-                            child: const Text('-',
-                                style: TextStyle(
-                                    fontSize: 15, color: Color(0xFF333333))),
-                          ),
-                        ),
-                        Container(
-                          constraints: const BoxConstraints(minWidth: 22),
-                          alignment: Alignment.center,
-                          child: Text(
-                            '${item.quantity < 1 ? 1 : item.quantity}',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 13),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            final currentQty =
-                                item.quantity < 1 ? 1 : item.quantity;
-                            _changeQuantity(item, currentQty + 1);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 9, vertical: 4),
-                            margin: const EdgeInsets.only(left: 5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF5F5F5),
-                              borderRadius: BorderRadius.circular(4),
-                              border:
-                                  Border.all(color: const Color(0xFFDDDDDD)),
-                            ),
-                            child:
-                                const Text('+', style: TextStyle(fontSize: 15)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          // Details Section
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
                           onTap: () {
                             if (item.slug != null) {
                               Navigator.of(context)
@@ -837,93 +849,110 @@ class _CartScreenState extends State<CartScreen>
                           },
                           child: Text(
                             item.productName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                                 fontWeight: FontWeight.w500,
                                 fontSize: 12,
                                 color: Color(0xFF111111)),
                           ),
                         ),
-                      ),
-                      Row(
-                        children: [
-                          if (saved)
-                            GestureDetector(
-                              onTap: () => _moveToCart(item),
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                margin: const EdgeInsets.only(left: 8),
-                                child: const Icon(Icons.shopping_cart_outlined,
-                                    color: Color(0xFF008083), size: 21),
-                              ),
-                            ),
-                          GestureDetector(
-                            onTap: _isDeleting
-                                ? null
-                                : () => _handleDeleteItem(item, saved: saved),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              margin: const EdgeInsets.only(left: 8),
-                              child: Icon(
-                                Icons.delete_outline,
-                                color: _isDeleting
-                                    ? Colors.grey.shade300
-                                    : const Color(0xFF999999),
-                                size: 20,
-                              ),
-                            ),
+                        if (item.size != null && item.size!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 3),
+                            child: Text('Size: ${item.size}',
+                                style: const TextStyle(color: Color(0xFF666666), fontSize: 11)),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  if (item.size != null && item.size!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text('Size: ${item.size}',
-                          style: const TextStyle(color: Color(0xFF666666))),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Row(
-                      children: [
-                        if (item.mrp != null)
-                          Text(
-                            '₹${item.mrp!.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                              decoration: TextDecoration.lineThrough,
-                              color: Color(0xFF999999),
-                              fontSize: 13,
-                            ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            children: [
+                              if (item.mrp != null)
+                                Text(
+                                  '₹${item.mrp!.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    decoration: TextDecoration.lineThrough,
+                                    color: Color(0xFF999999),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              if (item.mrp != null) const SizedBox(width: 6),
+                              Text(
+                                '₹${item.price.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700, fontSize: 14),
+                              ),
+                              if (discount.pct > 0) ...[
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${discount.pct}% OFF',
+                                  style: const TextStyle(
+                                      color: Color(0xFF008083),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12),
+                                ),
+                              ],
+                            ],
                           ),
-                        if (item.mrp != null) const SizedBox(width: 6),
-                        Text(
-                          '₹${item.price.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 14),
                         ),
-                        if (discount.pct > 0) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            '${discount.pct}% OFF',
-                            style: const TextStyle(
-                                color: Color(0xFF008083),
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12),
+                        if (item.quantity > 1)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Qty: ${item.quantity} x ₹${item.price.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                color: Color(0xFF666666),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ),
-                        ],
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            deliveryText,
+                            style: const TextStyle(
+                                color: Color(0xFF777777), fontSize: 12),
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      deliveryText,
-                      style: const TextStyle(
-                          color: Color(0xFF777777), fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: 6,
+            right: 6,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (saved)
+                  GestureDetector(
+                    onTap: () => _moveToCart(item),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      child: const Icon(Icons.shopping_cart_outlined,
+                          color: Color(0xFF008083), size: 20),
                     ),
                   ),
-                ],
-              ),
+                GestureDetector(
+                  onTap: _isDeleting
+                      ? null
+                      : () => _handleDeleteItem(item, saved: saved),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.delete_outline,
+                      color: _isDeleting
+                          ? Colors.grey.shade300
+                          : const Color(0xFF999999),
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1259,11 +1288,11 @@ class _CartScreenState extends State<CartScreen>
                                           ),
                                         ),
                                       ),
-                                      _summaryRow('Items subtotal',
+                                      _summaryRow('Items Total',
                                           '₹${_safeToFixed(subtotalLocal)}'),
                                       _summaryRow('Shipping',
                                           '₹${_safeToFixed(_cartSummary['shipping_cost'])}'),
-                                      _summaryRow('Total Discounts',
+                                      _summaryRow('Discount',
                                           '- ₹${_safeToFixed(totalSavings)}'),
                                       if (_safeNumber(
                                               _cartSummary['coupon_discount']) >
@@ -1298,7 +1327,7 @@ class _CartScreenState extends State<CartScreen>
                                         mainAxisAlignment:
                                             MainAxisAlignment.spaceBetween,
                                         children: [
-                                          const Text('Subtotal',
+                                          const Text('Total Amount',
                                               style: TextStyle(
                                                   fontWeight: FontWeight.w900)),
                                           Text('₹${_safeToFixed(grandTotal)}',
@@ -1357,6 +1386,14 @@ class _CartScreenState extends State<CartScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              const Text(
+                                'To Pay',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF666666),
+                                    fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(height: 2),
                               Text(
                                 '₹${_safeToFixed(grandTotal)}',
                                 style: const TextStyle(
@@ -1365,14 +1402,7 @@ class _CartScreenState extends State<CartScreen>
                                   color: Color(0xFF111111),
                                 ),
                               ),
-                              if (totalSavings > 0)
-                                Text(
-                                  'Save ₹${_safeToFixed(totalSavings)}',
-                                  style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Color(0xFF008083),
-                                      fontWeight: FontWeight.w600),
-                                ),
+
                             ],
                           ),
                           const SizedBox(width: 16),

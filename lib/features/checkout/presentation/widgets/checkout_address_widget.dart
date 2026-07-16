@@ -97,7 +97,7 @@ class _CheckoutAddressWidgetState extends State<CheckoutAddressWidget> {
           }
 
           final defaultAddress = addData.firstWhere(
-            (addr) => addr['using_this'] == 1,
+            (addr) => addr['using_this']?.toString() == '1',
             orElse: () => null,
           );
 
@@ -278,7 +278,7 @@ class _CheckoutAddressWidgetState extends State<CheckoutAddressWidget> {
             ),
 
             // DEFAULT tag
-            if (currentAddress['using_this'] == 1)
+             if (currentAddress['using_this']?.toString() == '1')
               Positioned(
                 top: 14,
                 right: 14,

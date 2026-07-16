@@ -518,8 +518,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: OutlinedButton(
-                                      onPressed: () {
-                                        Navigator.pushNamed(
+                                      onPressed: () async {
+                                        await Navigator.pushNamed(
                                           context,
                                           AppRoutes.orderDetails,
                                           arguments: {
@@ -527,6 +527,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                             'initialRefundStatus': order['current_order_status'],
                                           },
                                         );
+                                        _fetchOrders();
                                       },
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: const Color(0xFF1F2937),
