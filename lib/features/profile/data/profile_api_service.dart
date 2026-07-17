@@ -98,10 +98,30 @@ class ProfileApiService {
 
   String _formatDobForDisplay(String raw) {
     if (raw.isEmpty) return '';
-    final datePart = raw.split('T').first;
+
+    // Check if it's an ISO timestamp with timezone information (contains T and Z/+/offset)
+    if (raw.contains('T') && (raw.contains('Z') || raw.contains('+') || raw.contains('-'))) {
+      try {
+        final parsed = DateTime.tryParse(raw);
+        if (parsed != null) {
+          final localDate = parsed.toLocal();
+          final day = localDate.day.toString().padLeft(2, '0');
+          final month = localDate.month.toString().padLeft(2, '0');
+          return '$day-$month-${localDate.year}';
+        }
+      } catch (_) {}
+    }
+
+    // Fallback: extract date part and format without shifting timezones
+    final datePart = raw.split('T').first.split(' ').first;
     final parts = datePart.split('-');
     if (parts.length == 3) {
-      return '${parts[2]}-${parts[1]}-${parts[0]}';
+      if (parts[0].length == 4) {
+        return '${parts[2]}-${parts[1]}-${parts[0]}';
+      }
+      if (parts[2].length == 4) {
+        return '${parts[0]}-${parts[1]}-${parts[2]}';
+      }
     }
     return raw;
   }

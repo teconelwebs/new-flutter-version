@@ -175,7 +175,6 @@ class _CommentsSheetState extends State<CommentsSheet> {
 
   void _openProfile(String userId) {
     if (userId.isEmpty) return;
-    Navigator.pop(context);
     AppRoutes.openProfile(widget.hostContext, userId);
   }
 

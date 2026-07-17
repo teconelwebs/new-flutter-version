@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../core/router/app_router.dart';
 import '../core/theme/app_theme.dart';
@@ -18,6 +19,16 @@ class WelfogApp extends StatelessWidget {
       navigatorObservers: [play.appRouteObserver],
       initialRoute: SplashScreen.routeName,
       onGenerateRoute: AppRouter.onGenerateRoute,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', 'IN'),
+        Locale('en', 'US'),
+      ],
+      locale: const Locale('en', 'IN'),
       // Android edge-to-edge can report padding.bottom = 0 while the system
       // nav/gesture bar still covers content. Re-inject viewPadding so SafeArea
       // and bottom CTAs automatically clear those buttons app-wide.

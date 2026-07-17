@@ -4,6 +4,7 @@ import 'package:welfog_flutter_play/welfog_flutter_play.dart' show appRouteObser
 
 class InlineProductVideoPlayer extends StatefulWidget {
   final String videoUrl;
+  final String? placeholderUrl;
   final bool autoPlay;
   final bool loop;
   final bool initialMuted;
@@ -19,6 +20,7 @@ class InlineProductVideoPlayer extends StatefulWidget {
   const InlineProductVideoPlayer({
     super.key,
     required this.videoUrl,
+    this.placeholderUrl,
     this.autoPlay = true,
     this.loop = true,
     this.initialMuted = false,
@@ -33,7 +35,7 @@ class InlineProductVideoPlayer extends StatefulWidget {
 
 class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer>
     with RouteAware, WidgetsBindingObserver {
-  late VideoPlayerController _controller;
+  VideoPlayerController? _controller;
   bool _isInitialized = false;
   bool _isMuted = false;
   bool _showControls = false;
@@ -47,32 +49,67 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer>
   void initState() {
     super.initState();
     _isMuted = widget.initialMuted;
-    _initializeController();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkControllerState();
+    });
+  }
+
+  void _checkControllerState() {
+    final shouldBeRunning = widget.isActive && _routeVisible && _appActive;
+
+    if (shouldBeRunning) {
+      if (_controller == null) {
+        _initializeController();
+      } else if (_isInitialized) {
+        _syncPlayback();
+      }
+    } else {
+      if (_controller != null) {
+        _disposeController();
+      }
+    }
   }
 
   void _initializeController() {
+    if (_controller != null) return;
     try {
-      _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
-        ..initialize().then((_) {
-          if (!mounted) return;
-          setState(() {
-            _isInitialized = true;
-            _controller.setVolume(_isMuted ? 0.0 : 1.0);
-            _controller.setLooping(widget.loop);
-          });
-          _syncPlayback();
-        }).catchError((error) {
-          if (mounted) {
-            setState(() {
-              _errorMessage = 'Failed to load video';
-            });
-          }
+      final controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+      _controller = controller;
+      controller.initialize().then((_) {
+        if (!mounted || _controller != controller) {
+          controller.dispose();
+          return;
+        }
+        setState(() {
+          _isInitialized = true;
+          controller.setVolume(_isMuted ? 0.0 : 1.0);
+          controller.setLooping(widget.loop);
         });
+        _syncPlayback();
+      }).catchError((error) {
+        if (mounted && _controller == controller) {
+          setState(() {
+            _errorMessage = 'Failed to load video';
+          });
+        }
+      });
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to initialize player';
       });
+    }
+  }
+
+  void _disposeController() {
+    final controller = _controller;
+    _controller = null;
+    _isInitialized = false;
+    if (controller != null) {
+      controller.dispose();
+    }
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -83,32 +120,37 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer>
       // Clear manual pause when card leaves focus so it can autoplay again later.
       if (!widget.isActive) {
         _userPaused = false;
+      } else {
+        // Clear error and trigger retry if it becomes active/visible
+        if (_errorMessage != null) {
+          _errorMessage = null;
+        }
       }
-      _syncPlayback();
+      _checkControllerState();
     } else if (oldWidget.autoPlay != widget.autoPlay) {
       _syncPlayback();
     }
     if (oldWidget.videoUrl != widget.videoUrl) {
-      _controller.dispose();
-      _isInitialized = false;
+      _disposeController();
       _errorMessage = null;
       _userPaused = false;
-      _initializeController();
+      _checkControllerState();
     }
   }
 
   void _syncPlayback() {
-    if (!_isInitialized) return;
+    final controller = _controller;
+    if (controller == null || !_isInitialized) return;
     final shouldPlay =
         widget.autoPlay && widget.isActive && !_userPaused && _routeVisible && _appActive;
     if (shouldPlay) {
-      if (!_controller.value.isPlaying) {
-        _controller.play();
+      if (!controller.value.isPlaying) {
+        controller.play();
         if (mounted) setState(() {});
       }
     } else {
-      if (_controller.value.isPlaying) {
-        _controller.pause();
+      if (controller.value.isPlaying) {
+        controller.pause();
         if (mounted) setState(() {});
       }
     }
@@ -131,7 +173,7 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer>
     final nextActive = state == AppLifecycleState.resumed;
     if (nextActive != _appActive) {
       _appActive = nextActive;
-      _syncPlayback();
+      _checkControllerState();
     }
   }
 
@@ -141,7 +183,7 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer>
       setState(() {
         _routeVisible = false;
       });
-      _syncPlayback();
+      _checkControllerState();
     }
   }
 
@@ -151,7 +193,7 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer>
       setState(() {
         _routeVisible = true;
       });
-      _syncPlayback();
+      _checkControllerState();
     }
   }
 
@@ -161,59 +203,82 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer>
     if (_routeSubscribed) {
       appRouteObserver.unsubscribe(this);
     }
-    _controller.dispose();
+    _disposeController();
     super.dispose();
   }
 
   void _togglePlay() {
-    if (!_isInitialized) return;
+    final controller = _controller;
+    if (controller == null || !_isInitialized) return;
     setState(() {
-      if (_controller.value.isPlaying) {
+      if (controller.value.isPlaying) {
         _userPaused = true;
-        _controller.pause();
+        controller.pause();
       } else {
         _userPaused = false;
         if (widget.isActive && _routeVisible && _appActive) {
-          _controller.play();
+          controller.play();
         }
       }
     });
   }
 
   void _toggleMute() {
-    if (!_isInitialized) return;
+    final controller = _controller;
+    if (controller == null || !_isInitialized) return;
     setState(() {
       _isMuted = !_isMuted;
-      _controller.setVolume(_isMuted ? 0.0 : 1.0);
+      controller.setVolume(_isMuted ? 0.0 : 1.0);
     });
   }
 
   @override
   Widget build(BuildContext context) {
     if (_errorMessage != null) {
-      return Container(
-        color: const Color(0xFFF3F4F6),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline_rounded,
-                  color: Colors.redAccent, size: 36),
-              const SizedBox(height: 8),
-              Text(
-                _errorMessage!,
-                style: const TextStyle(
-                    color: Color(0xFF4B5563),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600),
-              ),
-            ],
+      return GestureDetector(
+        onTap: () {
+          setState(() {
+            _errorMessage = null;
+          });
+          _checkControllerState();
+        },
+        child: Container(
+          color: const Color(0xFFF3F4F6),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.refresh_rounded,
+                    color: Color(0xFFFB5404), size: 36),
+                const SizedBox(height: 8),
+                Text(
+                  '${_errorMessage!}. Tap to retry.',
+                  style: const TextStyle(
+                      color: Color(0xFF4B5563),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
 
-    if (!_isInitialized) {
+    final controller = _controller;
+    if (controller == null || !_isInitialized) {
+      if (widget.placeholderUrl != null && widget.placeholderUrl!.isNotEmpty) {
+        return Image.network(
+          widget.placeholderUrl!,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            color: const Color(0xFFF3F4F6),
+            child: const Center(
+              child: Icon(Icons.image_not_supported_outlined, size: 26),
+            ),
+          ),
+        );
+      }
       return Container(
         color: const Color(0xFFF3F4F6),
         child: const Center(
@@ -227,10 +292,10 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer>
 
     final video = Center(
       child: AspectRatio(
-        aspectRatio: _controller.value.aspectRatio == 0
+        aspectRatio: controller.value.aspectRatio == 0
             ? 1
-            : _controller.value.aspectRatio,
-        child: VideoPlayer(_controller),
+            : controller.value.aspectRatio,
+        child: VideoPlayer(controller),
       ),
     );
 
@@ -267,7 +332,7 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer>
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
-                            _controller.value.isPlaying
+                            controller.value.isPlaying
                                 ? Icons.pause_rounded
                                 : Icons.play_arrow_rounded,
                             color: Colors.white,
@@ -307,7 +372,7 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer>
             left: 0,
             right: 0,
             child: VideoProgressIndicator(
-              _controller,
+              controller,
               allowScrubbing: true,
               colors: const VideoProgressColors(
                 playedColor: Color(0xFFFB5404),

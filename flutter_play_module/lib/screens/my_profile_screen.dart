@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
@@ -839,23 +840,35 @@ class _MyProfileScreenState extends State<MyProfileScreen> with RouteAware {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    profile.bio!,
-                    maxLines: _showFullBio ? null : 3,
-                    overflow: _showFullBio ? null : TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF333333)),
-                  ),
-                  if (profile.bio!.length > 100)
+                  if (_isBioLong(profile.bio!)) ...[
                     GestureDetector(
                       onTap: () => setState(() => _showFullBio = !_showFullBio),
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          _showFullBio ? 'Read less' : 'Read more',
-                          style: const TextStyle(color: Color(0xFFfb5204), fontWeight: FontWeight.w600, fontSize: 13),
+                      child: RichText(
+                        text: TextSpan(
+                          style: const TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF333333)),
+                          children: [
+                            TextSpan(
+                              text: _showFullBio
+                                  ? profile.bio!
+                                  : _getCollapsedBio(profile.bio!),
+                            ),
+                            TextSpan(
+                              text: _showFullBio ? ' Read less' : ' more',
+                              style: const TextStyle(
+                                color: Color(0xFFfb5204),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
+                  ] else ...[
+                    Text(
+                      profile.bio!,
+                      style: const TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF333333)),
+                    ),
+                  ],
                 ],
               )
             else
@@ -908,28 +921,91 @@ class _MyProfileScreenState extends State<MyProfileScreen> with RouteAware {
     );
   }
 
+  bool _isBioLong(String bio) {
+    if (bio.contains('\n')) return true;
+    if (bio.length > 40) return true;
+    return false;
+  }
+
+  String _getCollapsedBio(String bio) {
+    String firstLine = bio;
+    if (bio.contains('\n')) {
+      firstLine = bio.split('\n').first;
+    }
+    if (firstLine.length > 40) {
+      return '${firstLine.substring(0, 40)}...';
+    }
+    if (bio.contains('\n')) {
+      return '$firstLine...';
+    }
+    return firstLine;
+  }
+
   void _showImage(String url) {
-    showDialog(
+    showGeneralDialog(
       context: context,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.black,
-        insetPadding: const EdgeInsets.all(16),
-        child: Stack(
-          children: [
-            InteractiveViewer(
-              child: Image.network(url, fit: BoxFit.contain),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
+      barrierDismissible: true,
+      barrierLabel: "Close Profile Photo",
+      // ignore: deprecated_member_use
+      barrierColor: Colors.black.withOpacity(0.5),
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Material(
+              color: Colors.transparent,
+              child: Stack(
+                children: [
+                  Center(
+                    child: GestureDetector(
+                      onTap: () {}, // Prevent taps on image from closing
+                      child: Container(
+                        width: MediaQuery.of(context).size.width * 0.8,
+                        height: MediaQuery.of(context).size.width * 0.8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              // ignore: deprecated_member_use
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 15,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: InteractiveViewer(
+                            maxScale: 4.0,
+                            child: Image.network(
+                              url,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: Colors.grey.shade200,
+                                child: const Icon(Icons.person, size: 80, color: Colors.grey),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 16,
+                    right: 16,
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

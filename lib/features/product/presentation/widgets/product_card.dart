@@ -63,6 +63,7 @@ class _ProductCardState extends State<ProductCard> {
                           builder: (context, isActive) {
                             return InlineProductVideoPlayer(
                               videoUrl: widget.item.videoUrl!,
+                              placeholderUrl: widget.item.imageUrl,
                               autoPlay: true,
                               loop: true,
                               initialMuted: true,

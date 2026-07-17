@@ -384,13 +384,17 @@ class _ProductScreenState extends State<ProductScreen> {
     }
   }
 
-  Future<void> _onShare() async {
+  Future<void> _onShare(BuildContext context) async {
     if (_detail == null) return;
     try {
       final url = 'https://www.welfog.com/products/${_detail!.slug}';
       final price = _detail!.sellPrice;
+      final RenderBox? box = context.findRenderObject() as RenderBox?;
+      final rect = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
       await Share.share(
-          '${_detail!.name} - ₹${price.toStringAsFixed(0)}\nCheck it out: $url');
+          '${_detail!.name} - ₹${price.toStringAsFixed(0)}\nCheck it out: $url',
+          sharePositionOrigin: rect,
+      );
     } catch (e) {
       debugPrint('Share Error: $e');
     }
@@ -472,23 +476,28 @@ class _ProductScreenState extends State<ProductScreen> {
                           Positioned(
                             top: 16,
                             right: 16,
-                            child: GestureDetector(
-                              onTap: _onShare,
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFE5E7EB),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.share_outlined,
-                                    size: 18,
-                                    color: Color(0xFFDC2626),
+                            child: Builder(
+                              builder: (buttonContext) {
+                                return GestureDetector(
+                                  onTap: () => _onShare(buttonContext),
+                                  behavior: HitTestBehavior.opaque,
+                                  child: Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFE5E7EB),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.share_outlined,
+                                        size: 18,
+                                        color: Color(0xFFDC2626),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
+                                );
+                              },
                             ),
                           ),
                         ],

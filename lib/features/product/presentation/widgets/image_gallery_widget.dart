@@ -125,12 +125,16 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
     }
   }
 
-  Future<void> _onShare() async {
+  Future<void> _onShare(BuildContext context) async {
     try {
       final url = 'https://www.welfog.com/products/${widget.slug}';
       final price = widget.newPrice ?? widget.oldPrice ?? 0.0;
+      final RenderBox? box = context.findRenderObject() as RenderBox?;
+      final rect = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
       await Share.share(
-          '${widget.name} - ₹${price.toStringAsFixed(0)}\nCheck it out: $url');
+          '${widget.name} - ₹${price.toStringAsFixed(0)}\nCheck it out: $url',
+          sharePositionOrigin: rect,
+      );
     } catch (e) {
       debugPrint('Share Error: $e');
     }
@@ -253,6 +257,11 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
                       clipBehavior: Clip.antiAlias,
                       child: InlineProductVideoPlayer(
                         videoUrl: widget.videoUrl!,
+                        placeholderUrl: widget.images.isNotEmpty
+                            ? (widget.images.first.startsWith('http')
+                                ? widget.images.first
+                                : 'https://d1f02fefkbso7w.cloudfront.net/${widget.images.first}')
+                            : null,
                         autoPlay: true,
                         loop: true,
                         initialMuted: widget.inlineMuted ?? false,
@@ -320,30 +329,35 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      // Share action
-                      GestureDetector(
-                        onTap: _onShare,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            // ignore: deprecated_member_use
-                            color: Colors.white.withOpacity(0.9),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
+                       // Share action
+                      Builder(
+                        builder: (buttonContext) {
+                          return GestureDetector(
+                            onTap: () => _onShare(buttonContext),
+                            behavior: HitTestBehavior.opaque,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
                                 // ignore: deprecated_member_use
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                                                            ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.share,
-                            size: 20,
-                            color: Color(0xFFFB5404),
-                          ),
-                        ),
+                                color: Colors.white.withOpacity(0.9),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    // ignore: deprecated_member_use
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.share,
+                                size: 20,
+                                color: Color(0xFFFB5404),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
