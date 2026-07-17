@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 
 import '../../product/data/models/product_item.dart';
 import '../../product/presentation/widgets/product_card.dart';
@@ -32,10 +33,15 @@ class _DynamicPromotionScreenState extends State<DynamicPromotionScreen> {
     });
 
     try {
-      final isNumber = RegExp(r'^\d+$').hasMatch(widget.slug);
+      var cleanSlug = widget.slug.split('?').first.trim();
+      if (cleanSlug.endsWith('/')) {
+        cleanSlug = cleanSlug.substring(0, cleanSlug.length - 1);
+      }
+
+      final isNumber = RegExp(r'^\d+$').hasMatch(cleanSlug);
       final apiUrl = isNumber
-          ? 'https://welfogapi.welfog.com/api/v2/promotion/get?id=${widget.slug}'
-          : 'https://welfogapi.welfog.com/api/v2/promotion/get?slug=${widget.slug}';
+          ? 'https://welfogapi.welfog.com/api/v2/promotion/get?id=$cleanSlug'
+          : 'https://welfogapi.welfog.com/api/v2/promotion/get?slug=$cleanSlug';
 
       final response = await http.get(Uri.parse(apiUrl));
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -224,11 +230,86 @@ class _DynamicPromotionScreenState extends State<DynamicPromotionScreen> {
           case 'products':
             return _buildProductsGrid(items);
 
+          case 'html':
+            return _buildHtmlSection(items);
+
           default:
             return const SizedBox.shrink();
         }
       },
     );
+  }
+
+  Widget _buildHtmlSection(List items) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: items.map((item) {
+          final htmlContent = item?.toString() ?? '';
+          if (htmlContent.isEmpty) return const SizedBox.shrink();
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: HtmlWidget(
+              _preprocessHtml(htmlContent),
+              textStyle: const TextStyle(fontSize: 14),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  String _preprocessHtml(String html) {
+    var processed = html;
+
+    // 1. Replace large padding with mobile-friendly responsive padding
+    processed = processed.replaceAll('padding:40px;', 'padding: 20px 12px;');
+    processed = processed.replaceAll('padding: 40px;', 'padding: 20px 12px;');
+    processed = processed.replaceAll('margin:30px auto;', 'margin: 10px auto;');
+    processed = processed.replaceAll('margin: 30px auto;', 'margin: 10px auto;');
+
+    // 2. Reduce large font sizes so they don't break/wrap awkwardly on mobile
+    processed = processed.replaceAll('font-size:36px;', 'font-size: 22px;');
+    processed = processed.replaceAll('font-size: 36px;', 'font-size: 22px;');
+    processed = processed.replaceAll('font-size:17px;', 'font-size: 14px;');
+    processed = processed.replaceAll('font-size: 17px;', 'font-size: 14px;');
+    processed = processed.replaceAll('line-height:28px;', 'line-height: 20px;');
+    processed = processed.replaceAll('line-height: 28px;', 'line-height: 20px;');
+
+    // 3. Adjust the link button padding and size
+    processed = processed.replaceAll('padding:16px 36px;', 'padding: 10px 20px;');
+    processed = processed.replaceAll('padding: 16px 36px;', 'padding: 10px 20px;');
+    processed = processed.replaceAll('font-size:18px;', 'font-size: 14px;');
+    processed = processed.replaceAll('font-size: 18px;', 'font-size: 14px;');
+
+    // 4. Fix flex display columns (replace flex box structure with responsive grid or table)
+    processed = processed.replaceAll(
+      'display:flex;justify-content:space-around;flex-wrap:wrap;gap:20px;',
+      'display: block; text-align: center;',
+    );
+    processed = processed.replaceAll(
+      'display: flex; justify-content: space-around; flex-wrap: wrap; gap: 20px;',
+      'display: block; text-align: center;',
+    );
+
+    // If flex is replaced by block, we can make the child divs display as inline-block with margins
+    processed = processed.replaceAll(
+      'min-width:150px;',
+      'display: inline-block; width: 30%; min-width: 85px; margin: 8px 1%; vertical-align: top;',
+    );
+    processed = processed.replaceAll(
+      'min-width: 150px;',
+      'display: inline-block; width: 30%; min-width: 85px; margin: 8px 1%; vertical-align: top;',
+    );
+
+    // 5. Optimize footer column text sizes and line heights for mobile devices
+    processed = processed.replaceAll('font-size:14px;color:#777;', 'font-size: 11px; color: #777; line-height: 1.25;');
+    processed = processed.replaceAll('font-size: 14px; color: #777;', 'font-size: 11px; color: #777; line-height: 1.25;');
+    processed = processed.replaceAll('font-weight:bold;color:#222;margin-top:8px;', 'font-weight: bold; color: #222; margin-top: 6px; font-size: 12px; line-height: 1.2;');
+    processed = processed.replaceAll('font-weight: bold; color: #222; margin-top: 8px;', 'font-weight: bold; color: #222; margin-top: 6px; font-size: 12px; line-height: 1.2;');
+
+    return processed;
   }
 
   Widget _buildBannerSlider(List items) {
@@ -324,7 +405,10 @@ class _BannerSliderWidgetState extends State<_BannerSliderWidget> {
             },
             itemBuilder: (context, index) {
               final banner = widget.items[index] as Map<String, dynamic>? ?? {};
-              final imageUrl = banner['image']?.toString() ?? '';
+              final rawImage = banner['image']?.toString() ?? '';
+              final imageUrl = rawImage.isNotEmpty
+                  ? (rawImage.startsWith('http') ? rawImage : 'https://d1f02fefkbso7w.cloudfront.net/$rawImage')
+                  : '';
 
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
