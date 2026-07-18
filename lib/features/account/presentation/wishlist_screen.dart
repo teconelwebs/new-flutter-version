@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/state/cart_state.dart';
+import '../../../core/state/wishlist_state.dart';
 import '../data/account_api_service.dart';
 import '../../product/data/models/product_item.dart';
 import '../../product/data/product_api_service.dart';
@@ -132,6 +133,9 @@ class _WishlistScreenState extends State<WishlistScreen>
       _wishlist.removeWhere((element) => element.id == item.id);
     });
 
+    // Instantly sync with SharedPreferences and other listening screens (e.g. Home screen)
+    await WishlistState.updateWishlistState(item.product.id.toString(), false);
+
     // Show custom black bottom popup snackbar
     _showCustomPopup('Item removed');
 
@@ -141,7 +145,6 @@ class _WishlistScreenState extends State<WishlistScreen>
           await _apiService.removeWishlistItem(item.product.id, item.compareId);
       if (success) {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('wishlist_state_${item.product.id}', 'false');
         await prefs.setString('wishlist_count', _wishlist.length.toString());
       }
     } catch (_) {

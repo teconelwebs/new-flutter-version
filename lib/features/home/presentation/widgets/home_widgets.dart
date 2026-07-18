@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../../../account/data/account_api_service.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/state/wishlist_state.dart';
 
 double _safeBannerAspectRatio(double? ratio, {double fallback = 3.0}) {
   if (ratio == null || !ratio.isFinite || ratio <= 0) return fallback;
@@ -577,6 +578,25 @@ class _HomeProductCardState extends State<HomeProductCard> {
   void initState() {
     super.initState();
     _checkWishlistState();
+    WishlistState.wishlistNotifier.addListener(_wishlistListener);
+  }
+
+  @override
+  void dispose() {
+    WishlistState.wishlistNotifier.removeListener(_wishlistListener);
+    super.dispose();
+  }
+
+  void _wishlistListener() {
+    final productId = widget.product.id.toString();
+    if (WishlistState.wishlistNotifier.value.containsKey(productId)) {
+      final val = WishlistState.wishlistNotifier.value[productId]!;
+      if (val != _isWishlisted && mounted) {
+        setState(() {
+          _isWishlisted = val;
+        });
+      }
+    }
   }
 
   @override
@@ -588,11 +608,10 @@ class _HomeProductCardState extends State<HomeProductCard> {
   }
 
   Future<void> _checkWishlistState() async {
-    final prefs = await SharedPreferences.getInstance();
-    final wishState = prefs.getString('wishlist_state_${widget.product.id}');
+    final wishState = await WishlistState.isWishlisted(widget.product.id.toString());
     if (mounted) {
       setState(() {
-        _isWishlisted = wishState == 'true';
+        _isWishlisted = wishState;
       });
     }
   }
@@ -618,9 +637,7 @@ class _HomeProductCardState extends State<HomeProductCard> {
 
         final success = await _apiService.removeWishlistItem(widget.product.id, compareId);
         if (success) {
-          setState(() {
-            _isWishlisted = false;
-          });
+          await WishlistState.updateWishlistState(widget.product.id.toString(), false);
           if (mounted) {
             const msg = 'Item removed from wishlist';
             const textWidth = (msg.length * 7.5) + 32;
@@ -650,9 +667,7 @@ class _HomeProductCardState extends State<HomeProductCard> {
       } else {
         final success = await _apiService.addWishlistItem(widget.product.id);
         if (success) {
-          setState(() {
-            _isWishlisted = true;
-          });
+          await WishlistState.updateWishlistState(widget.product.id.toString(), true);
           if (mounted) {
             const msg = 'Item added to wishlist';
             const textWidth = (msg.length * 7.5) + 32;

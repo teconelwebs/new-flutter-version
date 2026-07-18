@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:share_plus/share_plus.dart';
 import 'inline_product_video_player.dart';
+import '../../../../core/state/wishlist_state.dart';
 
 class ImageGalleryWidget extends StatefulWidget {
   final List<String> images;
@@ -52,6 +53,27 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
     super.initState();
     _localWishlisted = widget.isWishlisted;
     _checkSavedWishlist();
+    WishlistState.wishlistNotifier.addListener(_wishlistListener);
+  }
+
+  @override
+  void dispose() {
+    WishlistState.wishlistNotifier.removeListener(_wishlistListener);
+    super.dispose();
+  }
+
+  void _wishlistListener() {
+    if (widget.productId != null) {
+      final productId = widget.productId!;
+      if (WishlistState.wishlistNotifier.value.containsKey(productId)) {
+        final val = WishlistState.wishlistNotifier.value[productId]!;
+        if (val != _localWishlisted && mounted) {
+          setState(() {
+            _localWishlisted = val;
+          });
+        }
+      }
+    }
   }
 
   @override
@@ -66,12 +88,9 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
 
   Future<void> _checkSavedWishlist() async {
     if (widget.productId != null) {
-      final prefs = await SharedPreferences.getInstance();
-      final savedState = prefs.getString('wishlist_state_${widget.productId}');
-      if (savedState == 'true' && mounted) {
-        setState(() => _localWishlisted = true);
-      } else if (savedState == 'false' && mounted) {
-        setState(() => _localWishlisted = false);
+      final savedState = await WishlistState.isWishlisted(widget.productId!);
+      if (mounted) {
+        setState(() => _localWishlisted = savedState);
       }
     }
   }
@@ -85,10 +104,8 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
       _isToggling = true;
     });
 
-    final prefs = await SharedPreferences.getInstance();
     if (widget.productId != null) {
-      await prefs.setString(
-          'wishlist_state_${widget.productId}', newState.toString());
+      await WishlistState.updateWishlistState(widget.productId!, newState);
     }
 
     if (widget.onWishlistPress != null) {
@@ -98,6 +115,7 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
     // Call API directly for fallback
     if (widget.productId != null && widget.userId != null) {
       try {
+        final prefs = await SharedPreferences.getInstance();
         final token = prefs.getString('access_token');
         final endpoint = previousState
             ? 'wishlists-remove-product'
