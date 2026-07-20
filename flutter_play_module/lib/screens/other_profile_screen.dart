@@ -1,11 +1,9 @@
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../models/profile_post.dart';
 import '../models/user_profile.dart';
 import '../models/profile_reels_route_args.dart';
-import '../services/reels_api.dart';
 import '../utils/app_routes.dart';
 import '../utils/format_count.dart';
 import '../utils/flutter_nav.dart';
@@ -36,7 +34,6 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
   bool _isFollowing = false;
   bool _isBlocked = false;
   bool _actionLoading = false;
-  bool _shareInProgress = false;
   String? _error;
   String? _toast;
   bool _initialized = false;
@@ -287,38 +284,6 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
     }
   }
 
-  Future<void> _shareProfile() async {
-    if (_shareInProgress) return;
-    _shareInProgress = true;
-    try {
-      final profile = _profile;
-      if (profile == null) return;
-      final shareId = profile.id.trim();
-      if (!ReelsApi.isPlayProfileMongoId(shareId)) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('This profile cannot be shared right now.')),
-          );
-        }
-        return;
-      }
-      final msg =
-          await PlaySession.apiOf(context).getProfileShareMessage(shareId);
-      if (msg.isEmpty || !msg.contains('api/plays/p/')) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Could not generate profile share link.')),
-          );
-        }
-        return;
-      }
-      await Share.share(msg);
-    } finally {
-      _shareInProgress = false;
-    }
-  }
 
   void _openFollowList(String type) async {
     if (_isBlocked) return;
@@ -679,21 +644,6 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
                             ? '...'
                             : (_isFollowing ? 'Following' : 'Follow'),
                         style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Material(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(8),
-                    child: InkWell(
-                      onTap: _shareProfile,
-                      borderRadius: BorderRadius.circular(8),
-                      child: const SizedBox(
-                        width: 46,
-                        height: 46,
-                        child: Icon(Icons.share_outlined,
-                            color: Color(0xFFfb5404)),
                       ),
                     ),
                   ),

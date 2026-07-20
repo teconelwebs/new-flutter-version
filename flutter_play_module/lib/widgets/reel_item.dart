@@ -467,7 +467,10 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
     _shareInProgress = true;
     try {
       final msg = await widget.api.getShareMessage(widget.reel.id);
-      await Share.share(msg);
+      if (!mounted) return;
+      final RenderBox? box = context.findRenderObject() as RenderBox?;
+      final rect = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+      await Share.share(msg, sharePositionOrigin: rect);
     } finally {
       _shareInProgress = false;
     }

@@ -7,8 +7,14 @@ class SupplierInfoScreen extends StatelessWidget {
   const SupplierInfoScreen({super.key});
 
   /// Shows a custom rationale bottom sheet explaining WHY camera
-  /// permission is needed before triggering the system prompt.
+  /// permission is needed before triggering the system prompt (on non-iOS).
+  /// On iOS, requests permission natively and directly navigates.
   void _requestCameraAndNavigate(BuildContext context) async {
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      Navigator.of(context).pushNamed(AppRoutes.connectSupplier);
+      return;
+    }
+
     // Check current permission status using MobileScannerController
     final controller = MobileScannerController();
 

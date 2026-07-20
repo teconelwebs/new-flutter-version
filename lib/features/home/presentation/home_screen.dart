@@ -33,6 +33,7 @@ import 'widgets/custom_bottom_tab_bar.dart';
 import 'widgets/header.dart';
 import 'widgets/category_widget.dart';
 import 'widgets/banner_widget.dart';
+import 'widgets/category_promotion_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.initialTab});
@@ -151,6 +152,14 @@ class _HomeScreenState extends State<HomeScreen>
             _loadedPincode = cached.pincode;
           });
         }
+        // Trigger a background refresh to fetch fresh API promotions & categories
+        _fetchBundleWithPincodeTracking().then((fresh) {
+          if (mounted) {
+            setState(() {
+              _bundleFuture = Future.value(fresh);
+            });
+          }
+        }).catchError((_) {});
         return cached;
       } else {
         return _fetchBundleWithPincodeTracking();
@@ -1101,7 +1110,7 @@ class _HomeTabState extends State<_HomeTab> {
 
         final bundle = snap.data!;
         final dealList = bundle.todayDeals.take(10).toList();
-        final sections = bundle.sections.take(4).toList();
+        final sections = bundle.sections;
 
         return Stack(
           children: [
@@ -1224,38 +1233,40 @@ class _HomeTabState extends State<_HomeTab> {
                     (s) => SliverToBoxAdapter(
                       child: Column(
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: ProductStrip(
-                              title: s.name,
-                              products: s.products.take(10).toList(),
-                              onProductTap: (p) {
-                                Navigator.of(context)
-                                    .pushNamed(
-                                      AppRoutes.product,
-                                      arguments: _toProductItem(
-                                        p,
-                                        s.products.indexOf(p),
-                                      ),
-                                    )
-                                    .then((_) => _loadRecentlyViewed());
-                              },
-                              onRightIconTap: () {
-                                Navigator.of(context).pushNamed(
-                                  AppRoutes.searchResults,
-                                  arguments: {
-                                    'query': s.name,
-                                    'categoryId': s.id,
-                                  },
-                                ).then((_) => _loadRecentlyViewed());
-                              },
+                          if (s.products.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: ProductStrip(
+                                title: s.name,
+                                products: s.products.take(10).toList(),
+                                onProductTap: (p) {
+                                  Navigator.of(context)
+                                      .pushNamed(
+                                        AppRoutes.product,
+                                        arguments: _toProductItem(
+                                          p,
+                                          s.products.indexOf(p),
+                                        ),
+                                      )
+                                      .then((_) => _loadRecentlyViewed());
+                                },
+                                onRightIconTap: () {
+                                  Navigator.of(context).pushNamed(
+                                    AppRoutes.searchResults,
+                                    arguments: {
+                                      'query': s.name,
+                                      'categoryId': s.id,
+                                    },
+                                  ).then((_) => _loadRecentlyViewed());
+                                },
+                              ),
                             ),
-                          ),
                           if (s.bannerData.isNotEmpty)
                             Padding(
                               padding: const EdgeInsets.only(top: 10),
                               child: BannerCarousel(items: s.bannerData),
                             ),
+                          CategoryPromotionWidget(categoryId: s.id),
                         ],
                       ),
                     ),

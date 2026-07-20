@@ -429,7 +429,10 @@ class _MyProfileScreenState extends State<MyProfileScreen> with RouteAware {
         }
         return;
       }
-      await Share.share(msg);
+      if (!mounted) return;
+      final RenderBox? box = context.findRenderObject() as RenderBox?;
+      final rect = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+      await Share.share(msg, sharePositionOrigin: rect);
     } finally {
       _shareInProgress = false;
     }

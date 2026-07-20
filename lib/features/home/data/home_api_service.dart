@@ -18,16 +18,18 @@ class HomeApiService {
     final city = prefs.getString('city_name') ?? 'Jaipur';
     final pincode = prefs.getString('postal_code') ?? '302001';
 
-    // Fetch all three endpoints in parallel
+    // Fetch all four endpoints in parallel, adding the categories list
     final results = await Future.wait([
       _getJson('$_mainApi/bannerdata/'),
-      _getJson('https://welfogapi.welfog.com/api/cat_wise_product_show?latitude=$lat&longitude=$lng&page=1'),
+      _getJson('https://welfogapi.welfog.com/api/cat_wise_product_show?latitude=$lat&longitude=$lng&page=1&limit=20'),
       _getJson('$_secondApi/today_deal?latitude=$lat&longitude=$lng&page=1&limit=10'),
+      _getJson('https://welfogapi.welfog.com/api/nav_cat_data/'),
     ]);
 
     final bannerRes = results[0];
     final catRes = results[1];
     final dealRes = results[2];
+    final navCatRes = results[3];
 
     final mobileSlider = _mapBannerList(bannerRes['mobile_slider']);
     final banner1 = _mapBannerList(bannerRes['banner1']);
@@ -35,6 +37,23 @@ class HomeApiService {
 
     final sections = _mapSections(catRes['data']);
     final todayDeals = _mapDealProducts(dealRes['products']);
+
+    // Merge missing categories (like Women Fashion / Women) so they show up for promotions
+    final rawNavCats = navCatRes['categories'] as List? ?? [];
+    for (var nc in rawNavCats) {
+      if (nc is Map) {
+        final id = (nc['id'] ?? '').toString();
+        final name = (nc['name'] ?? '').toString();
+        if (id.isNotEmpty && !sections.any((s) => s.id == id)) {
+          sections.add(HomeCategorySection(
+            id: id,
+            name: name,
+            products: const [],
+            bannerData: const [],
+          ));
+        }
+      }
+    }
 
     final bundle = HomeBundle(
       mobileSlider: mobileSlider,
@@ -47,7 +66,7 @@ class HomeApiService {
     );
 
     try {
-      await prefs.setString('cached_home_bundle_v3', jsonEncode(bundle.toJson()));
+      await prefs.setString('cached_home_bundle_v4', jsonEncode(bundle.toJson()));
     } catch (e) {
       debugPrint("Failed to cache home bundle: $e");
     }
@@ -67,7 +86,7 @@ class HomeApiService {
   Future<HomeBundle?> getCachedHomeBundle() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final cachedStr = prefs.getString('cached_home_bundle_v3');
+      final cachedStr = prefs.getString('cached_home_bundle_v4');
       if (cachedStr != null) {
         final decoded = jsonDecode(cachedStr);
         return HomeBundle.fromJson(decoded);
