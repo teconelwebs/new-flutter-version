@@ -11,6 +11,7 @@ import '../../../core/services/check_app_update.dart';
 import '../../../core/utils/safe_insets.dart';
 import '../../../core/widgets/app_loader.dart';
 import '../../../core/widgets/no_internet_widget.dart';
+import '../../../core/widgets/view_cart_banner.dart';
 
 import 'package:app_links/app_links.dart';
 import '../../account/presentation/account_screen.dart';
@@ -835,6 +836,30 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ),
                   ),
+                ),
+              if (_currentIndex != 2 && _currentIndex != 3)
+                ValueListenableBuilder<int>(
+                  valueListenable: CartState.cartCountNotifier,
+                  builder: (context, cartCount, _) {
+                    if (cartCount <= 0) return const SizedBox.shrink();
+                    return Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 8.0,
+                      child: ViewCartBanner(
+                        onTap: () {
+                          setState(() {
+                            if (_currentIndex != 2) {
+                              _previousIndex = _currentIndex;
+                            }
+                            _currentIndex = 3;
+                          });
+                          _updateStatusBarColor();
+                          CartScreen.emitRefreshTabAction();
+                        },
+                      ),
+                    );
+                  },
                 ),
             ],
           );

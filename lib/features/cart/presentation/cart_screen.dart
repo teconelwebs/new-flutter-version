@@ -13,6 +13,7 @@ import '../../../core/state/cart_state.dart';
 import '../../../core/utils/safe_insets.dart';
 import '../../../core/widgets/app_loader.dart';
 import '../../home/presentation/home_screen.dart';
+import '../../../core/utils/top_toast.dart';
 
 class CartItem {
   final int id;
@@ -227,7 +228,6 @@ class _CartScreenState extends State<CartScreen>
   // ignore: unused_field
   bool _refreshing = false;
   bool _isDeleting = false;
-  DateTime? _lastToastTime;
 
   late AnimationController _bounceController;
   late Animation<double> _bounceAnimation;
@@ -626,52 +626,7 @@ class _CartScreenState extends State<CartScreen>
 
   void _showCustomPopup(String message) {
     if (!mounted) return;
-    final now = DateTime.now();
-    if (_lastToastTime != null &&
-        now.difference(_lastToastTime!) < const Duration(milliseconds: 1500)) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      _lastToastTime = now;
-      return;
-    }
-    _lastToastTime = now;
-
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-        content: Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            decoration: BoxDecoration(
-              // ignore: deprecated_member_use
-              color: const Color(0xFF222222).withOpacity(0.9),
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  // ignore: deprecated_member_use
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 6,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.3,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    TopToast.show(context, message);
   }
 
   Future<void> _changeQuantity(CartItem item, int newQty) async {

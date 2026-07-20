@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import '../../../../core/constants/app_routes.dart';
 import '../../../../core/state/cart_state.dart';
 import '../../../../core/widgets/app_loader.dart';
+import '../../../../core/utils/top_toast.dart';
 
 
 class BuyProductBtnWidget extends StatefulWidget {
@@ -151,30 +152,6 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
             debugPrint('Failed to sync cart count: $err');
           }
 
-          if (mounted) {
-            ScaffoldMessenger.of(context).clearSnackBars();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text(
-                  'Added to Cart!',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-                backgroundColor: const Color(0xB3111111),
-                behavior: SnackBarBehavior.floating,
-                width: MediaQuery.sizeOf(context).width * 0.5,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                duration: const Duration(seconds: 1),
-              ),
-            );
-          }
-
           if (navigateToCart) {
             // ignore: use_build_context_synchronously
             Navigator.of(context).pushNamed(
@@ -184,27 +161,7 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
           }
         } else {
           if (mounted) {
-            ScaffoldMessenger.of(context).clearSnackBars();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  resData['message'] ?? 'Failed to add item to cart.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-                backgroundColor: const Color(0xB3111111),
-                behavior: SnackBarBehavior.floating,
-                width: MediaQuery.sizeOf(context).width * 0.5,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                duration: const Duration(seconds: 1),
-              ),
-            );
+            TopToast.show(context, resData['message'] ?? 'Failed to add item to cart.');
           }
         }
       }

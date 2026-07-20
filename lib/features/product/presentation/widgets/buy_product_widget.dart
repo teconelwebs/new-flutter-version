@@ -2,13 +2,12 @@
 // Converted from: component/BuyProduct.tsx
 
 import 'package:flutter/material.dart';
+import '../../../../core/utils/top_toast.dart';
 
 class BuyProductWidget extends StatelessWidget {
   final Map<String, dynamic> data;
   final int quantity;
   final ValueChanged<int> onQuantityChanged;
-
-  static DateTime? _lastToastTime;
 
   // ignore: use_super_parameters
   const BuyProductWidget({
@@ -39,52 +38,7 @@ class BuyProductWidget extends StatelessWidget {
       if (quantity < maxLimit) {
         onQuantityChanged(quantity + 1);
       } else {
-        final now = DateTime.now();
-        if (_lastToastTime != null &&
-            now.difference(_lastToastTime!) < const Duration(milliseconds: 1500)) {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          _lastToastTime = now;
-          return;
-        }
-        _lastToastTime = now;
-
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-            content: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  // ignore: deprecated_member_use
-                  color: const Color(0xFF222222).withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      // ignore: deprecated_member_use
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 6,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: const Text(
-                  'Maximum purchase limit is 2 units',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
+        TopToast.show(context, 'Maximum purchase limit is 2 units');
       }
     }
 

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../../../core/constants/app_routes.dart';
 import '../../../core/widgets/app_loader.dart';
 import '../../../core/widgets/no_internet_widget.dart';
+import '../../../core/widgets/view_cart_banner.dart';
 import '../../../core/state/cart_state.dart';
 import '../data/models/product_item.dart';
 import '../data/product_api_service.dart';
@@ -430,110 +431,130 @@ class _ProductScreenState extends State<ProductScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            _ProductHeader(
-              onBack: () => Navigator.of(context).maybePop(),
-              onSearch: () => Navigator.of(context).pushNamed(AppRoutes.search),
-              onWishlist: _toggleWishlist,
-              onCartTap: () async {
-                final prefs = await SharedPreferences.getInstance();
-                final token = prefs.getString('access_token') ?? '';
-                if (token.isEmpty) {
-                  if (context.mounted) {
-                    Navigator.of(context).pushNamed(AppRoutes.login);
-                  }
-                  return;
-                }
-                if (context.mounted) {
-                  Navigator.of(context).pushNamed(AppRoutes.cart);
-                }
-              },
-              isWishlisted: _isWishlisted,
-            ),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _load,
-                child: ListView(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.only(top: 0, bottom: 24),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Stack(
-                        children: [
-                          ImageGalleryWidget(
-                            images: detail.images,
-                            videoUrl: detail.videoUrl,
-                            isWishlisted: _isWishlisted,
-                            onWishlistPress: _toggleWishlist,
-                            name: detail.name,
-                            slug: detail.slug,
-                            productId: detail.id,
-                            userId: _userId,
-                            showFloatingActions: false,
-                          ),
-                          Positioned(
-                            top: 16,
-                            right: 16,
-                            child: Builder(
-                              builder: (buttonContext) {
-                                return GestureDetector(
-                                  onTap: () => _onShare(buttonContext),
-                                  behavior: HitTestBehavior.opaque,
-                                  child: Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFFE5E7EB),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Center(
-                                      child: Icon(
-                                        Icons.share_outlined,
-                                        size: 18,
-                                        color: Color(0xFFDC2626),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ProductDetailsWidget(
-                      data: detail.rawJson,
-                      pincode: _pincode,
-                      onRatingTap: _scrollToReviews,
-                      onVariantSelected: _selectVariant,
-                    ),
-                    const SizedBox(height: 12),
-                    BuyProductWidget(
-                      data: detail.rawJson,
-                      quantity: _qty,
-                      onQuantityChanged: (newQty) {
-                        setState(() {
-                          _qty = newQty;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    ProductOtherDetailsWidget(
-                      data: detail.rawJson,
-                    ),
-                    const SizedBox(height: 12),
-                    CustomerReviewsWidget(
-                      key: _reviewsKey,
-                      data: detail.rawJson,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildSuggestedProducts(),
-                  ],
+            Column(
+              children: [
+                _ProductHeader(
+                  onBack: () => Navigator.of(context).maybePop(),
+                  onSearch: () => Navigator.of(context).pushNamed(AppRoutes.search),
+                  onWishlist: _toggleWishlist,
+                  onCartTap: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    final token = prefs.getString('access_token') ?? '';
+                    if (token.isEmpty) {
+                      if (context.mounted) {
+                        Navigator.of(context).pushNamed(AppRoutes.login);
+                      }
+                      return;
+                    }
+                    if (context.mounted) {
+                      Navigator.of(context).pushNamed(AppRoutes.cart);
+                    }
+                  },
+                  isWishlisted: _isWishlisted,
                 ),
-              ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _load,
+                    child: ListView(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.only(top: 0, bottom: 24),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Stack(
+                            children: [
+                              ImageGalleryWidget(
+                                images: detail.images,
+                                videoUrl: detail.videoUrl,
+                                isWishlisted: _isWishlisted,
+                                onWishlistPress: _toggleWishlist,
+                                name: detail.name,
+                                slug: detail.slug,
+                                productId: detail.id,
+                                userId: _userId,
+                                showFloatingActions: false,
+                              ),
+                              Positioned(
+                                top: 16,
+                                right: 16,
+                                child: Builder(
+                                  builder: (buttonContext) {
+                                    return GestureDetector(
+                                      onTap: () => _onShare(buttonContext),
+                                      behavior: HitTestBehavior.opaque,
+                                      child: Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFE5E7EB),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Center(
+                                          child: Icon(
+                                            Icons.share_outlined,
+                                            size: 18,
+                                            color: Color(0xFFDC2626),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ProductDetailsWidget(
+                          data: detail.rawJson,
+                          pincode: _pincode,
+                          onRatingTap: _scrollToReviews,
+                          onVariantSelected: _selectVariant,
+                        ),
+                        const SizedBox(height: 12),
+                        BuyProductWidget(
+                          data: detail.rawJson,
+                          quantity: _qty,
+                          onQuantityChanged: (newQty) {
+                            setState(() {
+                              _qty = newQty;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        ProductOtherDetailsWidget(
+                          data: detail.rawJson,
+                        ),
+                        const SizedBox(height: 12),
+                        CustomerReviewsWidget(
+                          key: _reviewsKey,
+                          data: detail.rawJson,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildSuggestedProducts(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            ValueListenableBuilder<int>(
+              valueListenable: CartState.cartCountNotifier,
+              builder: (context, cartCount, _) {
+                if (cartCount <= 0) return const SizedBox.shrink();
+                return Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 8.0,
+                  child: ViewCartBanner(
+                    onTap: () {
+                      Navigator.of(context).pushNamed(AppRoutes.cart);
+                    },
+                  ),
+                );
+              },
             ),
           ],
         ),

@@ -49,20 +49,9 @@ class PushNotificationService {
 
       bool shouldPrompt = true;
 
-      // On iOS, if we have context, check if we need to show rationale first
-      if (Platform.isIOS && context != null) {
-        final settings = await fcm.getNotificationSettings();
-        if (context.mounted && settings.authorizationStatus == AuthorizationStatus.notDetermined) {
-          final allowed = await showModalBottomSheet<bool>(
-            context: context,
-            backgroundColor: Colors.transparent,
-            isScrollControlled: true,
-            builder: (ctx) => const NotificationPermissionRationaleSheet(),
-          );
-          if (allowed != true) {
-            shouldPrompt = false;
-          }
-        }
+      // On iOS, skip requesting notification permissions as requested
+      if (Platform.isIOS) {
+        shouldPrompt = false;
       }
 
       if (shouldPrompt) {
