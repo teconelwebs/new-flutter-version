@@ -282,12 +282,23 @@ class PushNotificationService {
       final String platform = Platform.isAndroid ? "android" : "ios";
 
       final lastToken = prefs.getString('last_push_token');
+      
+      debugPrint(
+        "\n💾 ================================================\n"
+        "💾 LOCAL DEVICE TOKEN CHECK:\n"
+        "💾 Saved Local Token: ${lastToken ?? 'NONE (Empty/Not Stored)'}\n"
+        "💾 Current Device FCM Token: $token\n"
+        "💾 Is Token Stored and Matched? ${lastToken == token ? 'YES (Matched)' : 'NO (Needs Sync/Missing)'}\n"
+        "💾 ================================================\n",
+      );
+
       bool shouldRegister = force || lastToken != token;
 
       if (!shouldRegister) {
         final statusUrl = Uri.parse(
           'https://welfogapi.welfog.com/api/notification/token-status?user_id=$userId&device_id=$deviceId',
         );
+        debugPrint("💾 Checking token registration status on server: $statusUrl");
         final checkRes = await http.get(statusUrl);
 
         if (checkRes.statusCode == 200) {
@@ -295,18 +306,23 @@ class PushNotificationService {
           if (checkData['status'] == 'active' ||
               checkData['registered'] == true) {
             shouldRegister = false;
+            debugPrint("💾 Server reports token is already active/registered.");
           } else {
             shouldRegister = true;
+            debugPrint("💾 Server reports token is inactive or not registered.");
           }
         } else {
           shouldRegister = true;
+          debugPrint("💾 Server status check failed (status: ${checkRes.statusCode}). Forcing register.");
         }
       }
 
       if (!shouldRegister) {
-        debugPrint("FCM sync: token already active on server");
+        debugPrint("💾 FCM sync skipped: Token is already saved locally and registered on server.");
         return;
       }
+
+      debugPrint("💾 Fetching and saving new token to backend server...");
 
       final saveUrl =
           Uri.parse('https://welfogapi.welfog.com/api/notification/save-token');
@@ -317,7 +333,6 @@ class PushNotificationService {
           'user_id': userId,
           'device_id': deviceId,
           'push_token': token,
-          'expo_push_token': 'ExponentPushToken[$token]',
           'platform': platform,
           'app_version': '1.2.0',
         }),
@@ -337,6 +352,14 @@ class PushNotificationService {
           final Map<String, dynamic> resData = jsonDecode(saveRes.body);
           if (resData['status'] == 200 || resData['status'] == null) {
             await prefs.setString('last_push_token', token);
+            debugPrint(
+              "\n💾 ================================================\n"
+              "💾 LOCAL STORAGE SUCCESS:\n"
+              "💾 FCM Token has been saved to SharedPreferences.\n"
+              "💾 Key: last_push_token\n"
+              "💾 Value: $token\n"
+              "💾 ================================================\n",
+            );
           } else {
             debugPrint(
               "\n❌ ================================================\n"
@@ -347,6 +370,7 @@ class PushNotificationService {
           }
         } catch (_) {
           await prefs.setString('last_push_token', token);
+          debugPrint("💾 Error parsing response body, but saved token locally anyway.");
         }
       }
     } catch (e) {

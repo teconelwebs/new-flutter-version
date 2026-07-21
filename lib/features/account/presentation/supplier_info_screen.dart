@@ -316,16 +316,14 @@ class _SupplierInfoScreenState extends State<SupplierInfoScreen> {
                                           ? Image.network(
                                               logoUrl,
                                               fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) => const Icon(
-                                                Icons.storefront_rounded,
-                                                color: Color(0xFFFF6A00), // Orange logo color inside white background
-                                                size: 60,
+                                              errorBuilder: (_, __, ___) => Image.asset(
+                                                'assets/images/shop_default_logo.png',
+                                                fit: BoxFit.cover,
                                               ),
                                             )
-                                          : const Icon(
-                                              Icons.storefront_rounded,
-                                              color: Color(0xFFFF6A00), // Orange logo color inside white background
-                                              size: 60,
+                                          : Image.asset(
+                                              'assets/images/shop_default_logo.png',
+                                              fit: BoxFit.cover,
                                             ),
                                     ),
                                   ),
