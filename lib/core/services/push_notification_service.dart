@@ -317,7 +317,7 @@ class PushNotificationService {
           'user_id': userId,
           'device_id': deviceId,
           'push_token': token,
-          'expo_push_token': token,
+          'expo_push_token': 'ExponentPushToken[$token]',
           'platform': platform,
           'app_version': '1.2.0',
         }),

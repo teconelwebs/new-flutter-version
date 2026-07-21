@@ -68,18 +68,18 @@ class _ShopScreenState extends State<ShopScreen> {
   void _loadBannerAspectRatio(String url) {
     final image = NetworkImage(url);
     image.resolve(const ImageConfiguration()).addListener(
-      ImageStreamListener(
-        (ImageInfo info, bool _) {
-          final ratio = info.image.width / info.image.height;
-          if (mounted && ratio > 0 && ratio != _bannerAspectRatio) {
-            setState(() => _bannerAspectRatio = ratio);
-          }
-        },
-        onError: (exception, stackTrace) {
-          debugPrint('Error loading banner aspect ratio: $exception');
-        },
-      ),
-    );
+          ImageStreamListener(
+            (ImageInfo info, bool _) {
+              final ratio = info.image.width / info.image.height;
+              if (mounted && ratio > 0 && ratio != _bannerAspectRatio) {
+                setState(() => _bannerAspectRatio = ratio);
+              }
+            },
+            onError: (exception, stackTrace) {
+              // debugPrint('Error loading banner aspect ratio: $exception');
+            },
+          ),
+        );
   }
 
   Future<void> _fetchProducts() async {
@@ -196,7 +196,8 @@ class _ShopScreenState extends State<ShopScreen> {
 
                     // Products grid
                     if (_loadingProducts)
-                      SliverToBoxAdapter(child: _buildProductsSkeleton(cardWidth))
+                      SliverToBoxAdapter(
+                          child: _buildProductsSkeleton(cardWidth))
                     else if (_products.isEmpty)
                       const SliverToBoxAdapter(
                         child: Padding(
@@ -204,11 +205,13 @@ class _ShopScreenState extends State<ShopScreen> {
                           child: Center(
                             child: Column(
                               children: [
-                                Icon(Icons.shopping_bag_outlined, size: 48, color: Color(0xFFCCCCCC)),
+                                Icon(Icons.shopping_bag_outlined,
+                                    size: 48, color: Color(0xFFCCCCCC)),
                                 SizedBox(height: 12),
                                 Text(
                                   'No products found',
-                                  style: TextStyle(color: Color(0xFF888888), fontSize: 14),
+                                  style: TextStyle(
+                                      color: Color(0xFF888888), fontSize: 14),
                                 ),
                               ],
                             ),
@@ -220,10 +223,12 @@ class _ShopScreenState extends State<ShopScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         sliver: SliverGrid(
                           delegate: SliverChildBuilderDelegate(
-                            (context, index) => _buildProductCard(_products[index]),
+                            (context, index) =>
+                                _buildProductCard(_products[index]),
                             childCount: _products.length,
                           ),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
                             crossAxisSpacing: 10,
                             mainAxisSpacing: 10,
@@ -259,7 +264,8 @@ class _ShopScreenState extends State<ShopScreen> {
                 Navigator.of(context).pop();
               }
             },
-            icon: const Icon(Icons.chevron_left, size: 26, color: Color(0xFF111111)),
+            icon: const Icon(Icons.chevron_left,
+                size: 26, color: Color(0xFF111111)),
           ),
           const Expanded(
             child: Text(
@@ -410,7 +416,8 @@ class _ShopScreenState extends State<ShopScreen> {
                 children: [
                   // Rating badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
                       color: const Color(0xFF2E7D32),
                       borderRadius: BorderRadius.circular(4),
@@ -440,7 +447,8 @@ class _ShopScreenState extends State<ShopScreen> {
                   const SizedBox(width: 10),
                   Text(
                     '${detail.productCount} Products',
-                    style: const TextStyle(fontSize: 13, color: Color(0xFF666666)),
+                    style:
+                        const TextStyle(fontSize: 13, color: Color(0xFF666666)),
                   ),
                 ],
               ),
@@ -501,7 +509,9 @@ class _ShopScreenState extends State<ShopScreen> {
   Widget _buildProductCard(ShopProduct p) {
     final delivery = _calcDelivery(p.durationMinutes);
     final hasDiscount = p.oldPrice > p.newPrice && p.newPrice > 0;
-    final discountPct = hasDiscount ? (((p.oldPrice - p.newPrice) / p.oldPrice) * 100).round() : 0;
+    final discountPct = hasDiscount
+        ? (((p.oldPrice - p.newPrice) / p.oldPrice) * 100).round()
+        : 0;
 
     return GestureDetector(
       onTap: () => _openProduct(p),
@@ -552,7 +562,8 @@ class _ShopScreenState extends State<ShopScreen> {
                       top: 8,
                       left: 8,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFB5404),
                           borderRadius: BorderRadius.circular(4),
