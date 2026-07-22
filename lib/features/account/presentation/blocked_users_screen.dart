@@ -184,19 +184,37 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen>
   }
 
   Widget _buildEmptyState() {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.shield_outlined,
-              size: 60,
-              color: Color(0xFFCCCCCC),
+            Container(
+              width: 86,
+              height: 86,
+              decoration: const BoxDecoration(
+                color: Color(0xFFF3F4F6),
+                shape: BoxShape.circle,
+              ),
+              child: const Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    Icons.shield_outlined,
+                    size: 50,
+                    color: Color(0xFF9CA3AF),
+                  ),
+                  Icon(
+                    Icons.block_rounded,
+                    size: 24,
+                    color: Color(0xFFEF4444),
+                  ),
+                ],
+              ),
             ),
-            SizedBox(height: 16),
-            Text(
+            const SizedBox(height: 16),
+            const Text(
               'No Blocked Users',
               style: TextStyle(
                 fontSize: 18,
@@ -204,8 +222,8 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen>
                 color: Color(0xFF1F2937),
               ),
             ),
-            SizedBox(height: 8),
-            Text(
+            const SizedBox(height: 8),
+            const Text(
               'When you block someone, they will appear here.',
               textAlign: TextAlign.center,
               style: TextStyle(

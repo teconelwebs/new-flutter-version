@@ -445,21 +445,42 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
                                     height: 1, color: Color(0xFFEEEEEE)),
                               ),
                               if (_isBlocked)
-                                const SliverToBoxAdapter(
+                                SliverToBoxAdapter(
                                   child: Padding(
-                                    padding: EdgeInsets.all(32),
+                                    padding: const EdgeInsets.all(32),
                                     child: Column(
                                       children: [
-                                        Icon(Icons.block,
-                                            size: 48, color: Color(0xFF9CA3AF)),
-                                        SizedBox(height: 12),
-                                        Text('You blocked this user',
+                                        Container(
+                                          width: 80,
+                                          height: 80,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFFF3F4F6),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Stack(
+                                            alignment: Alignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.shield_outlined,
+                                                size: 46,
+                                                color: Color(0xFF9CA3AF),
+                                              ),
+                                              Icon(
+                                                Icons.block_rounded,
+                                                size: 22,
+                                                color: Color(0xFFEF4444),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 14),
+                                        const Text('You blocked this user',
                                             style: TextStyle(
                                                 fontWeight: FontWeight.w700,
                                                 fontSize: 16,
                                                 color: _textPrimary)),
-                                        SizedBox(height: 6),
-                                        Text('Unblock to see their posts again',
+                                        const SizedBox(height: 6),
+                                        const Text('Unblock to see their posts again',
                                             style:
                                                 TextStyle(color: _textMuted)),
                                       ],

@@ -14,6 +14,7 @@ import '../utils/flutter_nav.dart';
 import '../utils/play_profile_guard.dart';
 import '../utils/play_session.dart';
 import '../utils/profile_thumbnail_cache.dart';
+import 'animated_like_button.dart';
 import 'caption_sheet.dart';
 import 'comments_sheet.dart';
 import 'product_strip.dart';
@@ -58,6 +59,17 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
   bool _profileOpening = false;
   bool _deleteInProgress = false;
   String? _toast;
+  bool _showCenterHeart = false;
+
+  void _handleDoubleTapLike() {
+    if (!_liked) {
+      _handleLike();
+    }
+    setState(() => _showCenterHeart = true);
+    Timer(const Duration(milliseconds: 750), () {
+      if (mounted) setState(() => _showCenterHeart = false);
+    });
+  }
 
   List<LiveProduct> _liveProducts = [];
   bool _loadingProducts = false;
@@ -709,15 +721,45 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
                 GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onTap: _togglePlayPause,
-                  child: _paused
-                      ? Center(
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
-                            child: const Icon(Icons.play_arrow, color: Colors.white, size: 42),
-                          ),
-                        )
-                      : const SizedBox.expand(),
+                  onDoubleTap: _handleDoubleTapLike,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      _paused
+                          ? Center(
+                              child: Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: const BoxDecoration(
+                                    color: Colors.black45,
+                                    shape: BoxShape.circle),
+                                child: const Icon(Icons.play_arrow,
+                                    color: Colors.white, size: 42),
+                              ),
+                            )
+                          : const SizedBox.expand(),
+                      if (_showCenterHeart)
+                        TweenAnimationBuilder<double>(
+                          tween: Tween<double>(begin: 0.3, end: 1.3),
+                          duration: const Duration(milliseconds: 500),
+                          curve: Curves.elasticOut,
+                          builder: (context, scale, child) {
+                            return Transform.scale(
+                              scale: scale,
+                              child: ShaderMask(
+                                shaderCallback: (bounds) => const LinearGradient(
+                                  colors: [Color(0xFFFF2D55), Color(0xFFFF0055)],
+                                ).createShader(bounds),
+                                child: const Icon(
+                                  Icons.favorite,
+                                  size: 110,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
                 ),
                 if (!_initialized && !hasThumb)
                   const Center(child: CircularProgressIndicator(color: Color(0xFFfb5404))),
@@ -750,10 +792,9 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _ActionBtn(
-                icon: _liked ? Icons.favorite : Icons.favorite_border,
-                label: _formatCount(_likeCount),
-                color: _liked ? Colors.red : Colors.white,
+              AnimatedLikeButton(
+                isLiked: _liked,
+                count: _likeCount,
                 onTap: _handleLike,
               ),
               _ActionBtn(icon: Icons.chat_bubble_outline, label: _formatCount(_commentCount), onTap: _openComments),
@@ -931,13 +972,11 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
 class _ActionBtn extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Color color;
   final VoidCallback onTap;
 
   const _ActionBtn({
     required this.icon,
     required this.label,
-    this.color = Colors.white,
     required this.onTap,
   });
 
@@ -950,7 +989,7 @@ class _ActionBtn extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         child: Column(
           children: [
-            reelOverlayIcon(icon, color: color, size: 30),
+            reelOverlayIcon(icon, color: Colors.white, size: 30),
             if (label.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(label, style: reelOverlayText(11)),

@@ -19,8 +19,8 @@ import '../utils/play_profile_helper.dart';
 import '../utils/my_profile_cache.dart';
 import 'device_id_store.dart';
 
-const _baseUrl = 'https://api.welfog.com/api';
-// const _baseUrl = 'https://unnecessitous-domitila-unbudging.ngrok-free.dev/api';
+// const _baseUrl = 'https://api.welfog.com/api';
+const _baseUrl = 'https://unnecessitous-domitila-unbudging.ngrok-free.dev/api';
 const _secondBaseUrl = 'https://welfogapi.welfog.com/api';
 const _prefetchLimit = 50;
 
@@ -224,9 +224,9 @@ class ReelsApi {
     final action = follow ? 'follow' : 'unfollow';
     MyProfileCache.clear();
 
-    final activeViewerId =
-        await PlayProfileHelper.ensurePlayProfileMongoId(preferredId: viewerId) ??
-            viewerId;
+    final activeViewerId = await PlayProfileHelper.ensurePlayProfileMongoId(
+            preferredId: viewerId) ??
+        viewerId;
     final resolvedTarget = await resolveFollowListUserId(targetUserId);
 
     if (activeViewerId.isNotEmpty &&
