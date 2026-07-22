@@ -69,34 +69,45 @@ class CaptionSheet {
                             separatorBuilder: (_, __) => const SizedBox(width: 8),
                             itemBuilder: (_, i) {
                               final p = products[i];
-                              return Container(
-                                width: 120,
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey.shade200),
-                                  borderRadius: BorderRadius.circular(8),
+                              return GestureDetector(
+                                onTap: () => openProductInShop(
+                                  p.slug ?? p.id,
+                                  context: context,
                                 ),
-                                clipBehavior: Clip.hardEdge,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (p.imageUrl != null && p.imageUrl!.isNotEmpty)
-                                      Expanded(
-                                        child: Image.network(
-                                          p.imageUrl!,
-                                          width: double.infinity,
-                                          fit: BoxFit.cover,
+                                child: Container(
+                                  width: 120,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                        color: Colors.grey.shade200),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  clipBehavior: Clip.hardEdge,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      if (p.imageUrl != null &&
+                                          p.imageUrl!.isNotEmpty)
+                                        Expanded(
+                                          child: Image.network(
+                                            p.imageUrl!,
+                                            width: double.infinity,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(4),
+                                        child: Text(
+                                          p.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.black87),
                                         ),
                                       ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(4),
-                                      child: Text(
-                                        p.name,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 10, color: Colors.black87),
-                                      ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               );
                             },

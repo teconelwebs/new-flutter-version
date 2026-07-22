@@ -11,11 +11,15 @@ class SearchApiService {
   static const String _secondApi = 'https://welfogapi.welfog.com/api';
   static const String _cdnBase = 'https://d1f02fefkbso7w.cloudfront.net/';
 
+  static final http.Client _client = http.Client();
+  static String? _cachedLat;
+  static String? _cachedLng;
+
   Future<List<String>> autosuggest(String query) async {
     final q = query.trim();
     if (q.isEmpty) return const [];
     final uri = Uri.parse('$_mainApi/autosuggest?search=$q');
-    final response = await http.get(uri);
+    final response = await _client.get(uri);
     if (response.statusCode < 200 || response.statusCode >= 300) return const [];
     final decoded = jsonDecode(response.body);
     final payload = decoded is Map<String, dynamic> ? decoded['payload'] : null;
@@ -24,37 +28,68 @@ class SearchApiService {
     return list.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
   }
 
-  Future<List<ProductItem>> searchProducts(String query, {String? categoryId}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final lat = prefs.getString('latitude') ?? '0';
-    final lng = prefs.getString('longitude') ?? '0';
+  Future<SearchResultPayload> searchProducts(
+    String query, {
+    String? categoryId,
+    String? color,
+    String? sortBy,
+    int page = 1,
+  }) async {
+    if (_cachedLat == null || _cachedLng == null) {
+      final prefs = await SharedPreferences.getInstance();
+      _cachedLat = prefs.getString('latitude') ?? '0';
+      _cachedLng = prefs.getString('longitude') ?? '0';
+    }
+    final lat = _cachedLat!;
+    final lng = _cachedLng!;
     final trimmedQuery = query.trim();
 
-    final params = {
+    final params = <String, String>{
       if (categoryId != null && categoryId.trim().isNotEmpty && RegExp(r'^\d+$').hasMatch(categoryId.trim()))
         'categories': categoryId.trim()
       else if (trimmedQuery.isNotEmpty)
         'name': trimmedQuery,
       'latitude': lat,
       'longitude': lng,
-      'page': '1',
+      'page': page.toString(),
       'limit': '20',
     };
+
+    if (color != null && color.trim().isNotEmpty) {
+      var colorVal = color.trim();
+      if (colorVal.startsWith('#')) {
+        colorVal = colorVal.substring(1);
+      }
+      params['color'] = colorVal;
+    }
+
+    if (sortBy != null && sortBy.trim().isNotEmpty) {
+      params['sort_key'] = sortBy.trim();
+    }
+
     final uri = Uri.parse('$_mainApi/products/search').replace(queryParameters: params);
-    final response = await http.get(uri);
+    final response = await _client.get(uri);
     
     List data = [];
+    List colorsList = [];
+
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final decoded = jsonDecode(response.body);
-      final rawData = decoded is Map<String, dynamic> ? decoded['data'] : null;
-      if (rawData is List) {
-        data = rawData;
+      if (decoded is Map<String, dynamic>) {
+        final rawData = decoded['data'];
+        if (rawData is List) {
+          data = rawData;
+        }
+        final rawColors = decoded['colors'] ?? decoded['payload']?['colors'];
+        if (rawColors is List) {
+          colorsList = rawColors;
+        }
       }
     }
 
     // Fallback: If 0 products found and we have a search query (not category), fetch general products
     final isCategorySearch = categoryId != null && categoryId.trim().isNotEmpty && RegExp(r'^\d+$').hasMatch(categoryId.trim());
-    if (data.isEmpty && trimmedQuery.isNotEmpty && !isCategorySearch) {
+    if (data.isEmpty && page == 1 && trimmedQuery.isNotEmpty && !isCategorySearch) {
       try {
         final fallbackParams = {
           'latitude': lat,
@@ -63,24 +98,49 @@ class SearchApiService {
           'limit': '20',
         };
         final fallbackUri = Uri.parse('$_mainApi/products/search').replace(queryParameters: fallbackParams);
-        final fallbackRes = await http.get(fallbackUri);
+        final fallbackRes = await _client.get(fallbackUri);
         if (fallbackRes.statusCode >= 200 && fallbackRes.statusCode < 300) {
           final decoded = jsonDecode(fallbackRes.body);
-          final rawData = decoded is Map<String, dynamic> ? decoded['data'] : null;
-          if (rawData is List) {
-            data = rawData;
+          if (decoded is Map<String, dynamic>) {
+            final rawData = decoded['data'];
+            if (rawData is List) {
+              data = rawData;
+            }
+            final rawColors = decoded['colors'] ?? decoded['payload']?['colors'];
+            if (rawColors is List && colorsList.isEmpty) {
+              colorsList = rawColors;
+            }
           }
         }
       } catch (_) {}
     }
 
-    if (data.isEmpty) return const [];
+    if (data.isEmpty) {
+      return SearchResultPayload(products: const [], colors: colorsList);
+    }
 
     // Map to ProductItem
     final mappedProducts = data.whereType<Map>().map(_mapProduct).toList();
 
-    // Prioritize products containing the search query in their name/brand, followed by random products
-    if (trimmedQuery.isNotEmpty && !isCategorySearch) {
+    // Perform sorting if specified
+    if (sortBy != null && sortBy.trim().isNotEmpty) {
+      mappedProducts.sort((a, b) {
+        if (sortBy == 'price-asc') return a.price.compareTo(b.price);
+        if (sortBy == 'price-desc') return b.price.compareTo(a.price);
+        if (sortBy == 'newest') {
+          final idA = int.tryParse(a.id) ?? 0;
+          final idB = int.tryParse(b.id) ?? 0;
+          return idB.compareTo(idA);
+        }
+        if (sortBy == 'oldest') {
+          final idA = int.tryParse(a.id) ?? 0;
+          final idB = int.tryParse(b.id) ?? 0;
+          return idA.compareTo(idB);
+        }
+        return 0;
+      });
+    } else if (trimmedQuery.isNotEmpty && !isCategorySearch) {
+      // Prioritize products containing search query
       final lowerQuery = trimmedQuery.toLowerCase();
       final matching = <ProductItem>[];
       final nonMatching = <ProductItem>[];
@@ -92,17 +152,20 @@ class SearchApiService {
           nonMatching.add(p);
         }
       }
-      return [...matching, ...nonMatching];
+      return SearchResultPayload(
+        products: [...matching, ...nonMatching],
+        colors: colorsList,
+      );
     }
 
-    return mappedProducts;
+    return SearchResultPayload(products: mappedProducts, colors: colorsList);
   }
 
   Future<List<SearchCategory>> fetchCategories() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token') ?? '';
     final uri = Uri.parse('$_secondApi/nav_cat_data/');
-    final response = await http.get(
+    final response = await _client.get(
       uri,
       headers: token.isEmpty ? null : {'Authorization': 'Bearer $token'},
     );
@@ -197,3 +260,14 @@ class SearchCategory {
   final String name;
   final String iconUrl;
 }
+
+class SearchResultPayload {
+  const SearchResultPayload({
+    required this.products,
+    required this.colors,
+  });
+
+  final List<ProductItem> products;
+  final List<dynamic> colors;
+}
+

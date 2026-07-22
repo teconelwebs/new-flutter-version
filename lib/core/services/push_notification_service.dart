@@ -56,17 +56,18 @@ class PushNotificationService {
 
       if (shouldPrompt) {
         // 1. Request user permission
+        // ignore: unused_local_variable
         final settings = await fcm.requestPermission(
           alert: true,
           badge: true,
           sound: true,
           provisional: false,
         );
-        debugPrint(
-          "\n🔔 ================================================\n"
-          "🔔 PUSH PERMISSION STATUS: ${settings.authorizationStatus}\n"
-          "🔔 ================================================\n",
-        );
+        // debugPrint(
+        //   "\n🔔 ================================================\n"
+        //   "🔔 PUSH PERMISSION STATUS: ${settings.authorizationStatus}\n"
+        //   "🔔 ================================================\n",
+        // );
       }
 
       // iOS: show system banners while app is in foreground
@@ -152,27 +153,23 @@ class PushNotificationService {
       });
 
       _initialized = true;
-      debugPrint(
-        "\n🔔 ================================================\n"
-        "🔔 PushNotificationService initialized successfully.\n"
-        "🔔 ================================================\n",
-      );
+      // debugPrint(
+      //   "\n🔔 ================================================\n"
+      //   "🔔 PushNotificationService initialized successfully.\n"
+      //   "🔔 ================================================\n",
+      // );
 
       // Log token so we can verify in device logs
       final token = await getFcmToken();
       if (token != null) {
-        debugPrint(
-          "\n🔑 ================================================\n"
-          "🔑 MY DEVICE FCM TOKEN:\n"
-          "🔑 $token\n"
-          "🔑 ================================================\n",
-        );
+        // debugPrint(
+        //   "\n🔑 ================================================\n"
+        //   "🔑 MY DEVICE FCM TOKEN:\n"
+        //   "🔑 $token\n"
+        //   "🔑 ================================================\n",
+        // );
       } else {
-        debugPrint(
-          "\n🔔 ================================================\n"
-          "🔔 FCM TOKEN IS NULL (Check APNs / Play Services)\n"
-          "🔔 ================================================\n",
-        );
+        debugPrint("🔔 FCM TOKEN IS NULL (Check APNs / Play Services)\n");
       }
     } catch (e, st) {
       debugPrint("PushNotificationService initialization warning/failed: $e");
@@ -282,15 +279,15 @@ class PushNotificationService {
       final String platform = Platform.isAndroid ? "android" : "ios";
 
       final lastToken = prefs.getString('last_push_token');
-      
-      debugPrint(
-        "\n💾 ================================================\n"
-        "💾 LOCAL DEVICE TOKEN CHECK:\n"
-        "💾 Saved Local Token: ${lastToken ?? 'NONE (Empty/Not Stored)'}\n"
-        "💾 Current Device FCM Token: $token\n"
-        "💾 Is Token Stored and Matched? ${lastToken == token ? 'YES (Matched)' : 'NO (Needs Sync/Missing)'}\n"
-        "💾 ================================================\n",
-      );
+
+      // debugPrint(
+      //   "\n💾 ================================================\n"
+      //   "💾 LOCAL DEVICE TOKEN CHECK:\n"
+      //   "💾 Saved Local Token: ${lastToken ?? 'NONE (Empty/Not Stored)'}\n"
+      //   "💾 Current Device FCM Token: $token\n"
+      //   "💾 Is Token Stored and Matched? ${lastToken == token ? 'YES (Matched)' : 'NO (Needs Sync/Missing)'}\n"
+      //   "💾 ================================================\n",
+      // );
 
       bool shouldRegister = force || lastToken != token;
 
@@ -298,7 +295,8 @@ class PushNotificationService {
         final statusUrl = Uri.parse(
           'https://welfogapi.welfog.com/api/notification/token-status?user_id=$userId&device_id=$deviceId',
         );
-        debugPrint("💾 Checking token registration status on server: $statusUrl");
+        debugPrint(
+            "💾 Checking token registration status on server: $statusUrl");
         final checkRes = await http.get(statusUrl);
 
         if (checkRes.statusCode == 200) {
@@ -309,16 +307,19 @@ class PushNotificationService {
             debugPrint("💾 Server reports token is already active/registered.");
           } else {
             shouldRegister = true;
-            debugPrint("💾 Server reports token is inactive or not registered.");
+            debugPrint(
+                "💾 Server reports token is inactive or not registered.");
           }
         } else {
           shouldRegister = true;
-          debugPrint("💾 Server status check failed (status: ${checkRes.statusCode}). Forcing register.");
+          debugPrint(
+              "💾 Server status check failed (status: ${checkRes.statusCode}). Forcing register.");
         }
       }
 
       if (!shouldRegister) {
-        debugPrint("💾 FCM sync skipped: Token is already saved locally and registered on server.");
+        debugPrint(
+            "💾 FCM sync skipped: Token is already saved locally and registered on server.");
         return;
       }
 
@@ -337,40 +338,37 @@ class PushNotificationService {
           'app_version': '1.2.0',
         }),
       );
-      debugPrint(
-        "\n🚀 ================================================\n"
-        "🚀 FCM TOKEN SYNC DETAILS:\n"
-        "🚀 URL: $saveUrl\n"
-        "🚀 User ID: $userId\n"
-        "🚀 Device ID: $deviceId\n"
-        "🚀 Response Status Code: ${saveRes.statusCode}\n"
-        "🚀 Response Body: ${saveRes.body}\n"
-        "🚀 ================================================\n",
-      );
+      // debugPrint(
+      //   "\n🚀 ================================================\n"
+      //   "🚀 FCM TOKEN SYNC DETAILS:\n"
+      //   "🚀 URL: $saveUrl\n"
+      //   "🚀 User ID: $userId\n"
+      //   "🚀 Device ID: $deviceId\n"
+      //   "🚀 Response Status Code: ${saveRes.statusCode}\n"
+      //   "🚀 Response Body: ${saveRes.body}\n"
+      //   "🚀 ================================================\n",
+      // );
       if (saveRes.statusCode >= 200 && saveRes.statusCode < 300) {
         try {
           final Map<String, dynamic> resData = jsonDecode(saveRes.body);
           if (resData['status'] == 200 || resData['status'] == null) {
             await prefs.setString('last_push_token', token);
-            debugPrint(
-              "\n💾 ================================================\n"
-              "💾 LOCAL STORAGE SUCCESS:\n"
-              "💾 FCM Token has been saved to SharedPreferences.\n"
-              "💾 Key: last_push_token\n"
-              "💾 Value: $token\n"
-              "💾 ================================================\n",
-            );
+            // debugPrint(
+            //   "\n💾 ================================================\n"
+            //   "💾 LOCAL STORAGE SUCCESS:\n"
+            //   "💾 FCM Token has been saved to SharedPreferences.\n"
+            //   "💾 Key: last_push_token\n"
+            //   "💾 Value: $token\n"
+            //   "💾 ================================================\n",
+            // );
           } else {
-            debugPrint(
-              "\n❌ ================================================\n"
-              "❌ SERVER REJECTED TOKEN SYNC:\n"
-              "❌ Body: ${saveRes.body}\n"
-              "❌ ================================================\n",
-            );
+            debugPrint("❌ SERVER REJECTED TOKEN SYNC:\n"
+                "❌ Body: ${saveRes.body}\n");
           }
         } catch (_) {
           await prefs.setString('last_push_token', token);
-          debugPrint("💾 Error parsing response body, but saved token locally anyway.");
+          debugPrint(
+              "💾 Error parsing response body, but saved token locally anyway.");
         }
       }
     } catch (e) {
@@ -446,9 +444,12 @@ class NotificationPermissionRationaleSheet extends StatelessWidget {
           const SizedBox(height: 24),
 
           // Benefit points
-          _buildPoint(Icons.local_shipping_outlined, 'Real-time order and delivery tracking'),
-          _buildPoint(Icons.local_offer_outlined, 'Exclusive deals and discount offers'),
-          _buildPoint(Icons.chat_bubble_outline_rounded, 'Instant updates on customer support'),
+          _buildPoint(Icons.local_shipping_outlined,
+              'Real-time order and delivery tracking'),
+          _buildPoint(Icons.local_offer_outlined,
+              'Exclusive deals and discount offers'),
+          _buildPoint(Icons.chat_bubble_outline_rounded,
+              'Instant updates on customer support'),
           const SizedBox(height: 28),
 
           // Action buttons

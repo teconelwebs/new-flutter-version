@@ -12,7 +12,8 @@ class ShopApiService {
   /// Local defaults — remote `_nuxt/img/nobanner.*.png` URLs are dead (404).
   static const defaultBannerAsset = 'assets/images/shop_default_banner.png';
   static const defaultLogoAsset = 'assets/images/shop_default_logo.png';
-  static const defaultProductImageAsset = 'assets/images/shop_default_banner.png';
+  static const defaultProductImageAsset =
+      'assets/images/shop_default_banner.png';
 
   Future<ShopDetail?> fetchShopDetails({
     required String shopId,
@@ -48,7 +49,7 @@ class ShopApiService {
         defaultBannerAsset,
         defaultLogoAsset,
       );
-      debugPrint('🎯 [PARSED DETAILS] BANNER URL: ${detail.bannerUrl}');
+      // debugPrint('🎯 [PARSED DETAILS] BANNER URL: ${detail.bannerUrl}');
       return detail;
     } catch (e) {
       debugPrint('ShopApiService.fetchShopDetails error: $e');
@@ -85,8 +86,8 @@ class ShopApiService {
         'Content-Type': 'application/json',
       });
 
-      debugPrint('🔵 [API RES] STATUS CODE: ${response.statusCode}');
-      debugPrint('🔵 [API RES] BODY: ${response.body}');
+      // debugPrint('🔵 [API RES] STATUS CODE: ${response.statusCode}');
+      // debugPrint('🔵 [API RES] BODY: ${response.body}');
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         // ignore: prefer_const_constructors

@@ -206,20 +206,7 @@ class _LiveCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Tap ripple hint
-            if (onTap != null)
-              Positioned(
-                top: 4,
-                right: 4,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: Colors.black45,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.open_in_new_rounded, color: Colors.white70, size: 12),
-                ),
-              ),
+
           ],
         ),
       ),
@@ -292,19 +279,7 @@ class _ReelCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (onTap != null)
-              Positioned(
-                top: 4,
-                right: 4,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: Colors.black45,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.open_in_new_rounded, color: Colors.white70, size: 12),
-                ),
-              ),
+
           ],
         ),
       ),

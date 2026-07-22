@@ -884,7 +884,8 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
             error: _productsError,
             visible: _productStripOpen && _hasProducts,
             onClose: () => setState(() => _productStripOpen = false),
-            onProductTap: (slugOrId) => openProductInShop(slugOrId),
+            onProductTap: (slugOrId) =>
+                openProductInShop(slugOrId, context: context),
           ),
         ),
         Positioned(

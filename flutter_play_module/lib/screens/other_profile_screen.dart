@@ -10,6 +10,7 @@ import '../utils/flutter_nav.dart';
 import '../utils/play_profile_guard.dart';
 import '../utils/play_session.dart';
 import '../utils/profile_thumbnail_cache.dart';
+import '../utils/my_profile_cache.dart';
 import '../widgets/profile_widgets.dart';
 
 class OtherProfileScreen extends StatefulWidget {
@@ -100,15 +101,18 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
           ? (followers: 0, following: 0)
           : await api.fetchFollowCounts(profileKey);
       if (!mounted) return;
+
+      final isFollowingResolved = blocked
+          ? false
+          : PlaySessionRegistry.resolveFollowState(
+              userId: profile.id,
+              alternateId: profile.userid,
+              fallback: profile.isFollowedBy(api.viewerId),
+            );
+
       setState(() {
         _profile = profile;
-        _isFollowing = blocked
-            ? false
-            : PlaySessionRegistry.resolveFollowState(
-                userId: profile.id,
-                alternateId: profile.userid,
-                fallback: profile.isFollowedBy(api.viewerId),
-              );
+        _isFollowing = isFollowingResolved;
         _isBlocked = blocked;
         if (!blocked) {
           _displayFollowersCount = counts.followers;
@@ -181,6 +185,7 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
     if (profile == null || _actionLoading || _isBlocked) return;
     final api = PlaySession.apiOf(context);
     final next = !_isFollowing;
+    MyProfileCache.clear();
     setState(() {
       _isFollowing = next;
       _actionLoading = true;

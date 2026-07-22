@@ -163,6 +163,8 @@ class PlaySessionRegistry {
     return fallback;
   }
 
+  static Map<String, bool> get sessionFollowOverrides => Map.unmodifiable(_followOverrides);
+
   static final Map<String, bool> _likeOverrides = {};
   static final Map<String, int> _likeCountOverrides = {};
 

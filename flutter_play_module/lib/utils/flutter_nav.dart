@@ -27,16 +27,20 @@ Future<void> notifyPlayProfileCreated(String playUserId, String username) async 
   }
 }
 
-/// Opens a product in the React Native shop.
-/// Native Android receives the slug, brings RN to front, and navigates to product detail.
-Future<void> openProductInShop(String slug) async {
+/// Opens a product in the shop screen.
+/// Pushes AppRoutes.product in Flutter if context is provided, otherwise invokes native method channel.
+Future<void> openProductInShop(String slug, {BuildContext? context}) async {
   if (slug.isEmpty) return;
+  if (context != null && context.mounted) {
+    Navigator.of(context).pushNamed(
+      '/product',
+      arguments: {'slug': slug},
+    );
+    return;
+  }
   try {
     await _navChannel.invokeMethod<void>('openProduct', {'slug': slug});
-  } catch (_) {
-    // Native handler missing or bridge error — do not SystemNavigator.pop here,
-    // that only returns to Account without opening the product page.
-  }
+  } catch (_) {}
 }
 
 final RouteObserver<PageRoute<dynamic>> appRouteObserver = RouteObserver<PageRoute<dynamic>>();

@@ -57,6 +57,61 @@ class _FollowListScreenState extends State<FollowListScreen> {
       await PlaySessionRegistry.ensureBlockedListLoaded(api);
       final users = await api.fetchFollowList(widget.profileUserId, widget.type);
       if (!mounted) return;
+
+      // Sync session follow state with list
+      if (widget.type == 'followers') {
+        final isFollowedInSession = PlaySessionRegistry.resolveFollowState(
+          userId: widget.profileUserId,
+          fallback: false,
+        );
+        final viewerId = api.viewerId;
+        final hasViewerInList =
+            users.any((u) => u.id == viewerId || u.userid == viewerId);
+
+        if (isFollowedInSession && !hasViewerInList && viewerId.isNotEmpty) {
+          try {
+            final viewerProfile = await api.fetchUserProfile(viewerId);
+            users.insert(
+              0,
+              FollowUser(
+                id: viewerProfile.id,
+                userid: viewerProfile.userid,
+                username: viewerProfile.displayName,
+                profilePicture: viewerProfile.profilePicture,
+              ),
+            );
+          } catch (_) {}
+        } else if (!isFollowedInSession && hasViewerInList) {
+          users.removeWhere((u) => u.id == viewerId || u.userid == viewerId);
+        }
+      } else if (widget.type == 'following') {
+        if (widget.isOwnProfile || widget.profileUserId == api.viewerId) {
+          for (final key in PlaySessionRegistry.sessionFollowOverrides.keys) {
+            final isFollowing = PlaySessionRegistry.sessionFollowOverrides[key];
+            if (isFollowing == true) {
+              final alreadyInList =
+                  users.any((u) => u.id == key || u.userid == key);
+              if (!alreadyInList && key.isNotEmpty) {
+                try {
+                  final followedProfile = await api.fetchUserProfile(key);
+                  users.insert(
+                    0,
+                    FollowUser(
+                      id: followedProfile.id,
+                      userid: followedProfile.userid,
+                      username: followedProfile.displayName,
+                      profilePicture: followedProfile.profilePicture,
+                    ),
+                  );
+                } catch (_) {}
+              }
+            } else if (isFollowing == false) {
+              users.removeWhere((u) => u.id == key || u.userid == key);
+            }
+          }
+        }
+      }
+
       setState(() {
         _users = users;
         _loading = false;

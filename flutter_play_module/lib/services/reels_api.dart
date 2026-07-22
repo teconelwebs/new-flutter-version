@@ -16,6 +16,7 @@ import '../models/search_result.dart';
 import '../models/user_profile.dart';
 import '../utils/share_links.dart';
 import '../utils/play_profile_helper.dart';
+import '../utils/my_profile_cache.dart';
 import 'device_id_store.dart';
 
 const _baseUrl = 'https://api.welfog.com/api';
@@ -221,11 +222,33 @@ class ReelsApi {
 
   Future<void> toggleFollow(String targetUserId, {required bool follow}) async {
     final action = follow ? 'follow' : 'unfollow';
-    await http.put(
-      Uri.parse('$_baseUrl/users/$targetUserId/$action'),
-      headers: _jsonHeaders,
-      body: jsonEncode({'userId': viewerId, 'userid': viewerId}),
-    );
+    MyProfileCache.clear();
+
+    final activeViewerId =
+        await PlayProfileHelper.ensurePlayProfileMongoId(preferredId: viewerId) ??
+            viewerId;
+    final resolvedTarget = await resolveFollowListUserId(targetUserId);
+
+    if (activeViewerId.isNotEmpty &&
+        resolvedTarget.isNotEmpty &&
+        activeViewerId != resolvedTarget) {
+      await http.put(
+        Uri.parse('$_baseUrl/users/$resolvedTarget/$action'),
+        headers: _jsonHeaders,
+        body: jsonEncode({'userId': activeViewerId, 'userid': activeViewerId}),
+      );
+
+      if (resolvedTarget != targetUserId && targetUserId.isNotEmpty) {
+        try {
+          await http.put(
+            Uri.parse('$_baseUrl/users/$targetUserId/$action'),
+            headers: _jsonHeaders,
+            body: jsonEncode(
+                {'userId': activeViewerId, 'userid': activeViewerId}),
+          );
+        } catch (_) {}
+      }
+    }
   }
 
   Future<void> removeFollower(String followerUserId) async {
