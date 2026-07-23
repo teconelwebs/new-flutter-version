@@ -28,7 +28,6 @@ import '../../profile/data/profile_api_service.dart';
 import '../data/home_api_service.dart';
 import '../data/home_models.dart';
 import '../../chat_ai/presentation/chat_ai_screen.dart';
-import '../../checkout/presentation/order_success_screen.dart';
 import 'widgets/home_widgets.dart';
 import 'widgets/custom_bottom_tab_bar.dart';
 import 'widgets/header.dart';
@@ -128,7 +127,6 @@ class _HomeScreenState extends State<HomeScreen>
   String _userId = 'guest';
   bool _aiChatVisible = false;
   bool _aiChatMounted = false;
-  DateTime? _lastNotificationRoutedTime;
 
   // Stream/Timer references for events
   StreamSubscription? _subConnectivity;
@@ -187,12 +185,11 @@ class _HomeScreenState extends State<HomeScreen>
     _listenToNativeFlutterEvents();
     _updateStatusBarColor();
 
-    PushNotificationService.instance.onNotificationTapped = (data) {
-      if (mounted) {
-        _handleNotificationRouting(data);
-      }
-    };
-    PushNotificationService.instance.initialize(context: context);
+    // Notification deep-links are routed via appNavigatorKey once Home is ready.
+    PushNotificationService.instance.markHomeReady();
+    PushNotificationService.instance.flushPendingNavigation();
+    PushNotificationService.instance.refreshInitialMessage();
+    PushNotificationService.instance.requestPermissions();
 
     play.customClosePlayCallback = () {
       if (mounted) {
@@ -217,7 +214,7 @@ class _HomeScreenState extends State<HomeScreen>
       HomeScreen.activeState = null;
     }
     play.customClosePlayCallback = null;
-    PushNotificationService.instance.onNotificationTapped = null;
+    // Keep homeReady true during brief rebuilds; routing no longer depends on it.
     _subConnectivity?.cancel();
     _subDeepLinks?.cancel();
     _offlineToastTimer?.cancel();
@@ -396,125 +393,6 @@ class _HomeScreenState extends State<HomeScreen>
       await PushNotificationService.instance.syncTokenWithBackend();
     } catch (e) {
       debugPrint("Background token sync skipped/failed: $e");
-    }
-  }
-
-  void _handleNotificationRouting(Map<String, dynamic> data) {
-    final now = DateTime.now();
-    if (_lastNotificationRoutedTime != null &&
-        now.difference(_lastNotificationRoutedTime!) < const Duration(seconds: 2)) {
-      debugPrint("🔔 Duplicate notification tap event ignored (de-duplicated).");
-      return;
-    }
-    _lastNotificationRoutedTime = now;
-
-    final typeForRouting =
-        data['notificationFor'] ?? data['notification_for'] ?? data['type'] ?? data['target'] ?? data['screen'];
-    final typeStr = (typeForRouting ?? '').toString().toLowerCase();
-
-    final trackingId = data['oid'] ??
-        data['orderId'] ??
-        data['order_id'] ??
-        data['id'] ??
-        data['linkId'] ??
-        data['order_code'] ??
-        data['orderCode'];
-    final oidStr = trackingId?.toString() ?? '';
-
-    // If notification is for an order, push OrdersScreen instead of OrderDetailsScreen
-    if (typeStr.contains('order') || typeStr.contains('track') || typeStr.contains('purchase') || (typeForRouting == null && oidStr.isNotEmpty)) {
-      try {
-        OrderSuccessScreen.cancelActiveTimer();
-      } catch (err) {
-        debugPrint("Error cancelling success screen timer: $err");
-      }
-
-      if (mounted) {
-        Navigator.of(context).pushNamed(
-          AppRoutes.orders,
-          arguments: {'fromNotification': true},
-        );
-      }
-      return;
-    }
-
-    // Handle play module notifications
-    if (typeStr == 'follow' || typeStr.contains('follow')) {
-      final profileUserId = data['userId'] ??
-          data['user_id'] ??
-          data['senderId'] ??
-          data['sender_id'] ??
-          data['linkId'] ??
-          data['id'];
-      final uidStr = profileUserId?.toString() ?? '';
-      if (mounted && uidStr.isNotEmpty) {
-        Navigator.of(context).pushNamed('/OtheruserProfile/$uidStr');
-      }
-      return;
-    }
-
-    if (typeStr == 'like' ||
-        typeStr == 'comment' ||
-        typeStr == 'comment_reply' ||
-        typeStr == 'comment_like' ||
-        typeStr.contains('like') ||
-        typeStr.contains('comment')) {
-      final reelId = data['reelId'] ??
-          data['reel_id'] ??
-          data['linkId'] ??
-          data['id'];
-      final ridStr = reelId?.toString() ?? '';
-      if (mounted && ridStr.isNotEmpty) {
-        Navigator.of(context).pushNamed('/sepreel/$ridStr');
-      }
-      return;
-    }
-
-    if (typeForRouting == null) {
-      if (mounted) {
-        Navigator.of(context).pushNamed(
-          AppRoutes.orders,
-          arguments: {'fromNotification': true},
-        );
-      }
-      return;
-    }
-
-    switch (typeForRouting.toString()) {
-      case 'home':
-        setState(() {
-          _currentIndex = 0;
-        });
-        _updateStatusBarColor();
-        break;
-      case 'top_deals':
-        Navigator.of(context).pushNamed(AppRoutes.todayDeals);
-        break;
-      case 'category':
-        final categoryId =
-            data['linkId'] ?? data['categoryId'] ?? data['id'] ?? data['slug'];
-        if (categoryId != null) {
-          Navigator.of(context).pushNamed(
-            AppRoutes.searchResults,
-            arguments: {'query': '', 'categoryId': categoryId.toString()},
-          );
-        } else {
-          setState(() {
-            _currentIndex = 1; // Categories Tab index
-          });
-          _updateStatusBarColor();
-        }
-        break;
-      case 'product':
-        final productIdentifier =
-            data['linkId'] ?? data['productId'] ?? data['slug'] ?? data['id'];
-        if (productIdentifier != null) {
-          Navigator.of(context).pushNamed(
-            AppRoutes.product,
-            arguments: productIdentifier.toString(),
-          );
-        }
-        break;
     }
   }
 
@@ -1417,6 +1295,10 @@ class _NameUpdateDialogState extends State<_NameUpdateDialog> {
           debugPrint('Profile API update failed: $apiError');
         }
       }
+
+      // Bootstrap Play profile with display name + login userid only.
+      // Real Play username is chosen later in the Play setup sheet.
+      await play.PlayProfileHelper.bootstrapAfterNameSave(name: name);
 
       if (mounted) {
         widget.onSuccess();

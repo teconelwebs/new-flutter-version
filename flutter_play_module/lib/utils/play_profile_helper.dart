@@ -1,10 +1,12 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/play_launch_context.dart';
 import '../services/device_id_store.dart';
+import '../services/play_profile_service.dart';
 import 'viewer_id_helper.dart';
 
 const _mainApi = 'https://welfogapi.welfog.com/api/v2';
@@ -31,6 +33,7 @@ class PlayProfileHelper {
     await prefs.remove('cached_user_id');
     await prefs.remove('fourth_userid');
     await prefs.remove('loginid');
+    await prefs.remove('play_username_ready');
   }
 
   static Future<String?> getStoredPlayUserId() async {
@@ -297,18 +300,138 @@ class PlayProfileHelper {
   }
 
   static Future<PlayLaunchContext> resolveFlutterLaunchContext() async {
-    final profileExists = await hasPlayProfile();
-    if (profileExists) {
+    final userData = await getPlayProfileUserData();
+    final usernameReady = await isPlayUsernameReady();
+    if (usernameReady) {
       return const PlayLaunchContext(playProfileReady: true);
     }
 
-    final userData = await getPlayProfileUserData();
     return PlayLaunchContext(
       mainUserId: userData?.mainUserId ?? '',
       mobile: userData?.mobile ?? '',
       name: userData?.name ?? '',
       playProfileReady: false,
     );
+  }
+
+  /// True only when the user has chosen a real Play username (not pending_/userId).
+  static Future<bool> isPlayUsernameReady() async {
+    final prefs = await SharedPreferences.getInstance();
+    final mainUserId = (prefs.getString('user_id') ?? '').trim();
+
+    if (prefs.getString('play_username_ready') == '1') {
+      final cached = prefs.getString('play_profile_user_name') ?? '';
+      if (!PlayProfileService.isPlaceholderUsername(cached, mainUserId)) {
+        return true;
+      }
+    }
+
+    try {
+      final headers = await _playHeaders();
+      Map<String, dynamic>? userMap;
+
+      final mongoId = await getStoredPlayUserId();
+      if (mongoId != null) {
+        final res = await http.get(
+          Uri.parse('$_playApi/users/userpost/$mongoId'),
+          headers: headers,
+        );
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          final body = jsonDecode(res.body);
+          if (body is Map && body['user'] is Map) {
+            userMap = Map<String, dynamic>.from(body['user'] as Map);
+          }
+        }
+      }
+
+      if (userMap == null) {
+        final mobile = await _mobileFromSession();
+        if (mobile != null && mobile.isNotEmpty) {
+          final mobileRes = await http.get(
+            Uri.parse('$_playApi/users/bymobile/$mobile'),
+            headers: headers,
+          );
+          if (mobileRes.statusCode >= 200 && mobileRes.statusCode < 300) {
+            final body = jsonDecode(mobileRes.body);
+            if (body is Map) {
+              userMap = Map<String, dynamic>.from(body);
+            }
+          }
+        }
+      }
+
+      if (userMap == null) return false;
+
+      final username = (userMap['username'] ?? '').toString();
+      final id = (userMap['_id'] ?? '').toString();
+      if (isValidObjectId(id)) {
+        await prefs.setString('loginid', id);
+        await prefs.setString('cached_user_id', id);
+        await prefs.setString('play_profile_id', id);
+      }
+
+      final ready =
+          !PlayProfileService.isPlaceholderUsername(username, mainUserId);
+      if (ready) {
+        await prefs.setString('play_username_ready', '1');
+        await prefs.setString('play_profile_user_name', username);
+        debugPrint('🎮 [PlayProfile] username ready: @$username');
+      } else {
+        await prefs.setString('play_username_ready', '0');
+        debugPrint(
+          '🎮 [PlayProfile] username NOT ready (placeholder): "$username"',
+        );
+      }
+      return ready;
+    } catch (e) {
+      debugPrint('🎮 [PlayProfile] isPlayUsernameReady error: $e');
+      return false;
+    }
+  }
+
+  /// After home name dialog — create/update Play profile with name + userid only.
+  static Future<void> bootstrapAfterNameSave({required String name}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = (prefs.getString('user_id') ?? '').trim();
+    final mobile = (prefs.getString('mobile') ?? '').trim();
+    final trimmedName = name.trim();
+    if (userId.isEmpty || mobile.isEmpty || trimmedName.isEmpty) {
+      debugPrint(
+        '🎮 [PlayProfile] bootstrapAfterNameSave skipped — '
+        'userId=$userId mobile=$mobile name=$trimmedName',
+      );
+      return;
+    }
+
+    try {
+      final deviceId = await DeviceIdStore.getOrCreate();
+      final service = PlayProfileService(deviceId: deviceId);
+      final playUserId = await service.bootstrapWithName(
+        mainUserId: userId,
+        mobile: mobile,
+        name: trimmedName,
+      );
+
+      await prefs.setString('loginid', playUserId);
+      await prefs.setString('cached_user_id', playUserId);
+      await prefs.setString('play_profile_id', playUserId);
+      await prefs.setString('play_profile_name', trimmedName);
+      await prefs.setString('play_username_ready', '0');
+      await prefs.setString('fourth_userid', userId);
+
+      await service.syncMainUserId(
+        playMongoId: playUserId,
+        mainUserId: userId,
+      );
+
+      debugPrint(
+        '🎮 [PlayProfile] bootstrapAfterNameSave done — '
+        'mongoId=$playUserId userid=$userId name=$trimmedName '
+        '(username sheet still required)',
+      );
+    } catch (e) {
+      debugPrint('🎮 [PlayProfile] bootstrapAfterNameSave failed: $e');
+    }
   }
 
   static Future<PlayRouteSession> resolvePlayRouteSession() async {
@@ -329,13 +452,63 @@ class PlayProfileHelper {
   static Future<void> cachePlayProfileCreated({
     required String playUserId,
     String username = '',
+    String? mainUserId,
+    bool usernameReady = true,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('loginid', playUserId);
     await prefs.setString('cached_user_id', playUserId);
     await prefs.setString('play_profile_id', playUserId);
-    await prefs.setString('play_profile_user_name', username);
-    await prefs.setString('play_profile_name', username);
+    if (username.trim().isNotEmpty) {
+      await prefs.setString('play_profile_user_name', username.trim());
+      // Display name may already be set from home dialog — don't clobber with username
+      // unless we have no name yet.
+      final existingName = (prefs.getString('play_profile_name') ?? '').trim();
+      if (existingName.isEmpty) {
+        await prefs.setString('play_profile_name', username.trim());
+      }
+    }
+    await prefs.setString(
+      'play_username_ready',
+      usernameReady ? '1' : '0',
+    );
+    final uid = (mainUserId ?? prefs.getString('user_id') ?? '').trim();
+    if (uid.isNotEmpty && usernameReady) {
+      await prefs.setString('fourth_userid', uid);
+    }
+  }
+
+  /// Ensures Play profile `userid` matches main-app login `user_id`.
+  /// New users get this on create; old users get it when opening Play tab.
+  static Future<void> ensureMainUserIdOnPlayProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final mainUserId = (prefs.getString('user_id') ?? '').trim();
+    if (mainUserId.isEmpty) {
+      debugPrint('🎮 [PlayProfile] ensureMainUserId skipped — no login user_id');
+      return;
+    }
+
+    final playMongoId = await ensurePlayProfileMongoId();
+    if (playMongoId == null || playMongoId.isEmpty) {
+      debugPrint(
+        '🎮 [PlayProfile] ensureMainUserId skipped — no play mongo profile yet',
+      );
+      return;
+    }
+
+    final deviceId = await DeviceIdStore.getOrCreate();
+    final service = PlayProfileService(deviceId: deviceId);
+    final ok = await service.syncMainUserId(
+      playMongoId: playMongoId,
+      mainUserId: mainUserId,
+    );
+    if (ok) {
+      await prefs.setString('fourth_userid', mainUserId);
+      debugPrint(
+        '🎮 [PlayProfile] ensureMainUserId done — '
+        'playMongoId=$playMongoId userid=$mainUserId',
+      );
+    }
   }
 
   /// Build a play route URI with RN-equivalent session query params.

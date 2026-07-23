@@ -64,11 +64,12 @@ class _PlayProfileSetupSheetState extends State<PlayProfileSetupSheet> {
 
   Future<void> _handleCreate() async {
     final username = _usernameController.text.trim();
+    final mainUserId = widget.launchContext.mainUserId.trim();
     if (username.isEmpty) {
       setState(() => _errorText = 'Please enter a username.');
       return;
     }
-    if (RegExp(r'^user\d+$', caseSensitive: false).hasMatch(username)) {
+    if (PlayProfileService.isPlaceholderUsername(username, mainUserId)) {
       setState(() => _errorText = 'Please choose a custom username.');
       return;
     }
@@ -80,15 +81,51 @@ class _PlayProfileSetupSheetState extends State<PlayProfileSetupSheet> {
 
     try {
       final service = PlayProfileService(deviceId: widget.deviceId);
-      final playUserId = await service.createPlayProfile(
-        mainUserId: widget.launchContext.mainUserId,
-        mobile: widget.launchContext.mobile,
-        username: username,
-        name: widget.launchContext.name,
-      );
+      // Name dialog may have already created mongo profile — only set username.
+      var existingMongoId =
+          await PlayProfileHelper.ensurePlayProfileMongoId();
+      // Fallback: resolve by mobile so we never mint a duplicate profile.
+      if ((existingMongoId == null || existingMongoId.isEmpty) &&
+          widget.launchContext.mobile.trim().isNotEmpty) {
+        existingMongoId =
+            await PlayProfileHelper.resolvePlayUserIdByMobile();
+      }
+
+      late final String playUserId;
+      if (existingMongoId != null && existingMongoId.isNotEmpty) {
+        await service.updateUsername(
+          playMongoId: existingMongoId,
+          username: username,
+          mainUserId: mainUserId,
+          name: widget.launchContext.name,
+          mobile: widget.launchContext.mobile,
+        );
+        playUserId = existingMongoId;
+        debugPrint(
+          '🎮 [PlaySetup] username updated on existing mongoId=$playUserId '
+          'userid=$mainUserId username=$username',
+        );
+      } else {
+        playUserId = await service.createPlayProfile(
+          mainUserId: mainUserId,
+          mobile: widget.launchContext.mobile,
+          username: username,
+          name: widget.launchContext.name,
+        );
+        debugPrint(
+          '🎮 [PlaySetup] profile created mongoId=$playUserId '
+          'userid=$mainUserId username=$username',
+        );
+      }
       await PlayProfileHelper.cachePlayProfileCreated(
         playUserId: playUserId,
         username: username,
+        mainUserId: mainUserId,
+        usernameReady: true,
+      );
+      await service.syncMainUserId(
+        playMongoId: playUserId,
+        mainUserId: mainUserId,
       );
       await notifyPlayProfileCreated(playUserId, username);
       if (!mounted) return;

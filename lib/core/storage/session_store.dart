@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
 import '../services/push_notification_service.dart';
 
@@ -46,32 +47,37 @@ class SessionStore {
     if (mobile.isNotEmpty) {
       await prefs.setString(_kMobile, mobile);
 
-      // Create or fetch Play profile on api.welfog.com (same as RN flow).
+      // Do NOT create Play profile here with username=userId.
+      // New users: home name dialog bootstraps name+userid; Play tab asks for username.
+      // Returning users: soft-resolve existing mongo profile only.
       try {
-        final deviceId = await play.DeviceIdStore.getOrCreate();
-        final service = play.PlayProfileService(deviceId: deviceId);
-        final playUserId = await service.createPlayProfile(
-          mainUserId: userId,
-          mobile: mobile,
-          username: userId,
-          name: userName,
-        );
-        await play.PlayProfileHelper.cachePlayProfileCreated(
-          playUserId: playUserId,
-          username: userName,
-        );
-      } catch (_) {
-        // Fallback: resolve existing profile by mobile after prefs are saved.
-        try {
-          final resolved =
-              await play.PlayProfileHelper.resolvePlayUserIdFromSession();
-          if (resolved != null && resolved.isNotEmpty) {
-            await play.PlayProfileHelper.cachePlayProfileCreated(
-              playUserId: resolved,
-              username: userName,
-            );
+        final resolved =
+            await play.PlayProfileHelper.resolvePlayUserIdFromSession();
+        if (resolved != null && resolved.isNotEmpty) {
+          final usernameReady =
+              await play.PlayProfileHelper.isPlayUsernameReady();
+          await play.PlayProfileHelper.cachePlayProfileCreated(
+            playUserId: resolved,
+            username: usernameReady
+                ? (prefs.getString('play_profile_user_name') ?? '')
+                : '',
+            mainUserId: userId,
+            usernameReady: usernameReady,
+          );
+          if (usernameReady) {
+            await play.PlayProfileHelper.ensureMainUserIdOnPlayProfile();
           }
-        } catch (_) {}
+          debugPrint(
+            '🎮 [Login] Play profile soft-resolved mongoId=$resolved '
+            'userid=$userId usernameReady=$usernameReady',
+          );
+        } else {
+          debugPrint(
+            '🎮 [Login] no Play profile yet — waiting for name dialog / username sheet',
+          );
+        }
+      } catch (e) {
+        debugPrint('🎮 [Login] Play profile soft-resolve failed: $e');
       }
     }
 

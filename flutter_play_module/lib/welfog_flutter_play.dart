@@ -35,7 +35,7 @@ class EmbeddedReelsWrapper extends StatefulWidget {
 class _EmbeddedReelsWrapperState extends State<EmbeddedReelsWrapper> {
   String? _resolvedViewerId;
   PlayProfileUserData? _userData;
-  bool? _hasPlayProfile;
+  bool? _usernameReady;
   bool _loading = true;
 
   @override
@@ -59,12 +59,18 @@ class _EmbeddedReelsWrapperState extends State<EmbeddedReelsWrapper> {
     final id = await PlayProfileHelper.ensurePlayProfileMongoId() ??
         await PlayProfileHelper.resolveReelsViewerId();
     final data = await PlayProfileHelper.getPlayProfileUserData();
-    final hasProfile = await PlayProfileHelper.hasPlayProfile();
+    // Ready only when a real username exists — not merely a mongo doc.
+    final usernameReady = await PlayProfileHelper.isPlayUsernameReady();
+
+    if (usernameReady && widget.isActive) {
+      await PlayProfileHelper.ensureMainUserIdOnPlayProfile();
+    }
+
     if (mounted) {
       setState(() {
         _resolvedViewerId = id;
         _userData = data;
-        _hasPlayProfile = hasProfile;
+        _usernameReady = usernameReady;
         _loading = false;
       });
     }
@@ -90,9 +96,12 @@ class _EmbeddedReelsWrapperState extends State<EmbeddedReelsWrapper> {
       deviceId: '',
       shareUserId: '',
       launchContext: PlayLaunchContext(
-        mainUserId: widget.viewerId,
+        mainUserId: _userData?.mainUserId.isNotEmpty == true
+            ? _userData!.mainUserId
+            : widget.viewerId,
         mobile: _userData?.mobile ?? '',
-        playProfileReady: _hasPlayProfile ?? true,
+        name: _userData?.name ?? '',
+        playProfileReady: _usernameReady ?? false,
       ),
       child: ReelsScreen(
         isActive: widget.isActive,

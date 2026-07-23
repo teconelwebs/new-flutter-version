@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app.dart';
+import 'core/services/push_notification_service.dart';
 import 'firebase_options.dart';
 
 @pragma('vm:entry-point')
@@ -36,6 +37,9 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     debugPrint("Firebase initialized successfully.");
+
+    // Initialize notification service early to capture launch/tapped payloads
+    await PushNotificationService.instance.initialize();
 
     // Register FCM background message handler (required for Android)
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
