@@ -38,16 +38,29 @@ android {
 
     signingConfigs {
         create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
-            storeFile = keystoreProperties["storeFile"]?.let { file(it as String) }
-            storePassword = keystoreProperties["storePassword"] as String
+            val keyAliasProp = keystoreProperties["keyAlias"] as? String
+            val keyPasswordProp = keystoreProperties["keyPassword"] as? String
+            val storeFileProp = keystoreProperties["storeFile"] as? String
+            val storePasswordProp = keystoreProperties["storePassword"] as? String
+
+            if (keyAliasProp != null && keyPasswordProp != null && storeFileProp != null && storePasswordProp != null) {
+                keyAlias = keyAliasProp
+                keyPassword = keyPasswordProp
+                storeFile = file(storeFileProp)
+                storePassword = storePasswordProp
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            val releaseSigningConfig = signingConfigs.getByName("release")
+            if (releaseSigningConfig.storeFile?.exists() == true) {
+                signingConfig = releaseSigningConfig
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
+            
             // Required so Flutter's AAB strip-check finds libflutter.so.sym / libapp.so.sym
             ndk {
                 debugSymbolLevel = "SYMBOL_TABLE"
