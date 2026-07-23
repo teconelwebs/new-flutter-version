@@ -8,8 +8,9 @@ import '../../product/data/models/product_item.dart';
 
 class OrdersScreen extends StatefulWidget {
   static const routeName = AppRoutes.orders;
+  final bool fromNotification;
 
-  const OrdersScreen({super.key});
+  const OrdersScreen({super.key, this.fromNotification = false});
 
   @override
   State<OrdersScreen> createState() => _OrdersScreenState();
@@ -190,27 +191,52 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
 
 
+  void _handleBack() {
+    if (mounted) {
+      if (widget.fromNotification) {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.home,
+          (route) => false,
+        );
+      } else {
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        } else {
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            AppRoutes.home,
+            (route) => false,
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.chevron_left, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'My Orders',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.chevron_left, color: Colors.black),
+            onPressed: _handleBack,
           ),
+          title: const Text(
+            'My Orders',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          centerTitle: true,
         ),
-        centerTitle: true,
-      ),
       body: RefreshIndicator(
         onRefresh: () => _fetchOrders(),
         color: const Color(0xFFFB5404),
@@ -555,6 +581,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       );
                     },
                   ),
+      ),
       ),
     );
   }

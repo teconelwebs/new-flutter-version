@@ -199,9 +199,11 @@ class AppRouter {
           ),
         );
       case AppRoutes.orders:
+        final args = settings.arguments as Map<String, dynamic>? ?? {};
+        final fromNotification = args['fromNotification'] as bool? ?? false;
         return MaterialPageRoute(
           settings: settings,
-          builder: (_) => const OrdersScreen(),
+          builder: (_) => OrdersScreen(fromNotification: fromNotification),
         );
       case AppRoutes.notifications:
         return MaterialPageRoute(

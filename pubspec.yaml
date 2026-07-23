@@ -1,7 +1,7 @@
 name: welfog
 description: Welfog main Flutter app
 publish_to: "none"
-version: 1.1.38+74
+version: 1.1.42+78
 
 environment:
   sdk: ">=3.2.0 <4.0.0"

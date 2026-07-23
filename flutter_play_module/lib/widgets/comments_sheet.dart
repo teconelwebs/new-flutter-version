@@ -31,6 +31,8 @@ class CommentsSheet extends StatefulWidget {
   final String reelId;
   final BuildContext hostContext;
   final VoidCallback? onChanged;
+  final VoidCallback? onNavigateToProfile;
+  final VoidCallback? onResumeVideo;
 
   const CommentsSheet({
     super.key,
@@ -38,6 +40,8 @@ class CommentsSheet extends StatefulWidget {
     required this.reelId,
     required this.hostContext,
     this.onChanged,
+    this.onNavigateToProfile,
+    this.onResumeVideo,
   });
 
   static Future<void> show(
@@ -45,6 +49,8 @@ class CommentsSheet extends StatefulWidget {
     required ReelsApi api,
     required String reelId,
     VoidCallback? onChanged,
+    VoidCallback? onNavigateToProfile,
+    VoidCallback? onResumeVideo,
   }) {
     final height = MediaQuery.sizeOf(context).height * 0.62;
 
@@ -65,6 +71,8 @@ class CommentsSheet extends StatefulWidget {
               reelId: reelId,
               hostContext: context,
               onChanged: onChanged,
+              onNavigateToProfile: onNavigateToProfile,
+              onResumeVideo: onResumeVideo,
             ),
           ),
         ),
@@ -173,9 +181,15 @@ class _CommentsSheetState extends State<CommentsSheet> {
     _composerKey.currentState?.clearReply();
   }
 
-  void _openProfile(String userId) {
+  void _openProfile(String userId) async {
     if (userId.isEmpty) return;
-    AppRoutes.openProfile(widget.hostContext, userId);
+    if (widget.onNavigateToProfile != null) {
+      widget.onNavigateToProfile!();
+    }
+    await AppRoutes.openProfile(widget.hostContext, userId);
+    if (widget.onResumeVideo != null) {
+      widget.onResumeVideo!();
+    }
   }
 
   Future<void> _confirmDelete(ReelComment comment) async {

@@ -49,11 +49,6 @@ class PushNotificationService {
 
       bool shouldPrompt = true;
 
-      // On iOS, skip requesting notification permissions as requested
-      if (Platform.isIOS) {
-        shouldPrompt = false;
-      }
-
       if (shouldPrompt) {
         // 1. Request user permission
         // ignore: unused_local_variable
@@ -162,12 +157,12 @@ class PushNotificationService {
       // Log token so we can verify in device logs
       final token = await getFcmToken();
       if (token != null) {
-        // debugPrint(
-        //   "\n🔑 ================================================\n"
-        //   "🔑 MY DEVICE FCM TOKEN:\n"
-        //   "🔑 $token\n"
-        //   "🔑 ================================================\n",
-        // );
+        debugPrint(
+          "\n🔑 ================================================\n"
+          "🔑 MY DEVICE FCM TOKEN:\n"
+          "🔑 $token\n"
+          "🔑 ================================================\n",
+        );
       } else {
         debugPrint("🔔 FCM TOKEN IS NULL (Check APNs / Play Services)\n");
       }
@@ -219,11 +214,16 @@ class PushNotificationService {
       return;
     }
 
-    await _showLocal(
-      title: notification.title ?? 'Welfog',
-      body: notification.body ?? '',
-      payload: jsonEncode(message.data),
-    );
+    // If it's a notification message, iOS will automatically show it
+    // because of setForegroundNotificationPresentationOptions.
+    // We only need to show a local notification on Android.
+    if (Platform.isAndroid) {
+      await _showLocal(
+        title: notification.title ?? 'Welfog',
+        body: notification.body ?? '',
+        payload: jsonEncode(message.data),
+      );
+    }
   }
 
   Future<void> _showLocal({

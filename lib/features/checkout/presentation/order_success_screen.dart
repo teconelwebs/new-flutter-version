@@ -7,12 +7,18 @@ class OrderSuccessScreen extends StatefulWidget {
 
   const OrderSuccessScreen({super.key, required this.orderId});
 
+  static void cancelActiveTimer() {
+    _OrderSuccessScreenState.activeState?._cancelTimer();
+  }
+
   @override
   State<OrderSuccessScreen> createState() => _OrderSuccessScreenState();
 }
 
 class _OrderSuccessScreenState extends State<OrderSuccessScreen>
     with SingleTickerProviderStateMixin {
+  static _OrderSuccessScreenState? activeState;
+
   late AnimationController _animController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _rotateAnimation;
@@ -21,6 +27,7 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
   @override
   void initState() {
     super.initState();
+    activeState = this;
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -49,18 +56,23 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
           AppRoutes.home,
           (route) => false,
         );
-        Navigator.of(context).pushNamed(AppRoutes.orders);
       }
     });
   }
 
   void _cancelTimer() {
-    _redirectTimer?.cancel();
-    _redirectTimer = null;
+    if (_redirectTimer != null) {
+      debugPrint("🔔 OrderSuccessScreen redirect timer cancelled.");
+      _redirectTimer?.cancel();
+      _redirectTimer = null;
+    }
   }
 
   @override
   void dispose() {
+    if (activeState == this) {
+      activeState = null;
+    }
     _cancelTimer();
     _animController.dispose();
     super.dispose();

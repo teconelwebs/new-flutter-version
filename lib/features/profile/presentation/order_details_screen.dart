@@ -150,53 +150,97 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         return;
       }
 
-      final detailsUrl = 'https://welfogapi.welfog.com/api/v2/purchase-history-details/${widget.oid}?user_id=$userId';
-      final itemsUrl = 'https://welfogapi.welfog.com/api/v2/purchase-history-items/${widget.oid}?user_id=$userId';
-      final refundUrl = 'https://welfogapi.welfog.com/api/v2/return-request/${widget.oid}';
-
       final headers = {'Authorization': 'Bearer $token'};
+      String targetOid = widget.oid.trim();
 
-      final responses = await Future.wait([
-        http.get(Uri.parse(detailsUrl), headers: headers),
-        http.get(Uri.parse(itemsUrl), headers: headers),
-        http.get(Uri.parse(refundUrl), headers: headers).catchError((_) => http.Response('{}', 404)),
-      ]);
-
-      final detailsRes = responses[0];
-      final itemsRes = responses[1];
-      final refundRes = responses[2];
-
-      Map<String, dynamic>? detailsData;
-      Map<String, dynamic>? itemsData;
-      Map<String, dynamic>? refundData;
-
-      if (detailsRes.statusCode == 200) {
-        final body = jsonDecode(detailsRes.body);
-        if (body['data'] != null && (body['data'] as List).isNotEmpty) {
-          detailsData = body['data'][0];
+      Future<({Map<String, dynamic>? details, Map<String, dynamic>? items, Map<String, dynamic>? refund})>
+          fetchById(String oidToFetch) async {
+        if (oidToFetch.isEmpty) {
+          return (details: null, items: null, refund: null);
         }
+        final detailsUrl =
+            'https://welfogapi.welfog.com/api/v2/purchase-history-details/$oidToFetch?user_id=$userId';
+        final itemsUrl =
+            'https://welfogapi.welfog.com/api/v2/purchase-history-items/$oidToFetch?user_id=$userId';
+        final refundUrl =
+            'https://welfogapi.welfog.com/api/v2/return-request/$oidToFetch';
+
+        final responses = await Future.wait([
+          http.get(Uri.parse(detailsUrl), headers: headers),
+          http.get(Uri.parse(itemsUrl), headers: headers),
+          http.get(Uri.parse(refundUrl), headers: headers).catchError((_) => http.Response('{}', 404)),
+        ]);
+
+        Map<String, dynamic>? detailsData;
+        Map<String, dynamic>? itemsData;
+        Map<String, dynamic>? refundData;
+
+        if (responses[0].statusCode == 200) {
+          final body = jsonDecode(responses[0].body);
+          if (body['data'] != null && (body['data'] as List).isNotEmpty) {
+            detailsData = body['data'][0];
+          }
+        }
+
+        if (responses[1].statusCode == 200) {
+          final body = jsonDecode(responses[1].body);
+          if (body['data'] != null && (body['data'] as List).isNotEmpty) {
+            itemsData = body['data'][0];
+          }
+        }
+
+        if (responses[2].statusCode == 200) {
+          final body = jsonDecode(responses[2].body);
+          final actualRefund = body['data'] ?? body;
+          if (actualRefund != null && (actualRefund['result'] == true || actualRefund['id'] != null)) {
+            refundData = actualRefund;
+          }
+        }
+
+        return (details: detailsData, items: itemsData, refund: refundData);
       }
 
-      if (itemsRes.statusCode == 200) {
-        final body = jsonDecode(itemsRes.body);
-        if (body['data'] != null && (body['data'] as List).isNotEmpty) {
-          itemsData = body['data'][0];
-        }
-      }
+      var result = await fetchById(targetOid);
 
-      if (refundRes.statusCode == 200) {
-        final body = jsonDecode(refundRes.body);
-        final actualRefund = body['data'] ?? body;
-        if (actualRefund != null && (actualRefund['result'] == true || actualRefund['id'] != null)) {
-          refundData = actualRefund;
+      // If initial fetch yielded no details, fallback to purchase history list to find matching or latest order
+      if (result.details == null) {
+        try {
+          final historyUrl = 'https://welfogapi.welfog.com/api/v2/purchase-history/$userId?user_id=$userId';
+          final historyRes = await http.get(Uri.parse(historyUrl), headers: headers);
+          if (historyRes.statusCode == 200) {
+            final body = jsonDecode(historyRes.body);
+            final list = body['data'] as List? ?? [];
+            if (list.isNotEmpty) {
+              dynamic match;
+              if (targetOid.isNotEmpty) {
+                match = list.firstWhere(
+                  (o) =>
+                      o['id']?.toString() == targetOid ||
+                      o['code']?.toString() == targetOid ||
+                      o['order_code']?.toString() == targetOid ||
+                      o['id']?.toString().contains(targetOid) == true ||
+                      targetOid.contains(o['id']?.toString() ?? '___'),
+                  orElse: () => null,
+                );
+              }
+              match ??= list[0];
+
+              final resolvedId = match['id']?.toString() ?? '';
+              if (resolvedId.isNotEmpty && resolvedId != targetOid) {
+                result = await fetchById(resolvedId);
+              }
+            }
+          }
+        } catch (err) {
+          debugPrint("Error resolving order ID from history: $err");
         }
       }
 
       if (mounted) {
         setState(() {
-          _orderDetails = detailsData;
-          _orderItems = itemsData;
-          _refundDetails = refundData;
+          _orderDetails = result.details;
+          _orderItems = result.items;
+          _refundDetails = result.refund;
           _loading = false;
           if (_orderDetails == null) {
             _error = "Failed to load order details.";
@@ -463,29 +507,44 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     return price?.toString().replaceAll(RegExp(r'Rs|RS', caseSensitive: false), '').trim() ?? '0';
   }
 
+  void _handleBack() {
+    if (mounted) {
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      } else {
+        Navigator.of(context).pushReplacementNamed(AppRoutes.orders);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const themeColor = Color(0xFF0F766E); // Theme Teal color restoration
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack();
+      },
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.chevron_left, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.chevron_left, color: Colors.black),
+            onPressed: _handleBack,
+          ),
+          title: const Text(
+            'Order Details',
+            style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          centerTitle: true,
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Container(color: Colors.grey.shade200, height: 1),
+          ),
         ),
-        title: const Text(
-          'Order Details',
-          style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: Colors.grey.shade200, height: 1),
-        ),
-      ),
       body: _loading
           ? const AppLoader.page()
           : _error.isNotEmpty
@@ -674,6 +733,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         ),
                       ),
                     ),
+      ),
     );
   }
 

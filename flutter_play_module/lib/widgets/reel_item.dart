@@ -465,10 +465,20 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
       if (!await ensurePlayProfileForAction(context)) return;
       final target = widget.reel.user.id;
       if (target.isEmpty) return;
+
+      final wasPaused = _paused;
+      if (!wasPaused) {
+        _controller?.pause();
+      }
+
       // ignore: use_build_context_synchronously
       await AppRoutes.openProfile(context, target);
       if (!mounted) return;
       _syncFollowFromRegistry();
+
+      if (!wasPaused) {
+        _controller?.play();
+      }
     } finally {
       _profileOpening = false;
     }
@@ -498,6 +508,16 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
       onChanged: () async {
         final list = await widget.api.fetchComments(widget.reel.id);
         if (mounted) setState(() => _commentCount = countCommentsRecursive(list));
+      },
+      onNavigateToProfile: () {
+        if (!_paused) {
+          _controller?.pause();
+        }
+      },
+      onResumeVideo: () {
+        if (mounted && !_paused) {
+          _controller?.play();
+        }
       },
     );
   }

@@ -28,6 +28,7 @@ import '../../profile/data/profile_api_service.dart';
 import '../data/home_api_service.dart';
 import '../data/home_models.dart';
 import '../../chat_ai/presentation/chat_ai_screen.dart';
+import '../../checkout/presentation/order_success_screen.dart';
 import 'widgets/home_widgets.dart';
 import 'widgets/custom_bottom_tab_bar.dart';
 import 'widgets/header.dart';
@@ -127,6 +128,7 @@ class _HomeScreenState extends State<HomeScreen>
   String _userId = 'guest';
   bool _aiChatVisible = false;
   bool _aiChatMounted = false;
+  DateTime? _lastNotificationRoutedTime;
 
   // Stream/Timer references for events
   StreamSubscription? _subConnectivity;
@@ -398,8 +400,85 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _handleNotificationRouting(Map<String, dynamic> data) {
-    final typeForRouting = data['notificationFor'] ?? data['notification_for'];
-    if (typeForRouting == null) return;
+    final now = DateTime.now();
+    if (_lastNotificationRoutedTime != null &&
+        now.difference(_lastNotificationRoutedTime!) < const Duration(seconds: 2)) {
+      debugPrint("🔔 Duplicate notification tap event ignored (de-duplicated).");
+      return;
+    }
+    _lastNotificationRoutedTime = now;
+
+    final typeForRouting =
+        data['notificationFor'] ?? data['notification_for'] ?? data['type'] ?? data['target'] ?? data['screen'];
+    final typeStr = (typeForRouting ?? '').toString().toLowerCase();
+
+    final trackingId = data['oid'] ??
+        data['orderId'] ??
+        data['order_id'] ??
+        data['id'] ??
+        data['linkId'] ??
+        data['order_code'] ??
+        data['orderCode'];
+    final oidStr = trackingId?.toString() ?? '';
+
+    // If notification is for an order, push OrdersScreen instead of OrderDetailsScreen
+    if (typeStr.contains('order') || typeStr.contains('track') || typeStr.contains('purchase') || (typeForRouting == null && oidStr.isNotEmpty)) {
+      try {
+        OrderSuccessScreen.cancelActiveTimer();
+      } catch (err) {
+        debugPrint("Error cancelling success screen timer: $err");
+      }
+
+      if (mounted) {
+        Navigator.of(context).pushNamed(
+          AppRoutes.orders,
+          arguments: {'fromNotification': true},
+        );
+      }
+      return;
+    }
+
+    // Handle play module notifications
+    if (typeStr == 'follow' || typeStr.contains('follow')) {
+      final profileUserId = data['userId'] ??
+          data['user_id'] ??
+          data['senderId'] ??
+          data['sender_id'] ??
+          data['linkId'] ??
+          data['id'];
+      final uidStr = profileUserId?.toString() ?? '';
+      if (mounted && uidStr.isNotEmpty) {
+        Navigator.of(context).pushNamed('/OtheruserProfile/$uidStr');
+      }
+      return;
+    }
+
+    if (typeStr == 'like' ||
+        typeStr == 'comment' ||
+        typeStr == 'comment_reply' ||
+        typeStr == 'comment_like' ||
+        typeStr.contains('like') ||
+        typeStr.contains('comment')) {
+      final reelId = data['reelId'] ??
+          data['reel_id'] ??
+          data['linkId'] ??
+          data['id'];
+      final ridStr = reelId?.toString() ?? '';
+      if (mounted && ridStr.isNotEmpty) {
+        Navigator.of(context).pushNamed('/sepreel/$ridStr');
+      }
+      return;
+    }
+
+    if (typeForRouting == null) {
+      if (mounted) {
+        Navigator.of(context).pushNamed(
+          AppRoutes.orders,
+          arguments: {'fromNotification': true},
+        );
+      }
+      return;
+    }
 
     switch (typeForRouting.toString()) {
       case 'home':
@@ -407,17 +486,6 @@ class _HomeScreenState extends State<HomeScreen>
           _currentIndex = 0;
         });
         _updateStatusBarColor();
-        break;
-      case 'track_order':
-        final trackingId = data['oid'] ?? data['orderId'];
-        if (trackingId != null) {
-          Navigator.of(context).pushNamed(
-            AppRoutes.trackOrder,
-            arguments: {'oid': trackingId.toString()},
-          );
-        } else {
-          Navigator.of(context).pushNamed(AppRoutes.trackOrder);
-        }
         break;
       case 'top_deals':
         Navigator.of(context).pushNamed(AppRoutes.todayDeals);
