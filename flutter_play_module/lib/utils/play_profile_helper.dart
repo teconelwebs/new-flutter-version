@@ -279,8 +279,10 @@ class PlayProfileHelper {
     }
   }
 
-  /// When duplicate play profiles exist for one shop user, prefer the one that
-  /// still owns posts; otherwise the older ObjectId (original account).
+  /// When duplicate play profiles exist for one shop user:
+  /// 1) real username (not pending_)
+  /// 2) else most posts
+  /// 3) else newest ObjectId (latest create — not a stale pending stub)
   static Future<String?> _pickCanonicalPlayMongoId(
     Iterable<String?> candidates,
   ) async {
@@ -293,34 +295,65 @@ class PlayProfileHelper {
     if (ids.isEmpty) return null;
     if (ids.length == 1) return ids.first;
 
-    String? best;
+    final prefs = await SharedPreferences.getInstance();
+    final mainUserId = (prefs.getString('user_id') ?? '').trim();
+
+    String? bestReady;
+    var bestReadyPosts = -1;
+    String? bestByPosts;
     var bestPosts = -1;
+
     for (final id in ids) {
+      final map = await _fetchPlayUserMap(mongoId: id);
+      final username = (map?['username'] ?? '').toString();
+      final ready = map != null &&
+          !PlayProfileService.isPlaceholderUsername(username, mainUserId);
       final posts = await _postCountForMongoId(id);
-      debugPrint('🎮 [PlayProfile] candidate mongoId=$id postHint=$posts');
+      debugPrint(
+        '🎮 [PlayProfile] candidate mongoId=$id '
+        'username="$username" ready=$ready postHint=$posts',
+      );
+
+      if (ready) {
+        if (bestReady == null ||
+            posts > bestReadyPosts ||
+            (posts == bestReadyPosts && id.compareTo(bestReady) > 0)) {
+          bestReady = id;
+          bestReadyPosts = posts;
+        }
+      }
+
       if (posts > bestPosts ||
           (posts == bestPosts &&
-              best != null &&
-              id.compareTo(best) < 0) ||
-          (posts == bestPosts && best == null)) {
+              bestByPosts != null &&
+              id.compareTo(bestByPosts) > 0) ||
+          (posts == bestPosts && bestByPosts == null)) {
         bestPosts = posts;
-        best = id;
+        bestByPosts = id;
       }
     }
 
-    // All empty → oldest ObjectId (original profile before accidental recreate).
-    if (bestPosts <= 0) {
-      ids.sort();
-      best = ids.first;
+    if (bestReady != null) {
       debugPrint(
-        '🎮 [PlayProfile] no posts on candidates — preferring oldest $best',
+        '🎮 [PlayProfile] canonical=mongoId=$bestReady (real username)',
       );
-    } else {
-      debugPrint(
-        '🎮 [PlayProfile] canonical mongoId=$best (postsHint=$bestPosts)',
-      );
+      return bestReady;
     }
-    return best;
+
+    if (bestByPosts != null && bestPosts > 0) {
+      debugPrint(
+        '🎮 [PlayProfile] canonical=mongoId=$bestByPosts (posts=$bestPosts)',
+      );
+      return bestByPosts;
+    }
+
+    // No username / posts — prefer newest stub (just created), not oldest pending.
+    ids.sort();
+    final newest = ids.last;
+    debugPrint(
+      '🎮 [PlayProfile] canonical=mongoId=$newest (newest stub, no ready username)',
+    );
+    return newest;
   }
 
   /// Resolves the real Play mongo id for the logged-in shop user.
@@ -592,7 +625,11 @@ class PlayProfileHelper {
     }
 
     try {
-      final mongoId = await getStoredPlayUserId();
+      // Prefer canonical profile (real username over stale pending duplicate).
+      final canonical = mainUserId.isNotEmpty
+          ? await resolveCanonicalPlayMongoId()
+          : null;
+      final mongoId = canonical ?? await getStoredPlayUserId();
       final mobile = await _mobileFromSession();
       final userMap = await _fetchPlayUserMap(
         mongoId: mongoId,
