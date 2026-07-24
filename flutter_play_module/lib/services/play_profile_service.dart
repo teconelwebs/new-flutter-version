@@ -42,14 +42,18 @@ class PlayProfileService {
   static String pendingUsernameFor(String mainUserId) =>
       'pending_${mainUserId.trim()}';
 
+  /// Provisional / auto usernames only — NOT "username == shop userId".
+  /// Many live profiles (legacy RN / backend) use the shop id as username
+  /// (e.g. "1153"). Treating that as placeholder caused the setup sheet to
+  /// reopen forever even though the Play profile already exists.
   static bool isPlaceholderUsername(String? username, String mainUserId) {
     final u = (username ?? '').trim();
-    final id = mainUserId.trim();
     if (u.isEmpty) return true;
-    if (id.isNotEmpty && u == id) return true;
+    final lower = u.toLowerCase();
+    if (lower.startsWith('pending_')) return true;
+    if (lower.startsWith('temp_')) return true;
+    // Backend auto names like user123 — not a user-chosen handle.
     if (RegExp(r'^user\d+$', caseSensitive: false).hasMatch(u)) return true;
-    if (u.toLowerCase().startsWith('pending_')) return true;
-    if (u.toLowerCase().startsWith('temp_')) return true;
     return false;
   }
 
@@ -103,7 +107,11 @@ class PlayProfileService {
     // 1) Shop userid first (canonical), then mobile.
     final byUserId = await _lookupByShopUserId(mainUserId);
     final byMobile = await _lookupByMobile(mobile);
-    final existing = _preferExistingProfile(byUserId, byMobile);
+    final existing = _preferExistingProfile(
+      byUserId,
+      byMobile,
+      mainUserId: mainUserId,
+    );
 
     if (existing != null) {
       final existingId = (existing['_id'] ?? '').toString();
@@ -145,11 +153,12 @@ class PlayProfileService {
     return createdId;
   }
 
-  /// When duplicates exist, keep the older mongo ObjectId (original account).
+  /// When duplicates exist: real username wins, else older mongo ObjectId.
   static Map<String, dynamic>? _preferExistingProfile(
     Map<String, dynamic>? a,
-    Map<String, dynamic>? b,
-  ) {
+    Map<String, dynamic>? b, {
+    String mainUserId = '',
+  }) {
     if (a == null) return b;
     if (b == null) return a;
     final idA = (a['_id'] ?? '').toString();
@@ -157,8 +166,42 @@ class PlayProfileService {
     if (idA.isEmpty) return b;
     if (idB.isEmpty) return a;
     if (idA == idB) return a;
+
+    final readyA =
+        !isPlaceholderUsername((a['username'] ?? '').toString(), mainUserId);
+    final readyB =
+        !isPlaceholderUsername((b['username'] ?? '').toString(), mainUserId);
+    if (readyA && !readyB) return a;
+    if (readyB && !readyA) return b;
+
     // ObjectId hex is time-sortable — smaller = older = original profile.
     return idA.compareTo(idB) <= 0 ? a : b;
+  }
+
+  static Map<String, dynamic>? _pickBestFromMaps(
+    Iterable<Map<String, dynamic>> maps, {
+    required String mainUserId,
+  }) {
+    Map<String, dynamic>? bestReady;
+    Map<String, dynamic>? bestAny;
+    for (final raw in maps) {
+      final id = (raw['_id'] ?? '').toString();
+      if (id.isEmpty) continue;
+      bestAny ??= raw;
+      final ready = !isPlaceholderUsername(
+        (raw['username'] ?? '').toString(),
+        mainUserId,
+      );
+      if (!ready) continue;
+      if (bestReady == null) {
+        bestReady = raw;
+        continue;
+      }
+      final bestId = (bestReady['_id'] ?? '').toString();
+      // Prefer older ready profile (original account with posts).
+      if (id.compareTo(bestId) < 0) bestReady = raw;
+    }
+    return bestReady ?? bestAny;
   }
 
   Future<Map<String, dynamic>?> _lookupByShopUserId(String mainUserId) async {
@@ -171,17 +214,28 @@ class PlayProfileService {
       _log('GET users/$id status=${res.statusCode} body=${res.body}');
       if (res.statusCode < 200 || res.statusCode >= 300) return null;
       final body = jsonDecode(res.body);
-      if (body is Map) {
-        if (body['data'] is List && (body['data'] as List).isNotEmpty) {
-          final first = (body['data'] as List).first;
-          if (first is Map && (first['_id'] ?? '').toString().isNotEmpty) {
-            return Map<String, dynamic>.from(first);
-          }
-        }
-        if ((body['_id'] ?? '').toString().isNotEmpty) {
-          return Map<String, dynamic>.from(body);
+      final maps = <Map<String, dynamic>>[];
+      void addMap(dynamic raw) {
+        if (raw is Map && (raw['_id'] ?? '').toString().isNotEmpty) {
+          maps.add(Map<String, dynamic>.from(raw));
         }
       }
+
+      if (body is List) {
+        for (final item in body) {
+          addMap(item);
+        }
+      } else if (body is Map) {
+        if (body['data'] is List) {
+          for (final item in body['data'] as List) {
+            addMap(item);
+          }
+        } else {
+          addMap(body);
+        }
+      }
+
+      return _pickBestFromMaps(maps, mainUserId: id);
     } catch (e) {
       _log('lookupByShopUserId error: $e');
     }

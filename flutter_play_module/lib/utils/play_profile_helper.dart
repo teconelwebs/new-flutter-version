@@ -209,27 +209,50 @@ class PlayProfileHelper {
       return null;
     }
 
+    bool isReady(Map<String, dynamic> map) {
+      final prefsId = (mainUserId ?? '').trim();
+      return !PlayProfileService.isPlaceholderUsername(
+        (map['username'] ?? '').toString(),
+        prefsId,
+      );
+    }
+
+    Map<String, dynamic>? placeholderHit;
+
     final mongo = (mongoId ?? '').trim();
     if (mongo.isNotEmpty) {
       final fromPost = await tryUserpost(mongo);
-      if (fromPost != null) return fromPost;
+      if (fromPost != null) {
+        if (isReady(fromPost)) return fromPost;
+        placeholderHit ??= fromPost;
+      }
       final fromDirect = await tryDirect(mongo);
-      if (fromDirect != null) return fromDirect;
+      if (fromDirect != null) {
+        if (isReady(fromDirect)) return fromDirect;
+        placeholderHit ??= fromDirect;
+      }
     }
 
     final shopId = (mainUserId ?? '').trim();
     if (shopId.isNotEmpty) {
       final fromShop = await tryDirect(shopId);
-      if (fromShop != null) return fromShop;
+      if (fromShop != null) {
+        if (isReady(fromShop)) return fromShop;
+        placeholderHit ??= fromShop;
+      }
     }
 
     final mob = (mobile ?? '').trim();
     if (mob.isNotEmpty) {
       final fromMobile = await tryMobile(mob);
-      if (fromMobile != null) return fromMobile;
+      if (fromMobile != null) {
+        if (isReady(fromMobile)) return fromMobile;
+        placeholderHit ??= fromMobile;
+      }
     }
 
-    return null;
+    // Prefer any real username found above; else last placeholder stub.
+    return placeholderHit;
   }
 
   /// Looks up Play Mongo `_id` by mobile (ignores stale guest cache).
@@ -625,48 +648,75 @@ class PlayProfileHelper {
     }
 
     try {
-      // Prefer canonical profile (real username over stale pending duplicate).
-      final canonical = mainUserId.isNotEmpty
-          ? await resolveCanonicalPlayMongoId()
-          : null;
-      final mongoId = canonical ?? await getStoredPlayUserId();
       final mobile = await _mobileFromSession();
-      final userMap = await _fetchPlayUserMap(
-        mongoId: mongoId,
-        mainUserId: mainUserId,
-        mobile: mobile,
-      );
+      final storedMongo = await getStoredPlayUserId();
 
-      if (userMap == null) {
-        debugPrint(
-          '🎮 [PlayProfile] username NOT ready — no play profile found '
-          '(mainUserId=$mainUserId mobile=$mobile)',
+      // Check every source separately — never let a pending mongo stub hide the
+      // real username profile found by shop id / mobile.
+      final maps = <Map<String, dynamic>?>[
+        if (mainUserId.isNotEmpty)
+          await _fetchPlayUserMap(mainUserId: mainUserId),
+        if (mobile != null && mobile.isNotEmpty)
+          await _fetchPlayUserMap(mobile: mobile),
+        if (storedMongo != null)
+          await _fetchPlayUserMap(mongoId: storedMongo),
+      ];
+
+      Map<String, dynamic>? readyMap;
+      Map<String, dynamic>? anyMap;
+      for (final map in maps) {
+        if (map == null) continue;
+        anyMap ??= map;
+        final username = (map['username'] ?? '').toString();
+        final ready = !PlayProfileService.isPlaceholderUsername(
+          username,
+          mainUserId,
         );
-        await prefs.setString('play_username_ready', '0');
-        return false;
+        debugPrint(
+          '🎮 [PlayProfile] ready-check mongoId=${map['_id']} '
+          'username="$username" ready=$ready',
+        );
+        if (ready) {
+          readyMap = map;
+          break;
+        }
       }
 
-      final username = (userMap['username'] ?? '').toString();
-      final id = (userMap['_id'] ?? '').toString();
-      if (isValidObjectId(id)) {
-        await prefs.setString('loginid', id);
-        await prefs.setString('cached_user_id', id);
-        await prefs.setString('play_profile_id', id);
-      }
-
-      final ready =
-          !PlayProfileService.isPlaceholderUsername(username, mainUserId);
-      if (ready) {
+      if (readyMap != null) {
+        final username = (readyMap['username'] ?? '').toString();
+        final id = (readyMap['_id'] ?? '').toString();
+        if (isValidObjectId(id)) {
+          await prefs.setString('loginid', id);
+          await prefs.setString('cached_user_id', id);
+          await prefs.setString('play_profile_id', id);
+        }
         await prefs.setString('play_username_ready', '1');
         await prefs.setString('play_profile_user_name', username);
         debugPrint('🎮 [PlayProfile] username ready: @$username');
-      } else {
+        return true;
+      }
+
+      if (anyMap != null) {
+        final username = (anyMap['username'] ?? '').toString();
+        final id = (anyMap['_id'] ?? '').toString();
+        if (isValidObjectId(id)) {
+          await prefs.setString('loginid', id);
+          await prefs.setString('cached_user_id', id);
+          await prefs.setString('play_profile_id', id);
+        }
         await prefs.setString('play_username_ready', '0');
         debugPrint(
           '🎮 [PlayProfile] username NOT ready (placeholder): "$username"',
         );
+        return false;
       }
-      return ready;
+
+      debugPrint(
+        '🎮 [PlayProfile] username NOT ready — no play profile found '
+        '(mainUserId=$mainUserId mobile=$mobile)',
+      );
+      await prefs.setString('play_username_ready', '0');
+      return false;
     } catch (e) {
       debugPrint('🎮 [PlayProfile] isPlayUsernameReady error: $e');
       return false;
