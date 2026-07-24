@@ -224,7 +224,9 @@ class PlaySession extends InheritedWidget {
   bool updateShouldNotify(PlaySession oldWidget) =>
       api.viewerId != oldWidget.api.viewerId ||
       launchContext.playProfileReady !=
-          oldWidget.launchContext.playProfileReady;
+          oldWidget.launchContext.playProfileReady ||
+      launchContext.mainUserId != oldWidget.launchContext.mainUserId ||
+      launchContext.mobile != oldWidget.launchContext.mobile;
 }
 
 /// Holds mutable play session state (viewer id + profile setup flags).
@@ -262,6 +264,29 @@ class PlaySessionScopeState extends State<PlaySessionScope> {
     _launchContext = widget.launchContext;
     _deviceId = widget.deviceId;
     _bootstrapSession();
+  }
+
+  @override
+  void didUpdateWidget(PlaySessionScope oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialViewerId != widget.initialViewerId) {
+      _viewerId = widget.initialViewerId;
+    }
+    if (oldWidget.launchContext.playProfileReady !=
+            widget.launchContext.playProfileReady ||
+        oldWidget.launchContext.mainUserId !=
+            widget.launchContext.mainUserId ||
+        oldWidget.launchContext.mobile != widget.launchContext.mobile ||
+        oldWidget.launchContext.name != widget.launchContext.name) {
+      _launchContext = widget.launchContext;
+      if (!widget.launchContext.playProfileReady) {
+        _setupDismissed = false;
+      }
+    }
+    if (oldWidget.deviceId != widget.deviceId &&
+        widget.deviceId.trim().isNotEmpty) {
+      _deviceId = widget.deviceId;
+    }
   }
 
   Future<void> _bootstrapSession() async {
@@ -309,12 +334,25 @@ class PlaySessionScopeState extends State<PlaySessionScope> {
       _launchContext = PlayLaunchContext(
         mainUserId: _launchContext.mainUserId,
         mobile: _launchContext.mobile,
+        name: _launchContext.name,
         playProfileReady: true,
       );
       _setupDismissed = true;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PlaySessionRegistry.ensureBlockedListLoaded(api);
+    });
+  }
+
+  void markPlayProfileReady() {
+    if (_launchContext.playProfileReady) return;
+    setState(() {
+      _launchContext = PlayLaunchContext(
+        mainUserId: _launchContext.mainUserId,
+        mobile: _launchContext.mobile,
+        name: _launchContext.name,
+        playProfileReady: true,
+      );
     });
   }
 
@@ -375,7 +413,10 @@ Widget wrapWithActivePlaySession(Widget child) {
     initialViewerId: 'guest',
     deviceId: '',
     shareUserId: '',
-    launchContext: const PlayLaunchContext(playProfileReady: true),
+    launchContext: const PlayLaunchContext(
+      mainUserId: 'guest',
+      playProfileReady: true,
+    ),
     child: child,
   );
 }

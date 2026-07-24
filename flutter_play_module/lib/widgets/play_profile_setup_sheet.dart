@@ -80,18 +80,34 @@ class _PlayProfileSetupSheetState extends State<PlayProfileSetupSheet> {
     });
 
     try {
+      var mobile = widget.launchContext.mobile.trim();
+      var name = widget.launchContext.name.trim();
+      if (mobile.isEmpty || name.isEmpty) {
+        final userData = await PlayProfileHelper.getPlayProfileUserData();
+        if (mobile.isEmpty) mobile = (userData?.mobile ?? '').trim();
+        if (name.isEmpty) name = (userData?.name ?? '').trim();
+      }
+
       debugPrint(
         '🎮 [PlaySetup] submit — mainUserId(OTP)=$mainUserId '
-        'mobile=${widget.launchContext.mobile} username=$username '
-        'name=${widget.launchContext.name}',
+        'mobile=$mobile username=$username name=$name',
       );
+      if (mobile.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _creating = false;
+          _errorText = 'Mobile number missing. Please re-login and try again.';
+        });
+        return;
+      }
+
       final service = PlayProfileService(deviceId: widget.deviceId);
       // Name dialog may have already created mongo profile — only set username.
       var existingMongoId =
           await PlayProfileHelper.ensurePlayProfileMongoId();
       // Fallback: resolve by mobile so we never mint a duplicate profile.
       if ((existingMongoId == null || existingMongoId.isEmpty) &&
-          widget.launchContext.mobile.trim().isNotEmpty) {
+          mobile.isNotEmpty) {
         existingMongoId =
             await PlayProfileHelper.resolvePlayUserIdByMobile();
       }
@@ -102,8 +118,8 @@ class _PlayProfileSetupSheetState extends State<PlayProfileSetupSheet> {
           playMongoId: existingMongoId,
           username: username,
           mainUserId: mainUserId,
-          name: widget.launchContext.name,
-          mobile: widget.launchContext.mobile,
+          name: name,
+          mobile: mobile,
         );
         playUserId = existingMongoId;
         debugPrint(
@@ -113,9 +129,9 @@ class _PlayProfileSetupSheetState extends State<PlayProfileSetupSheet> {
       } else {
         playUserId = await service.createPlayProfile(
           mainUserId: mainUserId,
-          mobile: widget.launchContext.mobile,
+          mobile: mobile,
           username: username,
-          name: widget.launchContext.name,
+          name: name,
         );
         debugPrint(
           '🎮 [PlaySetup] profile created mongoId=$playUserId '

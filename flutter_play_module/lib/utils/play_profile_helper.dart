@@ -80,19 +80,156 @@ class PlayProfileHelper {
 
   static Future<PlayProfileUserData?> getPlayProfileUserData() async {
     final prefs = await SharedPreferences.getInstance();
-    final mainUserId = prefs.getString('user_id') ?? '';
+    final mainUserId = (prefs.getString('user_id') ?? '').trim();
     final accessToken = prefs.getString('access_token') ?? '';
     if (mainUserId.isEmpty || accessToken.isEmpty) return null;
 
-    final mobile = await _mobileFromSession();
-    if (mobile == null || mobile.isEmpty) return null;
+    // Prefer prefs mobile; don't hard-fail if API name lookup is slow/offline.
+    var mobile = (prefs.getString('mobile') ?? '').trim();
+    if (mobile.isEmpty) {
+      mobile = (await _mobileFromSession() ?? '').trim();
+    }
 
-    final data = await _getSessionUserData(accessToken, mainUserId);
-    final name =
-        (data?['name'] ?? prefs.getString('user_name') ?? '').toString().trim();
+    var name = (prefs.getString('user_name') ?? '').trim();
+    try {
+      final data = await _getSessionUserData(accessToken, mainUserId);
+      final apiName = (data?['name'] ?? '').toString().trim();
+      if (apiName.isNotEmpty) name = apiName;
+      if (mobile.isEmpty) {
+        mobile = (data?['phone'] ?? data?['mobile'] ?? '').toString().trim();
+      }
+    } catch (_) {}
 
     return PlayProfileUserData(
-        mainUserId: mainUserId, mobile: mobile, name: name);
+      mainUserId: mainUserId,
+      mobile: mobile,
+      name: name,
+    );
+  }
+
+  static Set<String> _mobileCandidates(String mobile) {
+    final m = mobile.trim();
+    if (m.isEmpty) return {};
+    return {
+      m,
+      if (m.startsWith('+')) m.substring(1),
+      if (m.startsWith('91') && m.length > 10) m.substring(2),
+      if (!m.startsWith('+') && !m.startsWith('91') && m.length == 10) '91$m',
+    };
+  }
+
+  /// Fetch play user map by mongo id, shop userid, or mobile.
+  static Future<Map<String, dynamic>?> _fetchPlayUserMap({
+    String? mongoId,
+    String? mainUserId,
+    String? mobile,
+  }) async {
+    final headers = await _playHeaders();
+
+    Future<Map<String, dynamic>?> tryUserpost(String id) async {
+      if (!isValidObjectId(id)) return null;
+      try {
+        final res = await http.get(
+          Uri.parse('$_playApi/users/userpost/$id'),
+          headers: headers,
+        );
+        if (res.statusCode < 200 || res.statusCode >= 300) return null;
+        final body = jsonDecode(res.body);
+        if (body is Map && body['user'] is Map) {
+          return Map<String, dynamic>.from(body['user'] as Map);
+        }
+      } catch (_) {}
+      return null;
+    }
+
+    Future<Map<String, dynamic>?> tryDirect(String id) async {
+      final key = id.trim();
+      if (key.isEmpty) return null;
+      try {
+        final res = await http.get(
+          Uri.parse('$_playApi/users/$key'),
+          headers: headers,
+        );
+        if (res.statusCode < 200 || res.statusCode >= 300) return null;
+        final body = jsonDecode(res.body);
+
+        final maps = <Map<String, dynamic>>[];
+        void addMap(dynamic raw) {
+          if (raw is Map &&
+              ((raw['_id'] ?? '').toString().isNotEmpty ||
+                  (raw['username'] ?? '').toString().isNotEmpty)) {
+            maps.add(Map<String, dynamic>.from(raw));
+          }
+        }
+
+        if (body is List) {
+          for (final item in body) {
+            addMap(item);
+          }
+        } else if (body is Map) {
+          if (body['data'] is List) {
+            for (final item in body['data'] as List) {
+              addMap(item);
+            }
+          } else {
+            addMap(body);
+          }
+        }
+
+        if (maps.isEmpty) return null;
+        if (maps.length == 1) return maps.first;
+
+        final bestId = await _pickCanonicalPlayMongoId(
+          maps.map((m) => (m['_id'] ?? '').toString()),
+        );
+        for (final m in maps) {
+          if ((m['_id'] ?? '').toString() == bestId) return m;
+        }
+        return maps.first;
+      } catch (_) {}
+      return null;
+    }
+
+    Future<Map<String, dynamic>?> tryMobile(String raw) async {
+      for (final candidate in _mobileCandidates(raw)) {
+        try {
+          final res = await http.get(
+            Uri.parse('$_playApi/users/bymobile/$candidate'),
+            headers: headers,
+          );
+          if (res.statusCode < 200 || res.statusCode >= 300) continue;
+          final body = jsonDecode(res.body);
+          if (body is Map &&
+              ((body['_id'] ?? '').toString().isNotEmpty ||
+                  (body['username'] ?? '').toString().isNotEmpty)) {
+            return Map<String, dynamic>.from(body);
+          }
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    final mongo = (mongoId ?? '').trim();
+    if (mongo.isNotEmpty) {
+      final fromPost = await tryUserpost(mongo);
+      if (fromPost != null) return fromPost;
+      final fromDirect = await tryDirect(mongo);
+      if (fromDirect != null) return fromDirect;
+    }
+
+    final shopId = (mainUserId ?? '').trim();
+    if (shopId.isNotEmpty) {
+      final fromShop = await tryDirect(shopId);
+      if (fromShop != null) return fromShop;
+    }
+
+    final mob = (mobile ?? '').trim();
+    if (mob.isNotEmpty) {
+      final fromMobile = await tryMobile(mob);
+      if (fromMobile != null) return fromMobile;
+    }
+
+    return null;
   }
 
   /// Looks up Play Mongo `_id` by mobile (ignores stale guest cache).
@@ -101,42 +238,151 @@ class PlayProfileHelper {
     if (mobile == null || mobile.isEmpty) return null;
 
     try {
-      final headers = await _playHeaders();
-      final candidates = <String>{
-        mobile,
-        if (mobile.startsWith('+')) mobile.substring(1),
-        if (mobile.startsWith('91') && mobile.length > 10) mobile.substring(2),
-        if (!mobile.startsWith('+') && !mobile.startsWith('91')) '91$mobile',
-      };
+      final userMap = await _fetchPlayUserMap(mobile: mobile);
+      if (userMap == null) return null;
+      final finalUserId = (userMap['_id'] ?? '').toString();
+      if (!isValidObjectId(finalUserId)) return null;
 
-      for (final m in candidates) {
-        final mobileRes = await http.get(
-          Uri.parse('$_playApi/users/bymobile/$m'),
-          headers: headers,
-        );
-        if (mobileRes.statusCode < 200 || mobileRes.statusCode >= 300) {
-          continue;
-        }
-        final body = jsonDecode(mobileRes.body);
-        if (body is! Map) continue;
-        final finalUserId = (body['_id'] ?? '').toString();
-        if (!isValidObjectId(finalUserId)) continue;
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('cached_user_id', finalUserId);
-        await prefs.setString('loginid', finalUserId);
-        await prefs.setString('play_profile_id', finalUserId);
-        await prefs.setString(
-          'fourth_userid',
-          (body['userid'] ?? finalUserId).toString(),
-        );
-        return finalUserId;
-      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cached_user_id', finalUserId);
+      await prefs.setString('loginid', finalUserId);
+      await prefs.setString('play_profile_id', finalUserId);
+      await prefs.setString(
+        'fourth_userid',
+        (userMap['userid'] ?? finalUserId).toString(),
+      );
+      return finalUserId;
     } catch (_) {}
     return null;
   }
 
+  static Future<int> _postCountForMongoId(String mongoId) async {
+    final id = mongoId.trim();
+    if (!isValidObjectId(id)) return 0;
+    try {
+      final headers = await _playHeaders();
+      final uri = Uri.parse('$_playApi/reels/others/$id').replace(
+        queryParameters: {'limit': '1', 'skip': '0'},
+      );
+      final res = await http.get(uri, headers: headers);
+      if (res.statusCode < 200 || res.statusCode >= 300) return 0;
+      final body = jsonDecode(res.body);
+      if (body is List) return body.isEmpty ? 0 : 1;
+      if (body is Map) {
+        final raw = body['reels'] ?? body['data'] ?? body['total'];
+        if (raw is List) return raw.isEmpty ? 0 : raw.length;
+        if (raw is num) return raw.toInt();
+      }
+      return 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// When duplicate play profiles exist for one shop user, prefer the one that
+  /// still owns posts; otherwise the older ObjectId (original account).
+  static Future<String?> _pickCanonicalPlayMongoId(
+    Iterable<String?> candidates,
+  ) async {
+    final ids = <String>[];
+    for (final raw in candidates) {
+      final id = (raw ?? '').trim();
+      if (!isValidObjectId(id)) continue;
+      if (!ids.contains(id)) ids.add(id);
+    }
+    if (ids.isEmpty) return null;
+    if (ids.length == 1) return ids.first;
+
+    String? best;
+    var bestPosts = -1;
+    for (final id in ids) {
+      final posts = await _postCountForMongoId(id);
+      debugPrint('🎮 [PlayProfile] candidate mongoId=$id postHint=$posts');
+      if (posts > bestPosts ||
+          (posts == bestPosts &&
+              best != null &&
+              id.compareTo(best) < 0) ||
+          (posts == bestPosts && best == null)) {
+        bestPosts = posts;
+        best = id;
+      }
+    }
+
+    // All empty → oldest ObjectId (original profile before accidental recreate).
+    if (bestPosts <= 0) {
+      ids.sort();
+      best = ids.first;
+      debugPrint(
+        '🎮 [PlayProfile] no posts on candidates — preferring oldest $best',
+      );
+    } else {
+      debugPrint(
+        '🎮 [PlayProfile] canonical mongoId=$best (postsHint=$bestPosts)',
+      );
+    }
+    return best;
+  }
+
+  /// Resolves the real Play mongo id for the logged-in shop user.
+  /// Prefer shop userid + mobile, and never stick to a stale empty duplicate.
+  static Future<String?> resolveCanonicalPlayMongoId() async {
+    final prefs = await SharedPreferences.getInstance();
+    final mainUserId = (prefs.getString('user_id') ?? '').trim();
+    final mobile = await _mobileFromSession();
+
+    final byShop = mainUserId.isEmpty
+        ? null
+        : await _fetchPlayUserMap(mainUserId: mainUserId);
+    final byMobile = (mobile == null || mobile.isEmpty)
+        ? null
+        : await _fetchPlayUserMap(mobile: mobile);
+
+    final chosen = await _pickCanonicalPlayMongoId([
+      (byShop?['_id'] ?? '').toString(),
+      (byMobile?['_id'] ?? '').toString(),
+      prefs.getString('play_profile_id'),
+      prefs.getString('cached_user_id'),
+      prefs.getString('loginid'),
+    ]);
+
+    if (chosen == null || chosen.isEmpty) return null;
+
+    // If we chose the older profile, make sure mobile + userid stay linked.
+    final map = byShop?['_id']?.toString() == chosen
+        ? byShop
+        : byMobile?['_id']?.toString() == chosen
+            ? byMobile
+            : await _fetchPlayUserMap(mongoId: chosen);
+
+    await prefs.setString('cached_user_id', chosen);
+    await prefs.setString('loginid', chosen);
+    await prefs.setString('play_profile_id', chosen);
+    if (mainUserId.isNotEmpty) {
+      await prefs.setString('fourth_userid', mainUserId);
+    } else if (map != null) {
+      await prefs.setString(
+        'fourth_userid',
+        (map['userid'] ?? chosen).toString(),
+      );
+    }
+
+    debugPrint(
+      '🎮 [PlayProfile] resolveCanonical → mongoId=$chosen '
+      'shopUserId=$mainUserId mobile=$mobile',
+    );
+    return chosen;
+  }
+
   static Future<String?> resolvePlayUserIdFromSession() async {
+    // Always re-resolve for logged-in users so a mistaken duplicate profile
+    // (empty, created after wrong username sheet) does not stick forever.
+    final prefs = await SharedPreferences.getInstance();
+    final mainUserId = (prefs.getString('user_id') ?? '').trim();
+    if (mainUserId.isNotEmpty) {
+      final canonical = await resolveCanonicalPlayMongoId();
+      if (canonical != null) return canonical;
+    }
+
     final stored = await getStoredPlayUserId();
     if (stored != null) return stored;
     return resolvePlayUserIdByMobile();
@@ -174,9 +420,27 @@ class PlayProfileHelper {
     return false;
   }
 
-  /// Returns a verified Play Mongo `_id` for api.welfog.com actions (block, etc.).
+  /// Returns a verified Play Mongo `_id` for play API actions (block, etc.).
   static Future<String?> ensurePlayProfileMongoId({String? preferredId}) async {
     final prefs = await SharedPreferences.getInstance();
+    final mainUserId = (prefs.getString('user_id') ?? '').trim();
+
+    // Logged-in: always prefer canonical (posts / oldest) over stale cache.
+    if (mainUserId.isNotEmpty) {
+      final canonical = await resolveCanonicalPlayMongoId();
+      if (canonical != null && canonical.isNotEmpty) {
+        if (preferredId != null &&
+            isValidObjectId(preferredId) &&
+            preferredId != canonical) {
+          debugPrint(
+            '🎮 [PlayProfile] preferredId=$preferredId ignored — '
+            'canonical=$canonical',
+          );
+        }
+        return canonical;
+      }
+    }
+
     final candidates = <String>[];
 
     void addCandidate(String? raw) {
@@ -200,7 +464,6 @@ class PlayProfileHelper {
       }
     }
 
-    // Cached guest ObjectIds look valid but aren't in DB — resolve by mobile.
     final fromMobile = await resolvePlayUserIdByMobile();
     if (fromMobile != null && await _isRealPlayProfile(fromMobile)) {
       return fromMobile;
@@ -323,45 +586,28 @@ class PlayProfileHelper {
     if (prefs.getString('play_username_ready') == '1') {
       final cached = prefs.getString('play_profile_user_name') ?? '';
       if (!PlayProfileService.isPlaceholderUsername(cached, mainUserId)) {
+        debugPrint('🎮 [PlayProfile] username ready (cache): @$cached');
         return true;
       }
     }
 
     try {
-      final headers = await _playHeaders();
-      Map<String, dynamic>? userMap;
-
       final mongoId = await getStoredPlayUserId();
-      if (mongoId != null) {
-        final res = await http.get(
-          Uri.parse('$_playApi/users/userpost/$mongoId'),
-          headers: headers,
-        );
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          final body = jsonDecode(res.body);
-          if (body is Map && body['user'] is Map) {
-            userMap = Map<String, dynamic>.from(body['user'] as Map);
-          }
-        }
-      }
+      final mobile = await _mobileFromSession();
+      final userMap = await _fetchPlayUserMap(
+        mongoId: mongoId,
+        mainUserId: mainUserId,
+        mobile: mobile,
+      );
 
       if (userMap == null) {
-        final mobile = await _mobileFromSession();
-        if (mobile != null && mobile.isNotEmpty) {
-          final mobileRes = await http.get(
-            Uri.parse('$_playApi/users/bymobile/$mobile'),
-            headers: headers,
-          );
-          if (mobileRes.statusCode >= 200 && mobileRes.statusCode < 300) {
-            final body = jsonDecode(mobileRes.body);
-            if (body is Map) {
-              userMap = Map<String, dynamic>.from(body);
-            }
-          }
-        }
+        debugPrint(
+          '🎮 [PlayProfile] username NOT ready — no play profile found '
+          '(mainUserId=$mainUserId mobile=$mobile)',
+        );
+        await prefs.setString('play_username_ready', '0');
+        return false;
       }
-
-      if (userMap == null) return false;
 
       final username = (userMap['username'] ?? '').toString();
       final id = (userMap['_id'] ?? '').toString();
