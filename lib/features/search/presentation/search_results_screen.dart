@@ -30,6 +30,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   dynamic _selectedColor;
   String? _selectedCategory;
 
+  final ScrollController _scrollController = ScrollController();
+  int _currentPage = 1;
+  bool _hasMore = true;
+  bool _loadingMore = false;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +46,24 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     }
     _loadInitialData();
     CartState.loadCartCount();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (maxScroll - currentScroll <= 200) {
+      if (!_loading && !_loadingMore && _hasMore) {
+        _loadMoreProducts();
+      }
+    }
   }
 
   Future<void> _loadInitialData() async {
@@ -59,7 +82,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   }
 
   Future<void> _fetchProducts() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _currentPage = 1;
+      _hasMore = true;
+      _loadingMore = false;
+    });
     try {
       String? colorVal;
       if (_selectedColor != null) {
@@ -80,6 +108,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         categoryId: _selectedCategory,
         color: colorVal,
         sortBy: _sortBy,
+        page: 1,
       );
 
       if (!mounted) return;
@@ -88,11 +117,66 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         if (_colors.isEmpty && payload.colors.isNotEmpty) {
           _colors = payload.colors;
         }
+        if (payload.products.length < 20) {
+          _hasMore = false;
+        }
       });
     } catch (e) {
       debugPrint('Error fetching search products: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadMoreProducts() async {
+    setState(() => _loadingMore = true);
+    try {
+      String? colorVal;
+      if (_selectedColor != null) {
+        if (_selectedColor is String) {
+          colorVal = _selectedColor;
+        } else if (_selectedColor is Map) {
+          colorVal = (_selectedColor['name'] ??
+                  _selectedColor['code'] ??
+                  _selectedColor['color_code'] ??
+                  _selectedColor['color'] ??
+                  '')
+              .toString();
+        }
+      }
+
+      final nextPage = _currentPage + 1;
+      final payload = await _searchApi.searchProducts(
+        _query,
+        categoryId: _selectedCategory,
+        color: colorVal,
+        sortBy: _sortBy,
+        page: nextPage,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        if (payload.products.isEmpty) {
+          _hasMore = false;
+        } else {
+          final existingIds = _products.map((p) => p.id).toSet();
+          final newProducts = payload.products.where((p) => !existingIds.contains(p.id)).toList();
+          if (newProducts.isEmpty) {
+            _hasMore = false;
+          } else {
+            _products = [..._products, ...newProducts];
+            _currentPage = nextPage;
+            if (payload.products.length < 20) {
+              _hasMore = false;
+            }
+          }
+        }
+      });
+    } catch (e) {
+      debugPrint('Error loading more products: $e');
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -861,34 +945,46 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         }
 
                         return SingleChildScrollView(
+                          controller: _scrollController,
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.all(12),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Column(
                             children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: leftColumnItems
-                                      .map((item) => Padding(
-                                            padding: const EdgeInsets.only(bottom: 12),
-                                            child: ProductCard(item: item),
-                                          ))
-                                      .toList(),
-                                ),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: leftColumnItems
+                                          .map((item) => Padding(
+                                                padding: const EdgeInsets.only(bottom: 12),
+                                                child: ProductCard(item: item),
+                                              ))
+                                          .toList(),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: rightColumnItems
+                                          .map((item) => Padding(
+                                                padding: const EdgeInsets.only(bottom: 12),
+                                                child: ProductCard(item: item),
+                                              ))
+                                          .toList(),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: rightColumnItems
-                                      .map((item) => Padding(
-                                            padding: const EdgeInsets.only(bottom: 12),
-                                            child: ProductCard(item: item),
-                                          ))
-                                      .toList(),
+                              if (_loadingMore)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                  child: Center(
+                                    child: CircularProgressIndicator(color: Color(0xFFFB5404)),
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
                         );
