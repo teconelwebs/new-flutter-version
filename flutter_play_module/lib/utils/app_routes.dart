@@ -26,8 +26,14 @@ class AppRoutes {
   static const search = '/search';
   static const createPost = '/profile/create-post';
 
-  static ReelsScreen _reelsScreen({String initialReelId = ''}) {
-    return ReelsScreen(initialReelId: initialReelId);
+  static ReelsScreen _reelsScreen({
+    String initialReelId = '',
+    bool openCommentsOnStart = false,
+  }) {
+    return ReelsScreen(
+      initialReelId: initialReelId,
+      openCommentsOnStart: openCommentsOnStart,
+    );
   }
 
   static String normalizeInitialRoute(String initialRouteName) {
@@ -70,11 +76,17 @@ class AppRoutes {
 
     if (path.startsWith('/sepreel/')) {
       final reelId = path.replaceFirst('/sepreel/', '').split('/').first;
+      final openComments = uri.queryParameters['openComments'] == '1' ||
+          uri.queryParameters['openComments'] == 'true' ||
+          (uri.queryParameters['commentId'] ?? '').isNotEmpty;
       return MaterialPageRoute(
         settings: settings,
         builder: (_) => _wrapSession(
           settings,
-          _reelsScreen(initialReelId: reelId),
+          _reelsScreen(
+            initialReelId: reelId,
+            openCommentsOnStart: openComments,
+          ),
         ),
       );
     }

@@ -595,8 +595,8 @@ class PushNotificationService {
   ) {
     debugPrint("🔔 [Play Social] routing type=$typeStr");
 
+    // follow → sender profile
     if (typeStr == 'follow') {
-      // Prefer mongo ObjectId — OtherProfileScreen resolves via play API.
       final profileId = _cleanId(
         _dataValue(data, [
           'senderObjectId',
@@ -606,35 +606,33 @@ class PushNotificationService {
           'sender_user_id',
           'senderId',
           'sender_id',
-          'userId',
-          'user_id',
         ]),
       );
       if (profileId.isEmpty) {
         debugPrint("🔔 [Play Social] follow missing sender id");
         return false;
       }
-      debugPrint("🔔 [Play Social] → OtheruserProfile/$profileId");
+      debugPrint("🔔 [Play Social] follow → OtheruserProfile/$profileId");
       nav.pushNamed('/OtheruserProfile/$profileId');
       return true;
     }
 
-    // like | comment | comment_reply | comment_like → open that reel
+    // like / comment* → that reel (comments open for comment types)
     final reelId = _cleanId(
-      _dataValue(data, ['reel', 'reelId', 'reel_id']),
+      _dataValue(data, ['reel', 'reelId', 'reel_id', 'linkId', 'id']),
     );
     if (reelId.isEmpty) {
       debugPrint("🔔 [Play Social] $typeStr missing reel id");
       return false;
     }
 
-    final commentId = _cleanId(
-      _dataValue(data, ['comment', 'commentId', 'comment_id']),
-    );
-    final route = commentId.isNotEmpty
-        ? '/sepreel/$reelId?commentId=$commentId'
+    final openComments = typeStr == 'comment' ||
+        typeStr == 'comment_reply' ||
+        typeStr == 'comment_like';
+    final route = openComments
+        ? '/sepreel/$reelId?openComments=1'
         : '/sepreel/$reelId';
-    debugPrint("🔔 [Play Social] → $route");
+    debugPrint("🔔 [Play Social] $typeStr → $route");
     nav.pushNamed(route);
     return true;
   }
