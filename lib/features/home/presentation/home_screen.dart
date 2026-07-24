@@ -182,6 +182,7 @@ class _HomeScreenState extends State<HomeScreen>
     _initDeepLinkListener();
     _checkLocationStatus();
     _syncPushTokenInBackground();
+    _syncPlayUserIdInBackground();
     _listenToNativeFlutterEvents();
     _updateStatusBarColor();
 
@@ -393,6 +394,15 @@ class _HomeScreenState extends State<HomeScreen>
       await PushNotificationService.instance.syncTokenWithBackend();
     } catch (e) {
       debugPrint("Background token sync skipped/failed: $e");
+    }
+  }
+
+  /// Backfill play profile userid (random UUID → shop user_id) via Play API.
+  Future<void> _syncPlayUserIdInBackground() async {
+    try {
+      await play.PlayProfileHelper.syncShopUserIdViaUpdateApi();
+    } catch (e) {
+      debugPrint("Play userid sync skipped/failed: $e");
     }
   }
 

@@ -545,7 +545,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                   Expanded(
                                     child: OutlinedButton(
                                       onPressed: () async {
-                                        await Navigator.pushNamed(
+                                        final updatedOrder = await Navigator.pushNamed(
                                           context,
                                           AppRoutes.orderDetails,
                                           arguments: {
@@ -553,7 +553,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
                                             'initialRefundStatus': order['current_order_status'],
                                           },
                                         );
-                                        _fetchOrders();
+                                        if (updatedOrder is Map<String, dynamic>) {
+                                          setState(() {
+                                            final idx = _orders.indexWhere((o) => o['oid'] == order['oid']);
+                                            if (idx != -1) {
+                                              final mutableOrder = Map<String, dynamic>.from(_orders[idx]);
+                                              if (updatedOrder['current_order_status'] != null) {
+                                                mutableOrder['current_order_status'] = updatedOrder['current_order_status'];
+                                              }
+                                              if (updatedOrder['delivery_status_string'] != null) {
+                                                mutableOrder['delivery_status_string'] = updatedOrder['delivery_status_string'];
+                                              }
+                                              _orders[idx] = mutableOrder;
+                                            }
+                                          });
+                                        }
                                       },
                                       style: OutlinedButton.styleFrom(
                                         foregroundColor: const Color(0xFF1F2937),

@@ -279,8 +279,10 @@ class PlayProfileHelper {
     }
   }
 
-  /// When duplicate play profiles exist for one shop user, prefer the one that
-  /// still owns posts; otherwise the older ObjectId (original account).
+  /// When duplicate play profiles exist for one shop user:
+  /// 1) real username (not pending_)
+  /// 2) else most posts
+  /// 3) else newest ObjectId (latest create — not a stale pending stub)
   static Future<String?> _pickCanonicalPlayMongoId(
     Iterable<String?> candidates,
   ) async {
@@ -293,34 +295,65 @@ class PlayProfileHelper {
     if (ids.isEmpty) return null;
     if (ids.length == 1) return ids.first;
 
-    String? best;
+    final prefs = await SharedPreferences.getInstance();
+    final mainUserId = (prefs.getString('user_id') ?? '').trim();
+
+    String? bestReady;
+    var bestReadyPosts = -1;
+    String? bestByPosts;
     var bestPosts = -1;
+
     for (final id in ids) {
+      final map = await _fetchPlayUserMap(mongoId: id);
+      final username = (map?['username'] ?? '').toString();
+      final ready = map != null &&
+          !PlayProfileService.isPlaceholderUsername(username, mainUserId);
       final posts = await _postCountForMongoId(id);
-      debugPrint('🎮 [PlayProfile] candidate mongoId=$id postHint=$posts');
+      debugPrint(
+        '🎮 [PlayProfile] candidate mongoId=$id '
+        'username="$username" ready=$ready postHint=$posts',
+      );
+
+      if (ready) {
+        if (bestReady == null ||
+            posts > bestReadyPosts ||
+            (posts == bestReadyPosts && id.compareTo(bestReady) > 0)) {
+          bestReady = id;
+          bestReadyPosts = posts;
+        }
+      }
+
       if (posts > bestPosts ||
           (posts == bestPosts &&
-              best != null &&
-              id.compareTo(best) < 0) ||
-          (posts == bestPosts && best == null)) {
+              bestByPosts != null &&
+              id.compareTo(bestByPosts) > 0) ||
+          (posts == bestPosts && bestByPosts == null)) {
         bestPosts = posts;
-        best = id;
+        bestByPosts = id;
       }
     }
 
-    // All empty → oldest ObjectId (original profile before accidental recreate).
-    if (bestPosts <= 0) {
-      ids.sort();
-      best = ids.first;
+    if (bestReady != null) {
       debugPrint(
-        '🎮 [PlayProfile] no posts on candidates — preferring oldest $best',
+        '🎮 [PlayProfile] canonical=mongoId=$bestReady (real username)',
       );
-    } else {
-      debugPrint(
-        '🎮 [PlayProfile] canonical mongoId=$best (postsHint=$bestPosts)',
-      );
+      return bestReady;
     }
-    return best;
+
+    if (bestByPosts != null && bestPosts > 0) {
+      debugPrint(
+        '🎮 [PlayProfile] canonical=mongoId=$bestByPosts (posts=$bestPosts)',
+      );
+      return bestByPosts;
+    }
+
+    // No username / posts — prefer newest stub (just created), not oldest pending.
+    ids.sort();
+    final newest = ids.last;
+    debugPrint(
+      '🎮 [PlayProfile] canonical=mongoId=$newest (newest stub, no ready username)',
+    );
+    return newest;
   }
 
   /// Resolves the real Play mongo id for the logged-in shop user.
@@ -592,7 +625,11 @@ class PlayProfileHelper {
     }
 
     try {
-      final mongoId = await getStoredPlayUserId();
+      // Prefer canonical profile (real username over stale pending duplicate).
+      final canonical = mainUserId.isNotEmpty
+          ? await resolveCanonicalPlayMongoId()
+          : null;
+      final mongoId = canonical ?? await getStoredPlayUserId();
       final mobile = await _mobileFromSession();
       final userMap = await _fetchPlayUserMap(
         mongoId: mongoId,
@@ -728,6 +765,40 @@ class PlayProfileHelper {
     final uid = (mainUserId ?? prefs.getString('user_id') ?? '').trim();
     if (uid.isNotEmpty && usernameReady) {
       await prefs.setString('fourth_userid', uid);
+    }
+  }
+
+  /// Home-screen sync: POST /music/update-userid so old random UUIDs become shop user_id.
+  /// Uses [kPlayApiBaseUrl] (ngrok / live toggle) — never hardcodes localhost.
+  static Future<void> syncShopUserIdViaUpdateApi() async {
+    final prefs = await SharedPreferences.getInstance();
+    final mobile = (prefs.getString('mobile') ?? '').trim();
+    final userId = (prefs.getString('user_id') ?? '').trim();
+    if (mobile.isEmpty || userId.isEmpty) {
+      debugPrint(
+        '🎮 [PlayProfile] update-userid skipped — mobile=$mobile userId=$userId',
+      );
+      return;
+    }
+
+    final url = '$_playApi/music/update-userid';
+    final payload = {'mobile': mobile, 'userid': userId};
+    try {
+      debugPrint('🎮 [PlayProfile] POST $url payload=$payload');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _playHeaders(),
+        body: jsonEncode(payload),
+      );
+      debugPrint(
+        '🎮 [PlayProfile] update-userid status=${response.statusCode} '
+        'body=${response.body}',
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        await prefs.setString('fourth_userid', userId);
+      }
+    } catch (e) {
+      debugPrint('🎮 [PlayProfile] update-userid failed: $e');
     }
   }
 

@@ -488,6 +488,261 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     });
   }
 
+  void _showAlert(String message) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Alert', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Text(message, style: const TextStyle(fontSize: 14)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK', style: TextStyle(color: Color(0xFF0F766E), fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUpdateBankBottomSheet() {
+    final holderController = TextEditingController();
+    final bankNameController = TextEditingController();
+    final accNoController = TextEditingController();
+    final ifscController = TextEditingController();
+    bool submitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                top: 16.0,
+                left: 16.0,
+                right: 16.0,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24.0,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Update Bank Details',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  
+                  // Holder Name
+                  const Text('Account Holder Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: holderController,
+                    decoration: InputDecoration(
+                      hintText: 'Enter account holder name',
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Bank Name
+                  const Text('Bank Name', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: bankNameController,
+                    decoration: InputDecoration(
+                      hintText: 'Enter bank name (e.g. SBI, HDFC)',
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Account Number
+                  const Text('Account Number', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: accNoController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: 'Enter bank account number',
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // IFSC Code
+                  const Text('IFSC Code', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: ifscController,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      hintText: 'Enter 11-digit IFSC code',
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: submitting
+                          ? null
+                          : () async {
+                              final holder = holderController.text.trim();
+                              final bankName = bankNameController.text.trim();
+                              final accNo = accNoController.text.trim();
+                              final ifsc = ifscController.text.trim().toUpperCase();
+
+                              if (holder.isEmpty || bankName.isEmpty || accNo.isEmpty || ifsc.isEmpty) {
+                                _showAlert('Please fill in all fields.');
+                                return;
+                              }
+
+                              if (ifsc.length != 11) {
+                                _showAlert('IFSC code must be 11 characters long.');
+                                return;
+                              }
+
+                              setModalState(() => submitting = true);
+
+                              try {
+                                final prefs = await SharedPreferences.getInstance();
+                                final token = prefs.getString('access_token');
+                                if (token == null) {
+                                  _showAlert('User session expired. Please log in again.');
+                                  setModalState(() => submitting = false);
+                                  return;
+                                }
+
+                                // Refund record id is required by /return-request/bank-details
+                                final refundIdRaw = _refundDetails?['id'];
+                                final refundId = int.tryParse(refundIdRaw?.toString() ?? '');
+                                if (refundId == null) {
+                                  _showAlert('Refund record ID not found.');
+                                  setModalState(() => submitting = false);
+                                  return;
+                                }
+
+                                // Prefer route oid (same as purchase-history), then details/refund fallbacks
+                                final orderIdRaw = widget.oid.trim().isNotEmpty
+                                    ? widget.oid.trim()
+                                    : (_orderDetails?['id'] ??
+                                            _orderDetails?['oid'] ??
+                                            _refundDetails?['order_id'])
+                                        ?.toString()
+                                        .trim();
+                                final orderId = int.tryParse(orderIdRaw ?? '');
+                                if (orderId == null) {
+                                  _showAlert('Order ID not found. Please reopen this order and try again.');
+                                  setModalState(() => submitting = false);
+                                  return;
+                                }
+
+                                final payload = {
+                                  'id': refundId,
+                                  'order_id': orderId,
+                                  'account_holder_name': holder,
+                                  'bank_name': bankName,
+                                  'account_number': accNo,
+                                  'ifsc_code': ifsc,
+                                };
+
+                                final response = await http.post(
+                                  Uri.parse(
+                                    'https://welfogapi.welfog.com/api/v2/return-request/bank-details',
+                                  ),
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': 'Bearer $token',
+                                  },
+                                  body: jsonEncode(payload),
+                                );
+
+                                if (response.statusCode == 200 || response.statusCode == 201) {
+                                  final data = jsonDecode(response.body);
+                                  final isSuccess = data['result'] == true ||
+                                      data['result']?.toString() == 'true' ||
+                                      data['result'] == 1 ||
+                                      data['result'] == '1' ||
+                                      data['success'] == true ||
+                                      data['status'] == 'success';
+                                  if (isSuccess) {
+                                    _showAlert(
+                                      data['message']?.toString() ??
+                                          'Bank details updated successfully.',
+                                    );
+                                    if (context.mounted) {
+                                      Navigator.pop(context); // Close bottom sheet
+                                    }
+                                    _fetchOrderDetails(); // Refresh details screen
+                                  } else {
+                                    final msg = data['message'] ?? 'Failed to update bank details.';
+                                    _showAlert(msg);
+                                  }
+                                } else {
+                                  String msg =
+                                      'Failed to update bank details (${response.statusCode}).';
+                                  try {
+                                    final data = jsonDecode(response.body);
+                                    if (data is Map && data['message'] != null) {
+                                      msg = data['message'].toString();
+                                    }
+                                  } catch (_) {}
+                                  _showAlert(msg);
+                                }
+                              } catch (e) {
+                                debugPrint('Update Bank API Error: $e');
+                                _showAlert('Error updating bank details. Please try again.');
+                              } finally {
+                                setModalState(() => submitting = false);
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F766E),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: submitting
+                          ? const AppLoader.button()
+                          : const Text(
+                              'Submit Details',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   String _formatDateString(String? dateStr) {
     if (dateStr == null || dateStr.isEmpty) return "N/A";
     try {
@@ -510,7 +765,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   void _handleBack() {
     if (mounted) {
       if (Navigator.canPop(context)) {
-        Navigator.pop(context);
+        Navigator.pop(context, _orderDetails);
       } else {
         Navigator.of(context).pushReplacementNamed(AppRoutes.orders);
       }
@@ -789,6 +1044,26 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             Text(
               'Your refund of ₹${_refundDetails!['refund_amount']} is pending. We couldn\'t process it due to an issue with your bank account. Please update your details.',
               style: const TextStyle(color: Color(0xFF7F1D1D), fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 38,
+              child: ElevatedButton.icon(
+                onPressed: _showUpdateBankBottomSheet,
+                icon: const Icon(Icons.account_balance_outlined, color: Colors.white, size: 16),
+                label: const Text(
+                  'Update Bank Details',
+                  style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
