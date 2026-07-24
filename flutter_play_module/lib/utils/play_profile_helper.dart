@@ -768,6 +768,40 @@ class PlayProfileHelper {
     }
   }
 
+  /// Home-screen sync: POST /music/update-userid so old random UUIDs become shop user_id.
+  /// Uses [kPlayApiBaseUrl] (ngrok / live toggle) — never hardcodes localhost.
+  static Future<void> syncShopUserIdViaUpdateApi() async {
+    final prefs = await SharedPreferences.getInstance();
+    final mobile = (prefs.getString('mobile') ?? '').trim();
+    final userId = (prefs.getString('user_id') ?? '').trim();
+    if (mobile.isEmpty || userId.isEmpty) {
+      debugPrint(
+        '🎮 [PlayProfile] update-userid skipped — mobile=$mobile userId=$userId',
+      );
+      return;
+    }
+
+    final url = '$_playApi/music/update-userid';
+    final payload = {'mobile': mobile, 'userid': userId};
+    try {
+      debugPrint('🎮 [PlayProfile] POST $url payload=$payload');
+      final response = await http.post(
+        Uri.parse(url),
+        headers: await _playHeaders(),
+        body: jsonEncode(payload),
+      );
+      debugPrint(
+        '🎮 [PlayProfile] update-userid status=${response.statusCode} '
+        'body=${response.body}',
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        await prefs.setString('fourth_userid', userId);
+      }
+    } catch (e) {
+      debugPrint('🎮 [PlayProfile] update-userid failed: $e');
+    }
+  }
+
   /// Ensures Play profile `userid` matches main-app login `user_id`.
   /// New users get this on create; old users get it when opening Play tab.
   static Future<void> ensureMainUserIdOnPlayProfile() async {
