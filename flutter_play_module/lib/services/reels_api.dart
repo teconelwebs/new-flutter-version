@@ -227,28 +227,59 @@ class ReelsApi {
     final activeViewerId = await PlayProfileHelper.ensurePlayProfileMongoId(
             preferredId: viewerId) ??
         viewerId;
-    final resolvedTarget = await resolveFollowListUserId(targetUserId);
+    // Follow/unfollow + FCM need the play mongo `_id` in the URL — not shop userid.
+    // (resolveFollowListUserId is for list endpoints only.)
+    final targetMongoId = await _resolveFollowTargetMongoId(targetUserId);
 
-    if (activeViewerId.isNotEmpty &&
-        resolvedTarget.isNotEmpty &&
-        activeViewerId != resolvedTarget) {
-      await http.put(
-        Uri.parse('$_baseUrl/users/$resolvedTarget/$action'),
-        headers: _jsonHeaders,
-        body: jsonEncode({'userId': activeViewerId, 'userid': activeViewerId}),
+    if (activeViewerId.isEmpty ||
+        targetMongoId.isEmpty ||
+        activeViewerId == targetMongoId) {
+      debugPrint(
+        'toggleFollow skipped — viewer=$activeViewerId target=$targetMongoId',
       );
-
-      if (resolvedTarget != targetUserId && targetUserId.isNotEmpty) {
-        try {
-          await http.put(
-            Uri.parse('$_baseUrl/users/$targetUserId/$action'),
-            headers: _jsonHeaders,
-            body: jsonEncode(
-                {'userId': activeViewerId, 'userid': activeViewerId}),
-          );
-        } catch (_) {}
-      }
+      return;
     }
+
+    debugPrint(
+      'toggleFollow $action → /users/$targetMongoId/$action '
+      'follower=$activeViewerId',
+    );
+    await http.put(
+      Uri.parse('$_baseUrl/users/$targetMongoId/$action'),
+      headers: _jsonHeaders,
+      body: jsonEncode({
+        'userId': activeViewerId,
+        'userid': activeViewerId,
+      }),
+    );
+  }
+
+  /// Mongo `_id` for follow/unfollow path (keeps shop userid lookups for lists).
+  Future<String> _resolveFollowTargetMongoId(String userId) async {
+    final trimmed = userId.trim();
+    if (trimmed.isEmpty) return '';
+    if (isPlayProfileMongoId(trimmed)) return trimmed;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/users/$trimmed'),
+        headers: _headers,
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final body = jsonDecode(response.body);
+        Map<String, dynamic>? data;
+        if (body is Map<String, dynamic>) {
+          if (body['data'] is List && (body['data'] as List).isNotEmpty) {
+            data = (body['data'] as List).first as Map<String, dynamic>;
+          } else {
+            data = body;
+          }
+        }
+        final id = data?['_id']?.toString() ?? '';
+        if (isPlayProfileMongoId(id)) return id;
+      }
+    } catch (_) {}
+    return trimmed;
   }
 
   Future<void> removeFollower(String followerUserId) async {
@@ -275,15 +306,21 @@ class ReelsApi {
 
   Future<ReelComment?> addComment(String reelId, String text,
       {String? parentId}) async {
+    final payload = <String, dynamic>{
+      'user': viewerId,
+      'reel': reelId,
+      'text': text.trim(),
+    };
+    final parent = (parentId ?? '').trim();
+    // Only send parent for replies — null parentComment confuses reply notify.
+    if (parent.isNotEmpty) {
+      payload['parentComment'] = parent;
+    }
+
     final response = await http.post(
       Uri.parse('$_baseUrl/comment/new'),
       headers: _jsonHeaders,
-      body: jsonEncode({
-        'user': viewerId,
-        'reel': reelId,
-        'text': text.trim(),
-        'parentComment': parentId,
-      }),
+      body: jsonEncode(payload),
     );
     if (response.statusCode != 201) return null;
     final body = jsonDecode(response.body);
@@ -295,7 +332,10 @@ class ReelsApi {
     await http.put(
       Uri.parse('$_baseUrl/comment/like/$commentId'),
       headers: _jsonHeaders,
-      body: jsonEncode({'userId': viewerId}),
+      body: jsonEncode({
+        'userId': viewerId,
+        'user': viewerId,
+      }),
     );
   }
 

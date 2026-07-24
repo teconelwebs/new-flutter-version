@@ -336,30 +336,42 @@ class PushNotificationService {
     return s;
   }
 
-  String _contentFingerprint(Map<String, dynamic> data) {
-    final type = (_dataValue(data, [
+  /// Prefer real play action (`play_type` / `type=follow|like|…`) over the
+  /// generic envelope `notificationFor: play` / `Type: play`.
+  String _resolveNotificationType(Map<String, dynamic> data) {
+    for (final key in ['play_type', 'playType', 'type', 'Type']) {
+      final raw = _dataValue(data, [key]);
+      final value = (raw ?? '').toString().trim().toLowerCase();
+      if (_isPlaySocialType(value)) return value;
+    }
+
+    final envelope = (_dataValue(data, [
               'notificationFor',
               'notification_for',
-              'type',
-              'Type',
-              'play_type',
-              'playType',
               'target',
               'screen',
+              'click_action',
             ]) ??
             '')
         .toString()
+        .trim()
         .toLowerCase();
+    return envelope;
+  }
+
+  String _contentFingerprint(Map<String, dynamic> data) {
+    final type = _resolveNotificationType(data);
 
     // Play social: fingerprint on type + reel/sender so order ids don't collide.
-    if (_isPlaySocialType(type)) {
+    if (_isPlaySocialType(type) || type == 'play') {
       final reel = _cleanId(
-        _dataValue(data, ['reel', 'reelId', 'reel_id']),
+        _dataValue(data, ['reel', 'reelId', 'reel_id', 'linkId', 'id']),
       );
       final sender = _cleanId(
         _dataValue(data, [
           'senderObjectId',
           'sender_object_id',
+          'sender',
           'senderUserId',
           'sender_user_id',
         ]),
@@ -454,18 +466,7 @@ class PushNotificationService {
   bool _pushRoute(NavigatorState nav, Map<String, dynamic> data) {
     debugPrint("🔔 [Notification Routing] Received payload data: $data");
 
-    final typeForRouting = _dataValue(data, [
-      'notificationFor',
-      'notification_for',
-      'type',
-      'Type',
-      'play_type',
-      'playType',
-      'target',
-      'screen',
-      'click_action',
-    ]);
-    final typeStr = (typeForRouting ?? '').toString().trim().toLowerCase();
+    final typeStr = _resolveNotificationType(data);
 
     final trackingId = _dataValue(data, [
       'oid',
@@ -491,6 +492,31 @@ class PushNotificationService {
         );
       }
       // Type was recognized; always consume so we don't retry / fall to orders.
+      return true;
+    }
+
+    // Generic play envelope without play_type — never dump into My Orders.
+    if (typeStr == 'play') {
+      final reelId = _cleanId(
+        _dataValue(data, ['reel', 'reelId', 'reel_id', 'linkId', 'id']),
+      );
+      if (reelId.isNotEmpty) {
+        nav.pushNamed('/sepreel/$reelId');
+        return true;
+      }
+      final sender = _cleanId(
+        _dataValue(data, [
+          'senderObjectId',
+          'sender_object_id',
+          'sender',
+          'senderUserId',
+        ]),
+      );
+      if (sender.isNotEmpty) {
+        nav.pushNamed('/OtheruserProfile/$sender');
+        return true;
+      }
+      debugPrint('🔔 Generic play notification — no reel/sender to open');
       return true;
     }
 
@@ -535,7 +561,7 @@ class PushNotificationService {
         typeStr.contains('delivery') ||
         typeStr == 'my_orders' ||
         typeStr == 'myorders' ||
-        (typeForRouting == null && oidStr.isNotEmpty) ||
+        (typeStr.isEmpty && oidStr.isNotEmpty) ||
         typeStr.isEmpty;
 
     if (looksLikeOrder) {
@@ -575,6 +601,7 @@ class PushNotificationService {
         _dataValue(data, [
           'senderObjectId',
           'sender_object_id',
+          'sender',
           'senderUserId',
           'sender_user_id',
           'senderId',

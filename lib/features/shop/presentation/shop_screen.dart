@@ -31,10 +31,31 @@ class _ShopScreenState extends State<ShopScreen> {
   bool _refreshing = false;
   double _bannerAspectRatio = 1024 / 273;
 
+  final ScrollController _scrollController = ScrollController();
+  bool _loadingMoreProducts = false;
+
   @override
   void initState() {
     super.initState();
     _fetchAll();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    if (maxScroll - currentScroll <= 200) {
+      if (!_loadingProducts && !_loadingMoreProducts && _page < _totalPages) {
+        _loadMoreProducts();
+      }
+    }
   }
 
   Future<void> _fetchAll() async {
@@ -84,10 +105,11 @@ class _ShopScreenState extends State<ShopScreen> {
 
   Future<void> _fetchProducts() async {
     if (!_refreshing) setState(() => _loadingProducts = true);
+    _page = 1;
     final result = await _api.fetchShopProducts(
       shopId: widget.shopId,
       slug: widget.slug,
-      page: _page,
+      page: 1,
     );
     if (mounted) {
       setState(() {
@@ -98,19 +120,38 @@ class _ShopScreenState extends State<ShopScreen> {
     }
   }
 
+  Future<void> _loadMoreProducts() async {
+    setState(() => _loadingMoreProducts = true);
+    try {
+      final nextPage = _page + 1;
+      final result = await _api.fetchShopProducts(
+        shopId: widget.shopId,
+        slug: widget.slug,
+        page: nextPage,
+      );
+      if (mounted) {
+        setState(() {
+          final existingIds = _products.map((p) => p.id).toSet();
+          final newProducts = result.products.where((p) => !existingIds.contains(p.id)).toList();
+          _products.addAll(newProducts);
+          _page = nextPage;
+          _totalPages = result.totalPages;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading more shop products: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _loadingMoreProducts = false);
+      }
+    }
+  }
+
   Future<void> _handleRefresh() async {
     setState(() => _refreshing = true);
     _page = 1;
     await _fetchAll();
     if (mounted) setState(() => _refreshing = false);
-  }
-
-  Future<void> _changePage(int newPage) async {
-    setState(() {
-      _page = newPage;
-      _loadingProducts = true;
-    });
-    await _fetchProducts();
   }
 
   static String _calcDelivery(int minutes) {
@@ -167,6 +208,7 @@ class _ShopScreenState extends State<ShopScreen> {
                 onRefresh: _handleRefresh,
                 color: const Color(0xFFFB5404),
                 child: CustomScrollView(
+                  controller: _scrollController,
                   physics: const AlwaysScrollableScrollPhysics(),
                   slivers: [
                     if (_loadingDetail)
@@ -237,9 +279,17 @@ class _ShopScreenState extends State<ShopScreen> {
                         ),
                       ),
 
-                    // Pagination
-                    if (_totalPages > 1)
-                      SliverToBoxAdapter(child: _buildPagination()),
+                    if (_loadingMoreProducts)
+                      const SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFFFB5404),
+                            ),
+                          ),
+                        ),
+                      ),
 
                     const SliverToBoxAdapter(child: SizedBox(height: 24)),
                   ],
@@ -673,71 +723,4 @@ class _ShopScreenState extends State<ShopScreen> {
     );
   }
 
-  Widget _buildPagination() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _PaginationButton(
-            label: 'Prev',
-            enabled: _page > 1,
-            onTap: _page > 1 ? () => _changePage(_page - 1) : null,
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              '$_page',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Color(0xFF1F2937),
-              ),
-            ),
-          ),
-          _PaginationButton(
-            label: 'Next',
-            enabled: _page < _totalPages,
-            onTap: _page < _totalPages ? () => _changePage(_page + 1) : null,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PaginationButton extends StatelessWidget {
-  const _PaginationButton({
-    required this.label,
-    required this.enabled,
-    this.onTap,
-  });
-
-  final String label;
-  final bool enabled;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: enabled ? const Color(0xFFFB5404) : const Color(0xFFCCCCCC),
-          ),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: enabled ? const Color(0xFFFB5404) : const Color(0xFFCCCCCC),
-          ),
-        ),
-      ),
-    );
-  }
 }
