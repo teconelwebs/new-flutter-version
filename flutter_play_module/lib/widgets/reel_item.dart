@@ -26,6 +26,7 @@ class ReelItemWidget extends StatefulWidget {
   final VideoPreloadPool pool;
   final ReelsApi api;
   final bool isActive;
+  final bool openCommentsOnStart;
   final VoidCallback onClose;
   final VoidCallback? onRefresh;
   final void Function(String reelId)? onRemoveReel;
@@ -37,6 +38,7 @@ class ReelItemWidget extends StatefulWidget {
     required this.api,
     required this.isActive,
     required this.onClose,
+    this.openCommentsOnStart = false,
     this.onRefresh,
     this.onRemoveReel,
   });
@@ -60,6 +62,7 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
   bool _deleteInProgress = false;
   String? _toast;
   bool _showCenterHeart = false;
+  bool _commentsOpenedFromNotification = false;
 
   void _handleDoubleTapLike() {
     if (!_liked) {
@@ -95,6 +98,9 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
     _productStripOpen = widget.reel.products.isNotEmpty;
     _currentPlaybackUrl = widget.reel.playbackUrl;
     _attachPlayer();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeOpenCommentsFromNotification();
+    });
   }
 
   @override
@@ -118,13 +124,32 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
         _resumeAfterRouteReturn(restartFromStart: false);
         if (!_productsFetched) _fetchProducts();
         widget.api.trackView(widget.reel.id);
+        _maybeOpenCommentsFromNotification();
       } else {
         _paused = false;
         _deactivatePlayback();
         widget.pool.stop(widget.reel.id);
         if (mounted) setState(() => _progress = 0);
       }
+    } else if (widget.openCommentsOnStart &&
+        !oldWidget.openCommentsOnStart &&
+        widget.isActive) {
+      _maybeOpenCommentsFromNotification();
     }
+  }
+
+  void _maybeOpenCommentsFromNotification() {
+    if (!widget.openCommentsOnStart ||
+        !widget.isActive ||
+        _commentsOpenedFromNotification ||
+        !mounted) {
+      return;
+    }
+    _commentsOpenedFromNotification = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _openComments();
+    });
   }
 
   void _syncFollowFromRegistry() {

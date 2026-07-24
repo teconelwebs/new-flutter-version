@@ -13,11 +13,13 @@ import '../widgets/reel_item.dart';
 class ReelsScreen extends StatefulWidget {
   final String initialReelId;
   final bool isActive;
+  final bool openCommentsOnStart;
 
   const ReelsScreen({
     super.key,
     this.initialReelId = '',
     this.isActive = true,
+    this.openCommentsOnStart = false,
   });
 
   @override
@@ -464,6 +466,9 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
             pool: pool,
             api: _api,
             isActive: index == _currentIndex && _routeVisible && widget.isActive,
+            openCommentsOnStart: widget.openCommentsOnStart &&
+                index == _currentIndex &&
+                reel.id == widget.initialReelId.trim(),
             onClose: _handleClose,
             onRefresh: _bootstrap,
             onRemoveReel: _removeReel,
