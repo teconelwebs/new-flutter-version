@@ -1,5 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
+import 'dart:ui';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +10,10 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
+
+import '../constants/app_routes.dart';
+import '../navigation/app_navigator.dart';
+import '../../features/checkout/presentation/order_success_screen.dart';
 
 class PushNotificationService {
   PushNotificationService._();
@@ -33,10 +40,45 @@ class PushNotificationService {
   }
 
   bool _initialized = false;
-  void Function(Map<String, dynamic> data)? onNotificationTapped;
+  bool _homeReady = false;
+  void Function(Map<String, dynamic> data)? _onNotificationTapped;
+  Map<String, dynamic>? pendingNotificationData;
 
-  Future<void> initialize({BuildContext? context}) async {
+  /// Recently handled message ids — stops duplicate banners / double navigation.
+  final Set<String> _recentMessageIds = {};
+  DateTime? _lastRoutedAt;
+  String? _lastRoutedFingerprint;
+
+  void Function(Map<String, dynamic> data)? get onNotificationTapped =>
+      _onNotificationTapped;
+
+  set onNotificationTapped(void Function(Map<String, dynamic> data)? callback) {
+    _onNotificationTapped = callback;
+    if (callback != null) {
+      flushPendingNavigation();
+    }
+  }
+
+  /// Call once Home (or main shell) is on screen and can accept routes.
+  void markHomeReady() {
+    _homeReady = true;
+    flushPendingNavigation();
+  }
+
+  void markHomeNotReady() {
+    _homeReady = false;
+  }
+
+  Future<void> initialize() async {
     if (_initialized) return;
+
+    if (Isolate.current.debugName != 'main' ||
+        PlatformDispatcher.instance.views.isEmpty) {
+      debugPrint(
+        "🔔 Skipping PushNotificationService.initialize in background isolate (${Isolate.current.debugName}) or non-UI context.",
+      );
+      return;
+    }
 
     try {
       final fcm = _fcm;
@@ -47,37 +89,23 @@ class PushNotificationService {
         return;
       }
 
-      bool shouldPrompt = true;
-
-      if (shouldPrompt) {
-        // 1. Request user permission
-        // ignore: unused_local_variable
-        final settings = await fcm.requestPermission(
-          alert: true,
-          badge: true,
-          sound: true,
-          provisional: false,
-        );
-        // debugPrint(
-        //   "\n🔔 ================================================\n"
-        //   "🔔 PUSH PERMISSION STATUS: ${settings.authorizationStatus}\n"
-        //   "🔔 ================================================\n",
-        // );
-      }
-
-      // iOS: show system banners while app is in foreground
+      // IMPORTANT (iOS): do NOT also show system foreground banners.
+      // We render one local notification ourselves so taps carry full data
+      // and the same alert is not shown twice.
       await fcm.setForegroundNotificationPresentationOptions(
-        alert: true,
+        alert: false,
         badge: true,
-        sound: true,
+        sound: false,
       );
 
-      // 2. Initialize local notifications (Android foreground + taps)
       const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
       const iosInit = DarwinInitializationSettings(
         requestAlertPermission: false,
         requestBadgePermission: false,
         requestSoundPermission: false,
+        defaultPresentAlert: true,
+        defaultPresentBadge: true,
+        defaultPresentSound: true,
       );
       const initSettings =
           InitializationSettings(android: androidInit, iOS: iosInit);
@@ -86,13 +114,14 @@ class PushNotificationService {
         settings: initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           final payload = response.payload;
-          if (payload != null && onNotificationTapped != null) {
-            try {
-              final Map<String, dynamic> data = jsonDecode(payload);
-              onNotificationTapped!(data);
-            } catch (e) {
-              debugPrint("Error parsing notification tap payload: $e");
-            }
+          if (payload == null || payload.isEmpty) return;
+          try {
+            final Map<String, dynamic> data =
+                Map<String, dynamic>.from(jsonDecode(payload) as Map);
+            debugPrint("🔔 Local notification tapped: $data");
+            _queueOrRoute(data);
+          } catch (e) {
+            debugPrint("Error parsing notification tap payload: $e");
           }
         },
       );
@@ -102,7 +131,7 @@ class PushNotificationService {
           'welfog_default_channel',
           'Default Notifications',
           description:
-              'This channel is used for order and promotional notifications.',
+              'Order, promotional, and Play (follow/like/comment) notifications.',
           importance: Importance.max,
           playSound: true,
         );
@@ -110,51 +139,58 @@ class PushNotificationService {
             .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>()
             ?.createNotificationChannel(channel);
-
-        await _localNotifications
-            .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>()
-            ?.requestNotificationsPermission();
       }
 
-      // 3. Foreground message listener
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         debugPrint(
-          "FCM foreground: title=${message.notification?.title}, data=${message.data}",
+          "FCM foreground: id=${message.messageId} title=${message.notification?.title}, data=${message.data}",
         );
         _showForegroundNotification(message);
       });
 
-      // 4. Background tap (app in background, not terminated)
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        debugPrint("FCM opened from background: ${message.data}");
-        if (onNotificationTapped != null) {
-          onNotificationTapped!(message.data);
-        }
+        debugPrint(
+          "FCM opened from background: id=${message.messageId} data=${message.data}",
+        );
+        _queueOrRoute(_normalizeMessageData(message));
       });
 
-      // 5. Cold start from notification
+      // Cold start from FCM
       final initialMessage = await fcm.getInitialMessage();
-      if (initialMessage != null && onNotificationTapped != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          onNotificationTapped!(initialMessage.data);
-        });
+      if (initialMessage != null) {
+        debugPrint(
+          "FCM initial message found: id=${initialMessage.messageId} data=${initialMessage.data}",
+        );
+        _storePending(_normalizeMessageData(initialMessage));
       }
 
-      // 6. Token refresh → keep backend in sync
+      // Cold start from a local notification — only if we don't already have FCM data.
+      final NotificationAppLaunchDetails? launchDetails =
+          await _localNotifications.getNotificationAppLaunchDetails();
+      if (launchDetails != null &&
+          launchDetails.didNotificationLaunchApp &&
+          launchDetails.notificationResponse?.payload != null) {
+        try {
+          final Map<String, dynamic> data = Map<String, dynamic>.from(
+            jsonDecode(launchDetails.notificationResponse!.payload!) as Map,
+          );
+          debugPrint("Local notification launch payload found: $data");
+          if (pendingNotificationData == null ||
+              pendingNotificationData!.isEmpty) {
+            _storePending(data);
+          }
+        } catch (e) {
+          debugPrint("Error parsing launch notification payload: $e");
+        }
+      }
+
       fcm.onTokenRefresh.listen((token) {
         debugPrint("FCM token refreshed: ${token.substring(0, 12)}...");
         syncTokenWithBackend(force: true);
       });
 
       _initialized = true;
-      // debugPrint(
-      //   "\n🔔 ================================================\n"
-      //   "🔔 PushNotificationService initialized successfully.\n"
-      //   "🔔 ================================================\n",
-      // );
 
-      // Log token so we can verify in device logs
       final token = await getFcmToken();
       if (token != null) {
         debugPrint(
@@ -172,12 +208,453 @@ class PushNotificationService {
     }
   }
 
+  /// Re-check cold-start message after UI is up (iOS sometimes misses early read).
+  Future<void> refreshInitialMessage() async {
+    try {
+      final fcm = _fcm;
+      if (fcm == null) return;
+      final initialMessage = await fcm.getInitialMessage();
+      if (initialMessage == null) return;
+      debugPrint(
+        "FCM initial message (refresh): id=${initialMessage.messageId} data=${initialMessage.data}",
+      );
+      _queueOrRoute(_normalizeMessageData(initialMessage));
+    } catch (e) {
+      debugPrint("refreshInitialMessage error: $e");
+    }
+  }
+
+  void flushPendingNavigation() {
+    final data = pendingNotificationData;
+    if (data == null) return;
+    if (appNavigatorKey.currentState == null) {
+      debugPrint("🔔 flushPending skipped — navigator not ready yet");
+      return;
+    }
+    pendingNotificationData = null;
+    debugPrint("🔔 flushPending → routing stored notification");
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _routeNotification(data);
+    });
+  }
+
+  void _storePending(Map<String, dynamic> data) {
+    pendingNotificationData = data;
+  }
+
+  void _queueOrRoute(Map<String, dynamic> data) {
+    final normalized = _normalizeDataMap(data);
+    final navReady = appNavigatorKey.currentState != null;
+    debugPrint(
+      "🔔 queueOrRoute homeReady=$_homeReady navReady=$navReady data=$normalized",
+    );
+    // Do NOT require _homeReady — checkout can dispose Home briefly.
+    // As long as the root navigator exists we can open My Orders.
+    if (!navReady) {
+      debugPrint("🔔 Navigator missing — storing pending notification");
+      _storePending(normalized);
+      return;
+    }
+    _routeNotification(normalized);
+  }
+
+  Map<String, dynamic> _normalizeMessageData(RemoteMessage message) {
+    final merged = <String, dynamic>{
+      ...message.data,
+      if (message.messageId != null) 'messageId': message.messageId,
+      if (message.notification?.title != null)
+        'title': message.notification!.title,
+      if (message.notification?.body != null)
+        'body': message.notification!.body,
+    };
+    return _normalizeDataMap(merged);
+  }
+
+  Map<String, dynamic> _normalizeDataMap(Map<String, dynamic> raw) {
+    final out = <String, dynamic>{};
+    raw.forEach((key, value) {
+      out[key.toString()] = value;
+    });
+
+    // Some backends nest custom fields inside a JSON "data" string.
+    final nested = out['data'];
+    if (nested is String && nested.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(nested);
+        if (decoded is Map) {
+          decoded.forEach((k, v) {
+            out.putIfAbsent(k.toString(), () => v);
+          });
+        }
+      } catch (_) {}
+    } else if (nested is Map) {
+      nested.forEach((k, v) {
+        out.putIfAbsent(k.toString(), () => v);
+      });
+    }
+
+    return out;
+  }
+
+  /// Case-insensitive lookup for backend keys like `Type` vs `type`.
+  dynamic _dataValue(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      if (data.containsKey(key)) return data[key];
+    }
+    final lowerMap = <String, dynamic>{};
+    data.forEach((k, v) {
+      lowerMap[k.toLowerCase()] = v;
+    });
+    for (final key in keys) {
+      final hit = lowerMap[key.toLowerCase()];
+      if (hit != null) return hit;
+    }
+    return null;
+  }
+
+  static const _playSocialTypes = {
+    'follow',
+    'like',
+    'comment',
+    'comment_reply',
+    'comment_like',
+  };
+
+  bool _isPlaySocialType(String typeStr) =>
+      _playSocialTypes.contains(typeStr.trim().toLowerCase());
+
+  /// FCM data values are often strings; treat null / "null" / empty as missing.
+  String _cleanId(dynamic value) {
+    if (value == null) return '';
+    if (value is Map) {
+      return _cleanId(value['id'] ?? value['_id']);
+    }
+    final s = value.toString().trim();
+    if (s.isEmpty || s.toLowerCase() == 'null' || s == 'undefined') {
+      return '';
+    }
+    return s;
+  }
+
+  String _contentFingerprint(Map<String, dynamic> data) {
+    final type = (_dataValue(data, [
+              'notificationFor',
+              'notification_for',
+              'type',
+              'Type',
+              'play_type',
+              'playType',
+              'target',
+              'screen',
+            ]) ??
+            '')
+        .toString()
+        .toLowerCase();
+
+    // Play social: fingerprint on type + reel/sender so order ids don't collide.
+    if (_isPlaySocialType(type)) {
+      final reel = _cleanId(
+        _dataValue(data, ['reel', 'reelId', 'reel_id']),
+      );
+      final sender = _cleanId(
+        _dataValue(data, [
+          'senderObjectId',
+          'sender_object_id',
+          'senderUserId',
+          'sender_user_id',
+        ]),
+      );
+      final comment = _cleanId(
+        _dataValue(data, ['comment', 'commentId', 'comment_id']),
+      );
+      return 'play|$type|$reel|$sender|$comment';
+    }
+
+    final id = (_dataValue(data, [
+              'linkId',
+              'oid',
+              'orderId',
+              'order_id',
+              'id',
+              'order_code',
+              'orderCode',
+            ]) ??
+            '')
+        .toString();
+    final title = (data['title'] ?? '').toString();
+    final body = (data['body'] ?? data['message'] ?? '').toString();
+    return '$type|$id|$title|$body';
+  }
+
+  bool _isDuplicateRoute(Map<String, dynamic> data) {
+    final fingerprint = _contentFingerprint(data);
+    final now = DateTime.now();
+    if (_lastRoutedFingerprint == fingerprint &&
+        _lastRoutedAt != null &&
+        now.difference(_lastRoutedAt!) < const Duration(seconds: 4)) {
+      return true;
+    }
+    _lastRoutedAt = now;
+    _lastRoutedFingerprint = fingerprint;
+    return false;
+  }
+
+  final Set<String> _recentContentFingerprints = {};
+
+  bool _shouldSkipDuplicateContent(Map<String, dynamic> data, {String? messageId}) {
+    if (messageId != null && messageId.isNotEmpty) {
+      if (_recentMessageIds.contains(messageId)) return true;
+      _recentMessageIds.add(messageId);
+      if (_recentMessageIds.length > 40) {
+        _recentMessageIds.remove(_recentMessageIds.first);
+      }
+    }
+
+    // Server often sends 2 FCM messages for one order (different messageIds).
+    final contentKey = _contentFingerprint(data);
+    if (_recentContentFingerprints.contains(contentKey)) {
+      debugPrint("🔔 Skipping duplicate content notification: $contentKey");
+      return true;
+    }
+    _recentContentFingerprints.add(contentKey);
+    if (_recentContentFingerprints.length > 40) {
+      _recentContentFingerprints.remove(_recentContentFingerprints.first);
+    }
+    return false;
+  }
+
+  Future<void> _routeNotification(Map<String, dynamic> data) async {
+    if (_isDuplicateRoute(data)) {
+      debugPrint("🔔 Duplicate notification route ignored: $data");
+      return;
+    }
+
+    for (var attempt = 0; attempt < 30; attempt++) {
+      final nav = appNavigatorKey.currentState;
+      if (nav != null) {
+        try {
+          final routed = _pushRoute(nav, data);
+          if (routed) {
+            debugPrint("🔔 Notification routed successfully (attempt $attempt)");
+            return;
+          }
+        } catch (e, st) {
+          debugPrint("🔔 Notification route error: $e\n$st");
+        }
+      } else {
+        debugPrint("🔔 Waiting for navigator... attempt $attempt");
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+
+    _storePending(data);
+    debugPrint("🔔 Notification route deferred (navigator not ready): $data");
+  }
+
+  bool _pushRoute(NavigatorState nav, Map<String, dynamic> data) {
+    debugPrint("🔔 [Notification Routing] Received payload data: $data");
+
+    final typeForRouting = _dataValue(data, [
+      'notificationFor',
+      'notification_for',
+      'type',
+      'Type',
+      'play_type',
+      'playType',
+      'target',
+      'screen',
+      'click_action',
+    ]);
+    final typeStr = (typeForRouting ?? '').toString().trim().toLowerCase();
+
+    final trackingId = _dataValue(data, [
+      'oid',
+      'orderId',
+      'order_id',
+      'id',
+      'linkId',
+      'order_code',
+      'orderCode',
+    ]);
+    final oidStr = _cleanId(trackingId);
+    debugPrint(
+      "🔔 [Notification Routing] Parsed typeStr: '$typeStr', oidStr: '$oidStr'",
+    );
+
+    // Play social (follow / like / comment*) — exact types only so order
+    // notifications never get swallowed by contains('like').
+    if (_isPlaySocialType(typeStr)) {
+      final ok = _routePlaySocialNotification(nav, data, typeStr);
+      if (!ok) {
+        debugPrint(
+          "🔔 Play social type='$typeStr' missing target ids — skipping nav",
+        );
+      }
+      // Type was recognized; always consume so we don't retry / fall to orders.
+      return true;
+    }
+
+    // Explicit marketing / catalog types before order fallback.
+    switch (typeStr) {
+      case 'home':
+        nav.pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
+        return true;
+      case 'top_deals':
+        nav.pushNamed(AppRoutes.todayDeals);
+        return true;
+      case 'category':
+        final categoryId = _dataValue(
+            data, ['linkId', 'categoryId', 'id', 'slug']);
+        if (categoryId != null && _cleanId(categoryId).isNotEmpty) {
+          nav.pushNamed(
+            AppRoutes.searchResults,
+            arguments: {'query': '', 'categoryId': _cleanId(categoryId)},
+          );
+        } else {
+          nav.pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
+        }
+        return true;
+      case 'product':
+        final productIdentifier =
+            _dataValue(data, ['linkId', 'productId', 'slug', 'id']);
+        if (productIdentifier != null &&
+            _cleanId(productIdentifier).isNotEmpty) {
+          nav.pushNamed(
+            AppRoutes.product,
+            arguments: _cleanId(productIdentifier),
+          );
+          return true;
+        }
+        break;
+    }
+
+    final looksLikeOrder = typeStr.contains('order') ||
+        typeStr.contains('track') ||
+        typeStr.contains('purchase') ||
+        typeStr.contains('payment') ||
+        typeStr.contains('delivery') ||
+        typeStr == 'my_orders' ||
+        typeStr == 'myorders' ||
+        (typeForRouting == null && oidStr.isNotEmpty) ||
+        typeStr.isEmpty;
+
+    if (looksLikeOrder) {
+      _openOrdersScreen(nav);
+      return true;
+    }
+
+    _openOrdersScreen(nav);
+    return true;
+  }
+
+  /// Routes Play FCM payloads to profile / reel screens (Android + iOS).
+  ///
+  /// Expected data shape:
+  /// ```json
+  /// {
+  ///   "recipientUserId": "1195",
+  ///   "senderUserId": "1742",
+  ///   "recipientObjectId": "...",
+  ///   "senderObjectId": "...",
+  ///   "type": "follow|like|comment|comment_reply|comment_like",
+  ///   "reel": "..."|null,
+  ///   "comment": "..."|null,
+  ///   "message": "..."
+  /// }
+  /// ```
+  bool _routePlaySocialNotification(
+    NavigatorState nav,
+    Map<String, dynamic> data,
+    String typeStr,
+  ) {
+    debugPrint("🔔 [Play Social] routing type=$typeStr");
+
+    if (typeStr == 'follow') {
+      // Prefer mongo ObjectId — OtherProfileScreen resolves via play API.
+      final profileId = _cleanId(
+        _dataValue(data, [
+          'senderObjectId',
+          'sender_object_id',
+          'senderUserId',
+          'sender_user_id',
+          'senderId',
+          'sender_id',
+          'userId',
+          'user_id',
+        ]),
+      );
+      if (profileId.isEmpty) {
+        debugPrint("🔔 [Play Social] follow missing sender id");
+        return false;
+      }
+      debugPrint("🔔 [Play Social] → OtheruserProfile/$profileId");
+      nav.pushNamed('/OtheruserProfile/$profileId');
+      return true;
+    }
+
+    // like | comment | comment_reply | comment_like → open that reel
+    final reelId = _cleanId(
+      _dataValue(data, ['reel', 'reelId', 'reel_id']),
+    );
+    if (reelId.isEmpty) {
+      debugPrint("🔔 [Play Social] $typeStr missing reel id");
+      return false;
+    }
+
+    final commentId = _cleanId(
+      _dataValue(data, ['comment', 'commentId', 'comment_id']),
+    );
+    final route = commentId.isNotEmpty
+        ? '/sepreel/$reelId?commentId=$commentId'
+        : '/sepreel/$reelId';
+    debugPrint("🔔 [Play Social] → $route");
+    nav.pushNamed(route);
+    return true;
+  }
+
+  /// Clears checkout/success stack so Orders is not wiped by OrderSuccess timer.
+  void _openOrdersScreen(NavigatorState nav) {
+    try {
+      OrderSuccessScreen.cancelActiveTimer();
+    } catch (err) {
+      debugPrint("Error cancelling success screen timer: $err");
+    }
+
+    nav.pushNamedAndRemoveUntil(
+      AppRoutes.orders,
+      (route) => false,
+      arguments: {'fromNotification': true},
+    );
+  }
+
+  Future<void> requestPermissions() async {
+    try {
+      final fcm = _fcm;
+      if (fcm == null) return;
+
+      await fcm.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
+
+      if (Platform.isAndroid) {
+        await _localNotifications
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.requestNotificationsPermission();
+      }
+    } catch (e) {
+      debugPrint("Error requesting notification permissions: $e");
+    }
+  }
+
   Future<String?> getFcmToken() async {
     try {
       final fcm = _fcm;
       if (fcm == null) return null;
 
-      // iOS needs an APNs token before FCM token is available.
       if (Platform.isIOS) {
         String? apns = await fcm.getAPNSToken();
         for (var i = 0; i < 10 && apns == null; i++) {
@@ -199,34 +676,56 @@ class PushNotificationService {
   }
 
   void _showForegroundNotification(RemoteMessage message) async {
-    final notification = message.notification;
-    if (notification == null) {
-      // Data-only messages: still surface a basic local notification if title exists
-      final title = message.data['title']?.toString();
-      final body = message.data['body']?.toString() ??
-          message.data['message']?.toString();
-      if (title == null && body == null) return;
-      await _showLocal(
-        title: title ?? 'Welfog',
-        body: body ?? '',
-        payload: jsonEncode(message.data),
-      );
+    final data = _normalizeMessageData(message);
+    final messageId = message.messageId;
+    if (_shouldSkipDuplicateContent(data, messageId: messageId)) {
+      debugPrint("🔔 Skipping duplicate foreground message: $messageId");
       return;
     }
 
-    // If it's a notification message, iOS will automatically show it
-    // because of setForegroundNotificationPresentationOptions.
-    // We only need to show a local notification on Android.
-    if (Platform.isAndroid) {
-      await _showLocal(
-        title: notification.title ?? 'Welfog',
-        body: notification.body ?? '',
-        payload: jsonEncode(message.data),
-      );
+    final notification = message.notification;
+
+    final title = notification?.title?.toString() ??
+        data['title']?.toString() ??
+        'Welfog';
+    final body = notification?.body?.toString() ??
+        data['body']?.toString() ??
+        data['message']?.toString() ??
+        '';
+
+    if ((notification == null) &&
+        (data['title'] == null &&
+            data['body'] == null &&
+            data['message'] == null)) {
+      return;
     }
+
+    // Stable id from order/content so a second FCM for the same order
+    // updates/replaces the first banner instead of stacking another one.
+    final stableId = _notificationIdForContent(data, title, body);
+
+    await _showLocal(
+      id: stableId,
+      title: title,
+      body: body.isEmpty ? 'You have a new update' : body,
+      payload: jsonEncode(data),
+    );
+  }
+
+  int _notificationIdForContent(
+    Map<String, dynamic> data,
+    String title,
+    String body,
+  ) {
+    final fingerprint = _contentFingerprint(data);
+    if (fingerprint.replaceAll('|', '').isNotEmpty) {
+      return fingerprint.hashCode & 0x7fffffff;
+    }
+    return (title.hashCode ^ body.hashCode) & 0x7fffffff;
   }
 
   Future<void> _showLocal({
+    required int id,
     required String title,
     required String body,
     required String payload,
@@ -251,7 +750,7 @@ class PushNotificationService {
         NotificationDetails(android: androidDetails, iOS: iosDetails);
 
     await _localNotifications.show(
-      id: title.hashCode ^ body.hashCode,
+      id: id,
       title: title,
       body: body,
       notificationDetails: details,
@@ -259,7 +758,6 @@ class PushNotificationService {
     );
   }
 
-  /// Sync push token with server database.
   Future<void> syncTokenWithBackend({bool force = false}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -277,17 +775,7 @@ class PushNotificationService {
 
       final String deviceId = await play.DeviceIdStore.getOrCreate();
       final String platform = Platform.isAndroid ? "android" : "ios";
-
       final lastToken = prefs.getString('last_push_token');
-
-      // debugPrint(
-      //   "\n💾 ================================================\n"
-      //   "💾 LOCAL DEVICE TOKEN CHECK:\n"
-      //   "💾 Saved Local Token: ${lastToken ?? 'NONE (Empty/Not Stored)'}\n"
-      //   "💾 Current Device FCM Token: $token\n"
-      //   "💾 Is Token Stored and Matched? ${lastToken == token ? 'YES (Matched)' : 'NO (Needs Sync/Missing)'}\n"
-      //   "💾 ================================================\n",
-      // );
 
       bool shouldRegister = force || lastToken != token;
 
@@ -338,29 +826,11 @@ class PushNotificationService {
           'app_version': '1.2.0',
         }),
       );
-      // debugPrint(
-      //   "\n🚀 ================================================\n"
-      //   "🚀 FCM TOKEN SYNC DETAILS:\n"
-      //   "🚀 URL: $saveUrl\n"
-      //   "🚀 User ID: $userId\n"
-      //   "🚀 Device ID: $deviceId\n"
-      //   "🚀 Response Status Code: ${saveRes.statusCode}\n"
-      //   "🚀 Response Body: ${saveRes.body}\n"
-      //   "🚀 ================================================\n",
-      // );
       if (saveRes.statusCode >= 200 && saveRes.statusCode < 300) {
         try {
           final Map<String, dynamic> resData = jsonDecode(saveRes.body);
           if (resData['status'] == 200 || resData['status'] == null) {
             await prefs.setString('last_push_token', token);
-            // debugPrint(
-            //   "\n💾 ================================================\n"
-            //   "💾 LOCAL STORAGE SUCCESS:\n"
-            //   "💾 FCM Token has been saved to SharedPreferences.\n"
-            //   "💾 Key: last_push_token\n"
-            //   "💾 Value: $token\n"
-            //   "💾 ================================================\n",
-            // );
           } else {
             debugPrint("❌ SERVER REJECTED TOKEN SYNC:\n"
                 "❌ Body: ${saveRes.body}\n");
@@ -391,7 +861,6 @@ class NotificationPermissionRationaleSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Drag handle
           Container(
             width: 40,
             height: 4,
@@ -401,8 +870,6 @@ class NotificationPermissionRationaleSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 28),
-
-          // Bell icon with orange glow
           Container(
             width: 80,
             height: 80,
@@ -418,8 +885,6 @@ class NotificationPermissionRationaleSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-
-          // Title
           const Text(
             'Enable Notifications',
             style: TextStyle(
@@ -430,8 +895,6 @@ class NotificationPermissionRationaleSheet extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
-
-          // Main explanation
           const Text(
             'Stay updated with your orders, delivery status, and exclusive offers.',
             style: TextStyle(
@@ -442,8 +905,6 @@ class NotificationPermissionRationaleSheet extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
-
-          // Benefit points
           _buildPoint(Icons.local_shipping_outlined,
               'Real-time order and delivery tracking'),
           _buildPoint(Icons.local_offer_outlined,
@@ -451,8 +912,6 @@ class NotificationPermissionRationaleSheet extends StatelessWidget {
           _buildPoint(Icons.chat_bubble_outline_rounded,
               'Instant updates on customer support'),
           const SizedBox(height: 28),
-
-          // Action buttons
           SizedBox(
             width: double.infinity,
             height: 50,

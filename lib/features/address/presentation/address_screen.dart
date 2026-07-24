@@ -327,10 +327,23 @@ class _AddressScreenState extends State<AddressScreen> {
                 .where((addr) => addr['id']?.toString() != addressId)
                 .toList();
           });
+          if (mounted) {
+            _showCustomPopup('Address deleted successfully', success: true);
+          }
+        } else if (mounted) {
+          _showCustomPopup(
+            (data['message'] ?? 'Unable to delete address.').toString(),
+            success: false,
+          );
         }
+      } else if (mounted) {
+        _showCustomPopup('Unable to delete address.', success: false);
       }
     } catch (e) {
       debugPrint('Error deleting address: $e');
+      if (mounted) {
+        _showCustomPopup('Unable to delete address.', success: false);
+      }
     }
   }
 
