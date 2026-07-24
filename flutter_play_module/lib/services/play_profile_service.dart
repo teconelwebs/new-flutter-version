@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_const_declarations
+
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -90,14 +92,19 @@ class PlayProfileService {
     );
   }
 
-  /// Prefer update-by-mobile so the server cannot mint duplicate profiles.
+  /// Prefer update of an existing profile — never mint a duplicate for the
+  /// same shop userid / mobile (that orphaned posts on older mongo ids).
   Future<String> upsertPlayProfile({
     required String mainUserId,
     required String mobile,
     required String username,
     String name = '',
   }) async {
-    final existing = await _lookupByMobile(mobile);
+    // 1) Shop userid first (canonical), then mobile.
+    final byUserId = await _lookupByShopUserId(mainUserId);
+    final byMobile = await _lookupByMobile(mobile);
+    final existing = _preferExistingProfile(byUserId, byMobile);
+
     if (existing != null) {
       final existingId = (existing['_id'] ?? '').toString();
       if (existingId.isNotEmpty) {
@@ -110,7 +117,7 @@ class PlayProfileService {
                 : username;
 
         _log(
-          'mobile already has profile mongoId=$existingId — '
+          'existing profile mongoId=$existingId — '
           'updating instead of create (username=$nextUsername)',
         );
         await _putFullProfile(
@@ -123,7 +130,6 @@ class PlayProfileService {
           existing: existing,
           mobile: mobile,
         );
-        // Confirm shop user_id stuck (server may still mint UUID on create).
         await syncMainUserId(playMongoId: existingId, mainUserId: mainUserId);
         return existingId;
       }
@@ -135,9 +141,51 @@ class PlayProfileService {
       username,
       name: name,
     );
-    // Server ignores userid on create and writes a UUID — force full PUT.
     await syncMainUserId(playMongoId: createdId, mainUserId: mainUserId);
     return createdId;
+  }
+
+  /// When duplicates exist, keep the older mongo ObjectId (original account).
+  static Map<String, dynamic>? _preferExistingProfile(
+    Map<String, dynamic>? a,
+    Map<String, dynamic>? b,
+  ) {
+    if (a == null) return b;
+    if (b == null) return a;
+    final idA = (a['_id'] ?? '').toString();
+    final idB = (b['_id'] ?? '').toString();
+    if (idA.isEmpty) return b;
+    if (idB.isEmpty) return a;
+    if (idA == idB) return a;
+    // ObjectId hex is time-sortable — smaller = older = original profile.
+    return idA.compareTo(idB) <= 0 ? a : b;
+  }
+
+  Future<Map<String, dynamic>?> _lookupByShopUserId(String mainUserId) async {
+    final id = mainUserId.trim();
+    if (id.isEmpty) return null;
+    try {
+      final url = '$_fourthBaseUrl/users/$id';
+      _log('GET $url (shop userid lookup)');
+      final res = await http.get(Uri.parse(url), headers: _headers);
+      _log('GET users/$id status=${res.statusCode} body=${res.body}');
+      if (res.statusCode < 200 || res.statusCode >= 300) return null;
+      final body = jsonDecode(res.body);
+      if (body is Map) {
+        if (body['data'] is List && (body['data'] as List).isNotEmpty) {
+          final first = (body['data'] as List).first;
+          if (first is Map && (first['_id'] ?? '').toString().isNotEmpty) {
+            return Map<String, dynamic>.from(first);
+          }
+        }
+        if ((body['_id'] ?? '').toString().isNotEmpty) {
+          return Map<String, dynamic>.from(body);
+        }
+      }
+    } catch (e) {
+      _log('lookupByShopUserId error: $e');
+    }
+    return null;
   }
 
   /// Sets the real username on an already-bootstrapped play profile.

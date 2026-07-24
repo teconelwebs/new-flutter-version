@@ -62,6 +62,12 @@ class _EmbeddedReelsWrapperState extends State<EmbeddedReelsWrapper> {
     // Ready only when a real username exists — not merely a mongo doc.
     final usernameReady = await PlayProfileHelper.isPlayUsernameReady();
 
+    debugPrint(
+      '🎮 [PlayTab] resolve viewerId=$id usernameReady=$usernameReady '
+      'mainUserId=${data?.mainUserId} mobile=${data?.mobile} '
+      'name=${data?.name}',
+    );
+
     if (usernameReady && widget.isActive) {
       await PlayProfileHelper.ensureMainUserIdOnPlayProfile();
     }
@@ -90,15 +96,20 @@ class _EmbeddedReelsWrapperState extends State<EmbeddedReelsWrapper> {
     }
 
     final playId = _resolvedViewerId ?? widget.viewerId;
+    final rawMain = (_userData?.mainUserId.isNotEmpty == true)
+        ? _userData!.mainUserId
+        : widget.viewerId;
+    final mainUserId =
+        (rawMain.toLowerCase() == 'guest' || rawMain.startsWith('guest_'))
+            ? ''
+            : rawMain;
 
     return PlaySessionScope(
       initialViewerId: playId,
       deviceId: '',
       shareUserId: '',
       launchContext: PlayLaunchContext(
-        mainUserId: _userData?.mainUserId.isNotEmpty == true
-            ? _userData!.mainUserId
-            : widget.viewerId,
+        mainUserId: mainUserId,
         mobile: _userData?.mobile ?? '',
         name: _userData?.name ?? '',
         playProfileReady: _usernameReady ?? false,

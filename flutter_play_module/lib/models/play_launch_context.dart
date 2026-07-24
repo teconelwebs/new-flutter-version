@@ -8,11 +8,22 @@ class PlayLaunchContext {
     this.mainUserId = '',
     this.mobile = '',
     this.name = '',
-    this.playProfileReady = true,
+    // Default false — missing ready flag must not skip username setup.
+    this.playProfileReady = false,
   });
 
-  bool get needsSetup =>
-      !playProfileReady && mainUserId.isNotEmpty && mobile.isNotEmpty;
+  static bool _isGuestMainUserId(String id) {
+    final v = id.trim().toLowerCase();
+    return v.isEmpty || v == 'guest' || v.startsWith('guest_');
+  }
+
+  /// Logged-in shop user without a real Play username must set one up.
+  /// Mobile is preferred but not required (sheet can resolve mobile from prefs).
+  bool get needsSetup {
+    if (playProfileReady) return false;
+    if (_isGuestMainUserId(mainUserId)) return false;
+    return true;
+  }
 
   factory PlayLaunchContext.fromQuery(Map<String, String> params) {
     final ready = params['playProfileReady'];
@@ -20,7 +31,7 @@ class PlayLaunchContext {
       mainUserId: params['mainUserId'] ?? '',
       mobile: params['mobile'] ?? '',
       name: params['name'] ?? '',
-      playProfileReady: ready != '0' && ready != 'false',
+      playProfileReady: ready == '1' || ready == 'true',
     );
   }
 }
