@@ -80,6 +80,11 @@ class _PlayProfileSetupSheetState extends State<PlayProfileSetupSheet> {
     });
 
     try {
+      debugPrint(
+        '🎮 [PlaySetup] submit — mainUserId(OTP)=$mainUserId '
+        'mobile=${widget.launchContext.mobile} username=$username '
+        'name=${widget.launchContext.name}',
+      );
       final service = PlayProfileService(deviceId: widget.deviceId);
       // Name dialog may have already created mongo profile — only set username.
       var existingMongoId =

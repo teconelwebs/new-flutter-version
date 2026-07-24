@@ -18,9 +18,9 @@ import '../utils/share_links.dart';
 import '../utils/play_profile_helper.dart';
 import '../utils/my_profile_cache.dart';
 import 'device_id_store.dart';
+import 'play_api_config.dart';
 
-// const _baseUrl = 'https://api.welfog.com/api';
-const _baseUrl = 'https://unnecessitous-domitila-unbudging.ngrok-free.dev/api';
+const _baseUrl = kPlayApiBaseUrl;
 const _secondBaseUrl = 'https://welfogapi.welfog.com/api';
 const _prefetchLimit = 50;
 

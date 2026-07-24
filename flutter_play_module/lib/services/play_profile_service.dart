@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-const _fourthBaseUrl = 'https://api.welfog.com/api';
+import 'play_api_config.dart';
+
+const _fourthBaseUrl = kPlayApiBaseUrl;
 
 class PlayProfileService {
   const PlayProfileService({required this.deviceId});
@@ -15,6 +17,9 @@ class PlayProfileService {
         'Content-Type': 'application/json',
         if (deviceId.isNotEmpty) 'x-android-id': deviceId,
       };
+
+  void _log(String msg) =>
+      debugPrint('🎮 [PlayProfile] baseUrl=$_fourthBaseUrl | $msg');
 
   /// Shop login ids are numeric (e.g. "1773"). Server often ignores string-only
   /// `{userid}` PUTs, so send numeric when possible.
@@ -54,8 +59,8 @@ class PlayProfileService {
     required String name,
   }) async {
     final pending = pendingUsernameFor(mainUserId);
-    debugPrint(
-      '🎮 [PlayProfile] bootstrapWithName '
+    _log(
+      'bootstrapWithName '
       'userid=$mainUserId name=$name mobile=$mobile pendingUsername=$pending',
     );
     return upsertPlayProfile(
@@ -73,8 +78,8 @@ class PlayProfileService {
     String name = '',
   }) async {
     final trimmed = username.trim();
-    debugPrint(
-      '🎮 [PlayProfile] createPlayProfile start '
+    _log(
+      'createPlayProfile start '
       'mainUserId=$mainUserId mobile=$mobile username=$trimmed name=$name',
     );
     return upsertPlayProfile(
@@ -104,8 +109,8 @@ class PlayProfileService {
                 ? existingUsername
                 : username;
 
-        debugPrint(
-          '🎮 [PlayProfile] mobile already has profile mongoId=$existingId — '
+        _log(
+          'mobile already has profile mongoId=$existingId — '
           'updating instead of create (username=$nextUsername)',
         );
         await _putFullProfile(
@@ -173,16 +178,17 @@ class PlayProfileService {
       'mobile': mobile,
       'name': name.isNotEmpty ? name : username,
     };
-    debugPrint('🎮 [PlayProfile] POST /users/ payload=$payload');
+    final url = '$_fourthBaseUrl/users/';
+    _log('POST $url payload=$payload');
 
     final response = await http.post(
-      Uri.parse('$_fourthBaseUrl/users/'),
+      Uri.parse(url),
       headers: _headers,
       body: jsonEncode(payload),
     );
 
-    debugPrint(
-      '🎮 [PlayProfile] POST /users/ status=${response.statusCode} body=${response.body}',
+    _log(
+      'POST /users/ status=${response.statusCode} body=${response.body}',
     );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -195,8 +201,8 @@ class PlayProfileService {
     if (id == null || id.isEmpty) {
       throw Exception('Failed to create profile: missing id');
     }
-    debugPrint(
-      '🎮 [PlayProfile] created mongoId=$id '
+    _log(
+      'created mongoId=$id '
       'userid=${body['userid']} username=${body['username']} name=${body['name']}',
     );
     return id;
@@ -214,16 +220,24 @@ class PlayProfileService {
 
     for (final candidate in candidates) {
       try {
+        final url = '$_fourthBaseUrl/users/bymobile/$candidate';
+        _log('GET $url');
         final lookup = await http.get(
-          Uri.parse('$_fourthBaseUrl/users/bymobile/$candidate'),
+          Uri.parse(url),
           headers: _headers,
+        );
+        _log(
+          'GET bymobile/$candidate status=${lookup.statusCode} '
+          'body=${lookup.body}',
         );
         if (lookup.statusCode < 200 || lookup.statusCode >= 300) continue;
         final body = jsonDecode(lookup.body);
         if (body is Map && (body['_id'] ?? '').toString().isNotEmpty) {
           return Map<String, dynamic>.from(body);
         }
-      } catch (_) {}
+      } catch (e) {
+        _log('GET bymobile/$candidate error: $e');
+      }
     }
     return null;
   }
@@ -277,16 +291,15 @@ class PlayProfileService {
       'profilePicture': existing['profilePicture'] ?? '',
     };
 
-    debugPrint(
-      '🎮 [PlayProfile] PUT full profile mongoId=$playMongoId payload=$payload',
-    );
+    final url = '$_fourthBaseUrl/users/$playMongoId';
+    _log('PUT $url payload=$payload');
     final response = await http.put(
-      Uri.parse('$_fourthBaseUrl/users/$playMongoId'),
+      Uri.parse(url),
       headers: _headers,
       body: jsonEncode(payload),
     );
-    debugPrint(
-      '🎮 [PlayProfile] PUT full status=${response.statusCode} body=${response.body}',
+    _log(
+      'PUT full status=${response.statusCode} body=${response.body}',
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Failed to update profile (${response.statusCode})');
@@ -300,8 +313,8 @@ class PlayProfileService {
     final mongoId = playMongoId.trim();
     final userId = mainUserId.trim();
     if (mongoId.isEmpty || userId.isEmpty) {
-      debugPrint(
-        '🎮 [PlayProfile] syncMainUserId skipped — '
+      _log(
+        'syncMainUserId skipped — '
         'mongoId="$mongoId" mainUserId="$userId"',
       );
       return false;
@@ -310,9 +323,7 @@ class PlayProfileService {
     try {
       final userMap = await _fetchUserMap(mongoId);
       if (userMap == null) {
-        debugPrint(
-          '🎮 [PlayProfile] syncMainUserId — profile not found mongoId=$mongoId',
-        );
+        _log('syncMainUserId — profile not found mongoId=$mongoId');
         return false;
       }
 
@@ -320,14 +331,12 @@ class PlayProfileService {
           .toString()
           .trim();
       if (current == userId) {
-        debugPrint(
-          '🎮 [PlayProfile] userid already set on play profile: $userId',
-        );
+        _log('userid already set on play profile: $userId');
         return true;
       }
 
-      debugPrint(
-        '🎮 [PlayProfile] backfilling userid — '
+      _log(
+        'backfilling userid — '
         'mongoId=$mongoId current="$current" → "$userId"',
       );
 
@@ -346,19 +355,19 @@ class PlayProfileService {
           .toString()
           .trim();
       final ok = saved == userId;
-      debugPrint(
-        '🎮 [PlayProfile] userid verify after PUT — '
+      _log(
+        'userid verify after PUT — '
         'wanted="$userId" got="$saved" ok=$ok',
       );
       if (!ok && isUuidLike(saved)) {
-        debugPrint(
-          '🎮 [PlayProfile] WARNING: server still stores UUID in userid. '
+        _log(
+          'WARNING: server still stores UUID in userid. '
           'Backend may be overwriting/ignoring shop user_id on /users PUT.',
         );
       }
       return ok;
     } catch (e) {
-      debugPrint('🎮 [PlayProfile] syncMainUserId error: $e');
+      _log('syncMainUserId error: $e');
       return false;
     }
   }

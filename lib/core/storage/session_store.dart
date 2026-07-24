@@ -50,6 +50,10 @@ class SessionStore {
       // Do NOT create Play profile here with username=userId.
       // New users: home name dialog bootstraps name+userid; Play tab asks for username.
       // Returning users: soft-resolve existing mongo profile only.
+      debugPrint(
+        '🎮 [Login] OTP done — saved shop user_id=$userId mobile=$mobile '
+        '(Play profile NOT created yet at OTP)',
+      );
       try {
         final resolved =
             await play.PlayProfileHelper.resolvePlayUserIdFromSession();

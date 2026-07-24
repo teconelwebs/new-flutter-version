@@ -131,7 +131,7 @@ class PushNotificationService {
           'welfog_default_channel',
           'Default Notifications',
           description:
-              'This channel is used for order and promotional notifications.',
+              'Order, promotional, and Play (follow/like/comment) notifications.',
           importance: Importance.max,
           playSound: true,
         );
@@ -312,7 +312,64 @@ class PushNotificationService {
     return null;
   }
 
+  static const _playSocialTypes = {
+    'follow',
+    'like',
+    'comment',
+    'comment_reply',
+    'comment_like',
+  };
+
+  bool _isPlaySocialType(String typeStr) =>
+      _playSocialTypes.contains(typeStr.trim().toLowerCase());
+
+  /// FCM data values are often strings; treat null / "null" / empty as missing.
+  String _cleanId(dynamic value) {
+    if (value == null) return '';
+    if (value is Map) {
+      return _cleanId(value['id'] ?? value['_id']);
+    }
+    final s = value.toString().trim();
+    if (s.isEmpty || s.toLowerCase() == 'null' || s == 'undefined') {
+      return '';
+    }
+    return s;
+  }
+
   String _contentFingerprint(Map<String, dynamic> data) {
+    final type = (_dataValue(data, [
+              'notificationFor',
+              'notification_for',
+              'type',
+              'Type',
+              'play_type',
+              'playType',
+              'target',
+              'screen',
+            ]) ??
+            '')
+        .toString()
+        .toLowerCase();
+
+    // Play social: fingerprint on type + reel/sender so order ids don't collide.
+    if (_isPlaySocialType(type)) {
+      final reel = _cleanId(
+        _dataValue(data, ['reel', 'reelId', 'reel_id']),
+      );
+      final sender = _cleanId(
+        _dataValue(data, [
+          'senderObjectId',
+          'sender_object_id',
+          'senderUserId',
+          'sender_user_id',
+        ]),
+      );
+      final comment = _cleanId(
+        _dataValue(data, ['comment', 'commentId', 'comment_id']),
+      );
+      return 'play|$type|$reel|$sender|$comment';
+    }
+
     final id = (_dataValue(data, [
               'linkId',
               'oid',
@@ -324,17 +381,6 @@ class PushNotificationService {
             ]) ??
             '')
         .toString();
-    final type = (_dataValue(data, [
-              'notificationFor',
-              'notification_for',
-              'type',
-              'Type',
-              'target',
-              'screen',
-            ]) ??
-            '')
-        .toString()
-        .toLowerCase();
     final title = (data['title'] ?? '').toString();
     final body = (data['body'] ?? data['message'] ?? '').toString();
     return '$type|$id|$title|$body';
@@ -413,11 +459,13 @@ class PushNotificationService {
       'notification_for',
       'type',
       'Type',
+      'play_type',
+      'playType',
       'target',
       'screen',
       'click_action',
     ]);
-    final typeStr = (typeForRouting ?? '').toString().toLowerCase();
+    final typeStr = (typeForRouting ?? '').toString().trim().toLowerCase();
 
     final trackingId = _dataValue(data, [
       'oid',
@@ -428,60 +476,56 @@ class PushNotificationService {
       'order_code',
       'orderCode',
     ]);
-    final oidStr = trackingId?.toString() ?? '';
+    final oidStr = _cleanId(trackingId);
     debugPrint(
       "🔔 [Notification Routing] Parsed typeStr: '$typeStr', oidStr: '$oidStr'",
     );
 
-    final playType = (_dataValue(data, ['play_type', 'playType']) ?? '')
-        .toString()
-        .toLowerCase();
-
-    if (playType == 'follow' ||
-        typeStr == 'follow' ||
-        typeStr.contains('follow')) {
-      final profileUserId = _dataValue(data, [
-        'senderUserId',
-        'sender_user_id',
-        'userId',
-        'user_id',
-        'senderId',
-        'sender_id',
-        'linkId',
-        'id',
-      ]);
-      final uidStr = profileUserId?.toString() ?? '';
-      if (uidStr.isNotEmpty) {
-        nav.pushNamed('/OtheruserProfile/$uidStr');
-        return true;
+    // Play social (follow / like / comment*) — exact types only so order
+    // notifications never get swallowed by contains('like').
+    if (_isPlaySocialType(typeStr)) {
+      final ok = _routePlaySocialNotification(nav, data, typeStr);
+      if (!ok) {
+        debugPrint(
+          "🔔 Play social type='$typeStr' missing target ids — skipping nav",
+        );
       }
+      // Type was recognized; always consume so we don't retry / fall to orders.
+      return true;
     }
 
-    if (playType == 'like' ||
-        playType == 'comment' ||
-        playType == 'comment_reply' ||
-        playType == 'comment_like' ||
-        typeStr == 'like' ||
-        typeStr == 'comment' ||
-        typeStr == 'comment_reply' ||
-        typeStr == 'comment_like' ||
-        typeStr.contains('like') ||
-        typeStr.contains('comment')) {
-      String ridStr = '';
-      final reelVal = data['reel'];
-      if (reelVal is Map) {
-        ridStr = (reelVal['id'] ?? reelVal['_id'] ?? '').toString();
-      } else if (reelVal != null) {
-        ridStr = reelVal.toString();
-      }
-      if (ridStr.isEmpty) {
-        ridStr = (_dataValue(data, ['reelId', 'reel_id', 'linkId', 'id']) ?? '')
-            .toString();
-      }
-      if (ridStr.isNotEmpty) {
-        nav.pushNamed('/sepreel/$ridStr');
+    // Explicit marketing / catalog types before order fallback.
+    switch (typeStr) {
+      case 'home':
+        nav.pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
         return true;
-      }
+      case 'top_deals':
+        nav.pushNamed(AppRoutes.todayDeals);
+        return true;
+      case 'category':
+        final categoryId = _dataValue(
+            data, ['linkId', 'categoryId', 'id', 'slug']);
+        if (categoryId != null && _cleanId(categoryId).isNotEmpty) {
+          nav.pushNamed(
+            AppRoutes.searchResults,
+            arguments: {'query': '', 'categoryId': _cleanId(categoryId)},
+          );
+        } else {
+          nav.pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
+        }
+        return true;
+      case 'product':
+        final productIdentifier =
+            _dataValue(data, ['linkId', 'productId', 'slug', 'id']);
+        if (productIdentifier != null &&
+            _cleanId(productIdentifier).isNotEmpty) {
+          nav.pushNamed(
+            AppRoutes.product,
+            arguments: _cleanId(productIdentifier),
+          );
+          return true;
+        }
+        break;
     }
 
     final looksLikeOrder = typeStr.contains('order') ||
@@ -499,39 +543,72 @@ class PushNotificationService {
       return true;
     }
 
-    switch (typeForRouting?.toString().toLowerCase()) {
-      case 'home':
-        nav.pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
-        return true;
-      case 'top_deals':
-        nav.pushNamed(AppRoutes.todayDeals);
-        return true;
-      case 'category':
-        final categoryId = _dataValue(
-            data, ['linkId', 'categoryId', 'id', 'slug']);
-        if (categoryId != null) {
-          nav.pushNamed(
-            AppRoutes.searchResults,
-            arguments: {'query': '', 'categoryId': categoryId.toString()},
-          );
-        } else {
-          nav.pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
-        }
-        return true;
-      case 'product':
-        final productIdentifier =
-            _dataValue(data, ['linkId', 'productId', 'slug', 'id']);
-        if (productIdentifier != null) {
-          nav.pushNamed(
-            AppRoutes.product,
-            arguments: productIdentifier.toString(),
-          );
-          return true;
-        }
-        break;
+    _openOrdersScreen(nav);
+    return true;
+  }
+
+  /// Routes Play FCM payloads to profile / reel screens (Android + iOS).
+  ///
+  /// Expected data shape:
+  /// ```json
+  /// {
+  ///   "recipientUserId": "1195",
+  ///   "senderUserId": "1742",
+  ///   "recipientObjectId": "...",
+  ///   "senderObjectId": "...",
+  ///   "type": "follow|like|comment|comment_reply|comment_like",
+  ///   "reel": "..."|null,
+  ///   "comment": "..."|null,
+  ///   "message": "..."
+  /// }
+  /// ```
+  bool _routePlaySocialNotification(
+    NavigatorState nav,
+    Map<String, dynamic> data,
+    String typeStr,
+  ) {
+    debugPrint("🔔 [Play Social] routing type=$typeStr");
+
+    if (typeStr == 'follow') {
+      // Prefer mongo ObjectId — OtherProfileScreen resolves via play API.
+      final profileId = _cleanId(
+        _dataValue(data, [
+          'senderObjectId',
+          'sender_object_id',
+          'senderUserId',
+          'sender_user_id',
+          'senderId',
+          'sender_id',
+          'userId',
+          'user_id',
+        ]),
+      );
+      if (profileId.isEmpty) {
+        debugPrint("🔔 [Play Social] follow missing sender id");
+        return false;
+      }
+      debugPrint("🔔 [Play Social] → OtheruserProfile/$profileId");
+      nav.pushNamed('/OtheruserProfile/$profileId');
+      return true;
     }
 
-    _openOrdersScreen(nav);
+    // like | comment | comment_reply | comment_like → open that reel
+    final reelId = _cleanId(
+      _dataValue(data, ['reel', 'reelId', 'reel_id']),
+    );
+    if (reelId.isEmpty) {
+      debugPrint("🔔 [Play Social] $typeStr missing reel id");
+      return false;
+    }
+
+    final commentId = _cleanId(
+      _dataValue(data, ['comment', 'commentId', 'comment_id']),
+    );
+    final route = commentId.isNotEmpty
+        ? '/sepreel/$reelId?commentId=$commentId'
+        : '/sepreel/$reelId';
+    debugPrint("🔔 [Play Social] → $route");
+    nav.pushNamed(route);
     return true;
   }
 

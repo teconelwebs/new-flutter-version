@@ -6,11 +6,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/play_launch_context.dart';
 import '../services/device_id_store.dart';
+import '../services/play_api_config.dart';
 import '../services/play_profile_service.dart';
 import 'viewer_id_helper.dart';
 
 const _mainApi = 'https://welfogapi.welfog.com/api/v2';
-const _playApi = 'https://api.welfog.com/api';
+const _playApi = kPlayApiBaseUrl;
 const _guestViewerKey = 'guest_viewer_id';
 
 /// Mirrors RN `playProfileHelper.ts` — resolves play profile ids and launch params
@@ -395,6 +396,10 @@ class PlayProfileHelper {
     final userId = (prefs.getString('user_id') ?? '').trim();
     final mobile = (prefs.getString('mobile') ?? '').trim();
     final trimmedName = name.trim();
+    debugPrint(
+      '🎮 [PlayProfile] bootstrapAfterNameSave START '
+      'baseUrl=$_playApi userId=$userId mobile=$mobile name=$trimmedName',
+    );
     if (userId.isEmpty || mobile.isEmpty || trimmedName.isEmpty) {
       debugPrint(
         '🎮 [PlayProfile] bootstrapAfterNameSave skipped — '
@@ -426,11 +431,13 @@ class PlayProfileHelper {
 
       debugPrint(
         '🎮 [PlayProfile] bootstrapAfterNameSave done — '
-        'mongoId=$playUserId userid=$userId name=$trimmedName '
-        '(username sheet still required)',
+        'baseUrl=$_playApi mongoId=$playUserId userid=$userId '
+        'name=$trimmedName (username sheet still required)',
       );
     } catch (e) {
-      debugPrint('🎮 [PlayProfile] bootstrapAfterNameSave failed: $e');
+      debugPrint(
+        '🎮 [PlayProfile] bootstrapAfterNameSave failed baseUrl=$_playApi: $e',
+      );
     }
   }
 
