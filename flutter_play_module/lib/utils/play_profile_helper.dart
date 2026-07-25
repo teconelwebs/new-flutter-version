@@ -831,10 +831,12 @@ class PlayProfileHelper {
       return;
     }
 
+    // ignore: prefer_const_declarations
     final url = '$_playApi/music/update-userid';
     final payload = {'mobile': mobile, 'userid': userId};
     try {
       debugPrint('🎮 [PlayProfile] PUT $url payload=$payload');
+      // ignore: avoid_print
       print('🚀 [PlayProfile] Sending PUT request to update User ID...');
       final response = await http.put(
         Uri.parse(url),
@@ -847,12 +849,15 @@ class PlayProfileHelper {
       );
       if (response.statusCode >= 200 && response.statusCode < 300) {
         await prefs.setString('fourth_userid', userId);
+        // ignore: avoid_print
         print('✅ [PlayProfile] SUCCESS: User ID updated successfully! status=${response.statusCode}, body=${response.body}');
       } else {
+        // ignore: avoid_print
         print('❌ [PlayProfile] FAILED: Server returned status=${response.statusCode}, body=${response.body}');
       }
     } catch (e) {
       debugPrint('🎮 [PlayProfile] update-userid failed: $e');
+      // ignore: avoid_print
       print('❌ [PlayProfile] ERROR during User ID update: $e');
     }
   }

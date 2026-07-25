@@ -3,10 +3,16 @@ import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Persists the same `x-device-id` key RN uses so share-link cold starts can call the API.
+///
+/// IMPORTANT: never persist a brand-new id before SharedPreferences has been
+/// read — that used to overwrite a stable id on every early [peekOrGenerate]
+/// call and registered multiple FCM tokens per user (iOS then showed N pushes).
 class DeviceIdStore {
   static const _key = 'x-device-id';
 
   static String? _memory;
+  /// In-process only — never written to prefs until [_load] confirms prefs empty.
+  static String? _ephemeral;
   static Future<String>? _inflight;
 
   /// Fire-and-forget warm-up while the Flutter engine boots.
@@ -15,12 +21,17 @@ class DeviceIdStore {
   }
 
   /// Immediate id for API headers — never blocks on SharedPreferences.
+  /// Does **not** overwrite a persisted id.
   static String peekOrGenerate() {
     if (_memory != null && _memory!.isNotEmpty) return _memory!;
-    final id = 'device_${DateTime.now().millisecondsSinceEpoch}_${_randomSuffix()}';
-    _memory = id;
-    _inflight ??= _persist(id);
-    return id;
+    if (_ephemeral != null && _ephemeral!.isNotEmpty) {
+      _inflight ??= _load();
+      return _ephemeral!;
+    }
+    _ephemeral =
+        'device_${DateTime.now().millisecondsSinceEpoch}_${_randomSuffix()}';
+    _inflight ??= _load();
+    return _ephemeral!;
   }
 
   static Future<String> getOrCreate() {
@@ -32,18 +43,21 @@ class DeviceIdStore {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      var id = prefs.getString(_key)?.trim();
+      final id = prefs.getString(_key)?.trim();
       if (id != null && id.isNotEmpty) {
         _memory = id;
+        _ephemeral = null;
         return id;
       }
     } catch (_) {
       // Fall through to generated id.
     }
 
-    final generated = peekOrGenerate();
-    await _persist(generated);
-    return generated;
+    final generated = (_ephemeral != null && _ephemeral!.isNotEmpty)
+        ? _ephemeral!
+        : 'device_${DateTime.now().millisecondsSinceEpoch}_${_randomSuffix()}';
+    _ephemeral = null;
+    return _persist(generated);
   }
 
   static Future<String> _persist(String id) async {

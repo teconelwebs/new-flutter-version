@@ -46,9 +46,10 @@ class PushNotificationService {
 
   /// Recently handled message ids — stops duplicate banners / double navigation.
   final Set<String> _recentMessageIds = {};
+  final Map<String, DateTime> _recentContentAt = {};
   DateTime? _lastRoutedAt;
   String? _lastRoutedFingerprint;
-
+  Future<void> _foregroundShowChain = Future.value();
   void Function(Map<String, dynamic> data)? get onNotificationTapped =>
       _onNotificationTapped;
 
@@ -145,7 +146,13 @@ class PushNotificationService {
         debugPrint(
           "FCM foreground: id=${message.messageId} title=${message.notification?.title}, data=${message.data}",
         );
-        _showForegroundNotification(message);
+        // Serialize shows so parallel FCM deliveries (multi-token) can't race
+        // past the duplicate check and stack 3 banners on iOS.
+        _foregroundShowChain = _foregroundShowChain
+            .then((_) => _showForegroundNotification(message))
+            .catchError((Object e, StackTrace st) {
+          debugPrint("Foreground notification show error: $e\n$st");
+        });
       });
 
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
@@ -411,9 +418,13 @@ class PushNotificationService {
     return false;
   }
 
-  final Set<String> _recentContentFingerprints = {};
+  bool _shouldSkipDuplicateContent(Map<String, dynamic> data,
+      {String? messageId}) {
+    final now = DateTime.now();
+    _recentContentAt.removeWhere(
+      (_, at) => now.difference(at) > const Duration(seconds: 45),
+    );
 
-  bool _shouldSkipDuplicateContent(Map<String, dynamic> data, {String? messageId}) {
     if (messageId != null && messageId.isNotEmpty) {
       if (_recentMessageIds.contains(messageId)) return true;
       _recentMessageIds.add(messageId);
@@ -422,16 +433,17 @@ class PushNotificationService {
       }
     }
 
-    // Server often sends 2 FCM messages for one order (different messageIds).
+    // Same like/follow often arrives on multiple FCM tokens (different messageIds).
     final contentKey = _contentFingerprint(data);
-    if (_recentContentFingerprints.contains(contentKey)) {
+    if (contentKey.replaceAll('|', '').isEmpty) return false;
+
+    final lastAt = _recentContentAt[contentKey];
+    if (lastAt != null &&
+        now.difference(lastAt) < const Duration(seconds: 45)) {
       debugPrint("🔔 Skipping duplicate content notification: $contentKey");
       return true;
     }
-    _recentContentFingerprints.add(contentKey);
-    if (_recentContentFingerprints.length > 40) {
-      _recentContentFingerprints.remove(_recentContentFingerprints.first);
-    }
+    _recentContentAt[contentKey] = now;
     return false;
   }
 
@@ -447,7 +459,8 @@ class PushNotificationService {
         try {
           final routed = _pushRoute(nav, data);
           if (routed) {
-            debugPrint("🔔 Notification routed successfully (attempt $attempt)");
+            debugPrint(
+                "🔔 Notification routed successfully (attempt $attempt)");
             return;
           }
         } catch (e, st) {
@@ -529,8 +542,8 @@ class PushNotificationService {
         nav.pushNamed(AppRoutes.todayDeals);
         return true;
       case 'category':
-        final categoryId = _dataValue(
-            data, ['linkId', 'categoryId', 'id', 'slug']);
+        final categoryId =
+            _dataValue(data, ['linkId', 'categoryId', 'id', 'slug']);
         if (categoryId != null && _cleanId(categoryId).isNotEmpty) {
           nav.pushNamed(
             AppRoutes.searchResults,
@@ -629,9 +642,8 @@ class PushNotificationService {
     final openComments = typeStr == 'comment' ||
         typeStr == 'comment_reply' ||
         typeStr == 'comment_like';
-    final route = openComments
-        ? '/sepreel/$reelId?openComments=1'
-        : '/sepreel/$reelId';
+    final route =
+        openComments ? '/sepreel/$reelId?openComments=1' : '/sepreel/$reelId';
     debugPrint("🔔 [Play Social] $typeStr → $route");
     nav.pushNamed(route);
     return true;
@@ -733,7 +745,7 @@ class PushNotificationService {
       id: stableId,
       title: title,
       body: body.isEmpty ? 'You have a new update' : body,
-      payload: jsonEncode(data),
+      payload: jsonEncode(data), data: {},
     );
   }
 
@@ -754,6 +766,7 @@ class PushNotificationService {
     required String title,
     required String body,
     required String payload,
+    required Map<String, dynamic> data,
   }) async {
     const androidDetails = AndroidNotificationDetails(
       'welfog_default_channel',
@@ -765,14 +778,20 @@ class PushNotificationService {
       ticker: 'ticker',
     );
 
-    const iosDetails = DarwinNotificationDetails(
+    final fingerprint = _contentFingerprint(data);
+    final iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      // Collapse same like/follow into one thread on iOS Notification Center.
+      threadIdentifier:
+          fingerprint.replaceAll('|', '').isNotEmpty ? fingerprint : 'welfog',
     );
 
-    const details =
-        NotificationDetails(android: androidDetails, iOS: iosDetails);
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
 
     await _localNotifications.show(
       id: id,
@@ -849,6 +868,8 @@ class PushNotificationService {
           'push_token': token,
           'platform': platform,
           'app_version': '1.2.0',
+          // Prefer one active token per device; backend may ignore unknown fields.
+          'replace_same_device': true,
         }),
       );
       if (saveRes.statusCode >= 200 && saveRes.statusCode < 300) {
