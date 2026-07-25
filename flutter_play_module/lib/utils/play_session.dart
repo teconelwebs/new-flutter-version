@@ -270,7 +270,11 @@ class PlaySessionScopeState extends State<PlaySessionScope> {
   void didUpdateWidget(PlaySessionScope oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialViewerId != widget.initialViewerId) {
-      _viewerId = widget.initialViewerId;
+      // Prefer a real play mongo id — never replace it with shop id / guest.
+      final next = widget.initialViewerId.trim();
+      if (isValidObjectId(next) || !isValidObjectId(_viewerId)) {
+        _viewerId = next;
+      }
     }
     if (oldWidget.launchContext.playProfileReady !=
             widget.launchContext.playProfileReady ||
@@ -295,6 +299,21 @@ class PlaySessionScopeState extends State<PlaySessionScope> {
       _deviceId = DeviceIdStore.peekOrGenerate();
       final persisted = await DeviceIdStore.getOrCreate();
       if (persisted.isNotEmpty) _deviceId = persisted;
+    }
+    // Shop user_id / empty must not stay as viewer — like would send guest hash.
+    if (!isValidObjectId(_viewerId)) {
+      final mongoId = await PlayProfileHelper.ensurePlayProfileMongoId(
+        preferredId: _viewerId,
+      );
+      if (mongoId != null &&
+          mongoId.isNotEmpty &&
+          isValidObjectId(mongoId) &&
+          mounted) {
+        _viewerId = mongoId;
+        debugPrint(
+          '🎮 [PlaySession] bootstrap resolved viewer mongoId=$mongoId',
+        );
+      }
     }
     if (!mounted) return;
     setState(() => _sessionReady = true);

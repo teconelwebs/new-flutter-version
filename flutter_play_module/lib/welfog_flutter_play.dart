@@ -15,6 +15,7 @@ import 'utils/play_session.dart';
 import 'models/play_launch_context.dart';
 import 'screens/reels_screen.dart';
 import 'utils/play_profile_helper.dart';
+import 'utils/viewer_id_helper.dart';
 
 class EmbeddedReelsWrapper extends StatefulWidget {
   final String viewerId;
@@ -95,17 +96,21 @@ class _EmbeddedReelsWrapperState extends State<EmbeddedReelsWrapper> {
       );
     }
 
-    final playId = _resolvedViewerId ?? widget.viewerId;
+    // Never fall back to shop user_id — that is not a mongo ObjectId and
+    // resolveViewerIdForFeed would turn it into a guest device hash.
+    final playId = isValidObjectId(_resolvedViewerId)
+        ? _resolvedViewerId!
+        : (isValidObjectId(widget.viewerId) ? widget.viewerId : '');
     final rawMain = (_userData?.mainUserId.isNotEmpty == true)
         ? _userData!.mainUserId
-        : widget.viewerId;
+        : (isValidObjectId(widget.viewerId) ? '' : widget.viewerId);
     final mainUserId =
         (rawMain.toLowerCase() == 'guest' || rawMain.startsWith('guest_'))
             ? ''
             : rawMain;
 
     return PlaySessionScope(
-      initialViewerId: playId,
+      initialViewerId: playId.isNotEmpty ? playId : widget.viewerId,
       deviceId: '',
       shareUserId: '',
       launchContext: PlayLaunchContext(

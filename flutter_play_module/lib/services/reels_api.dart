@@ -212,11 +212,34 @@ class ReelsApi {
     return (reels: reels, hasMore: rawCount >= _prefetchLimit);
   }
 
+  /// Play mongo `_id` for like/comment/follow — never shop id or guest hash.
+  Future<String> _resolveActivePlayMongoId() async {
+    final resolved = await PlayProfileHelper.ensurePlayProfileMongoId(
+      preferredId: viewerId,
+    );
+    if (resolved != null &&
+        resolved.isNotEmpty &&
+        isPlayProfileMongoId(resolved)) {
+      return resolved;
+    }
+    if (isPlayProfileMongoId(viewerId)) return viewerId;
+    debugPrint(
+      '🎮 [ReelsApi] active play mongo unresolved — '
+      'viewerId=$viewerId resolved=$resolved',
+    );
+    return viewerId;
+  }
+
   Future<void> toggleLike(String reelId) async {
+    final activeViewerId = await _resolveActivePlayMongoId();
+    debugPrint(
+      'toggleLike → /reels/like/$reelId userId=$activeViewerId '
+      '(sessionViewer=$viewerId)',
+    );
     await http.put(
       Uri.parse('$_baseUrl/reels/like/$reelId'),
       headers: _jsonHeaders,
-      body: jsonEncode({'userId': viewerId}),
+      body: jsonEncode({'userId': activeViewerId}),
     );
   }
 
@@ -224,9 +247,7 @@ class ReelsApi {
     final action = follow ? 'follow' : 'unfollow';
     MyProfileCache.clear();
 
-    final activeViewerId = await PlayProfileHelper.ensurePlayProfileMongoId(
-            preferredId: viewerId) ??
-        viewerId;
+    final activeViewerId = await _resolveActivePlayMongoId();
     // Follow/unfollow + FCM need the play mongo `_id` in the URL — not shop userid.
     // (resolveFollowListUserId is for list endpoints only.)
     final targetMongoId = await _resolveFollowTargetMongoId(targetUserId);
@@ -306,8 +327,9 @@ class ReelsApi {
 
   Future<ReelComment?> addComment(String reelId, String text,
       {String? parentId}) async {
+    final activeViewerId = await _resolveActivePlayMongoId();
     final payload = <String, dynamic>{
-      'user': viewerId,
+      'user': activeViewerId,
       'reel': reelId,
       'text': text.trim(),
     };
@@ -317,6 +339,10 @@ class ReelsApi {
       payload['parentComment'] = parent;
     }
 
+    debugPrint(
+      'addComment → user=$activeViewerId reel=$reelId '
+      '(sessionViewer=$viewerId)',
+    );
     final response = await http.post(
       Uri.parse('$_baseUrl/comment/new'),
       headers: _jsonHeaders,
@@ -329,12 +355,17 @@ class ReelsApi {
   }
 
   Future<void> likeComment(String commentId) async {
+    final activeViewerId = await _resolveActivePlayMongoId();
+    debugPrint(
+      'likeComment → comment=$commentId userId=$activeViewerId '
+      '(sessionViewer=$viewerId)',
+    );
     await http.put(
       Uri.parse('$_baseUrl/comment/like/$commentId'),
       headers: _jsonHeaders,
       body: jsonEncode({
-        'userId': viewerId,
-        'user': viewerId,
+        'userId': activeViewerId,
+        'user': activeViewerId,
       }),
     );
   }
