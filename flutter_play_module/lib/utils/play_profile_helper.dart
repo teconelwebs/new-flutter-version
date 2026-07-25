@@ -834,8 +834,9 @@ class PlayProfileHelper {
     final url = '$_playApi/music/update-userid';
     final payload = {'mobile': mobile, 'userid': userId};
     try {
-      debugPrint('🎮 [PlayProfile] POST $url payload=$payload');
-      final response = await http.post(
+      debugPrint('🎮 [PlayProfile] PUT $url payload=$payload');
+      print('🚀 [PlayProfile] Sending PUT request to update User ID...');
+      final response = await http.put(
         Uri.parse(url),
         headers: await _playHeaders(),
         body: jsonEncode(payload),
@@ -846,9 +847,13 @@ class PlayProfileHelper {
       );
       if (response.statusCode >= 200 && response.statusCode < 300) {
         await prefs.setString('fourth_userid', userId);
+        print('✅ [PlayProfile] SUCCESS: User ID updated successfully! status=${response.statusCode}, body=${response.body}');
+      } else {
+        print('❌ [PlayProfile] FAILED: Server returned status=${response.statusCode}, body=${response.body}');
       }
     } catch (e) {
       debugPrint('🎮 [PlayProfile] update-userid failed: $e');
+      print('❌ [PlayProfile] ERROR during User ID update: $e');
     }
   }
 

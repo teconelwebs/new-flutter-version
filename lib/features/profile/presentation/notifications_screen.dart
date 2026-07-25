@@ -293,16 +293,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                         height: 1.4,
                                       ),
                                     ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      "Order ID: ${item['id'] ?? ''}",
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: Color(0xFF888888),
-                                        fontWeight: FontWeight.w500,
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        "Order ID: ${item['id'] ?? ''}",
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF888888),
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
                                 ),
                               ),
                             );
