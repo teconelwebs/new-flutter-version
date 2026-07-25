@@ -55,13 +55,16 @@ class SessionStore {
         '(Play profile NOT created yet at OTP)',
       );
       try {
-        final resolved =
-            await play.PlayProfileHelper.resolvePlayUserIdFromSession();
-        if (resolved != null && resolved.isNotEmpty) {
-          final usernameReady =
-              await play.PlayProfileHelper.isPlayUsernameReady();
+        // Ready-check first (shop + mobile). Never lock prefs to a pending
+        // stub, then overwrite the ready mongo id with that stub.
+        final usernameReady =
+            await play.PlayProfileHelper.isPlayUsernameReady();
+        final mongoId =
+            await play.PlayProfileHelper.getStoredPlayUserId() ??
+                await play.PlayProfileHelper.resolvePlayUserIdFromSession();
+        if (mongoId != null && mongoId.isNotEmpty) {
           await play.PlayProfileHelper.cachePlayProfileCreated(
-            playUserId: resolved,
+            playUserId: mongoId,
             username: usernameReady
                 ? (prefs.getString('play_profile_user_name') ?? '')
                 : '',
@@ -72,7 +75,7 @@ class SessionStore {
             await play.PlayProfileHelper.ensureMainUserIdOnPlayProfile();
           }
           debugPrint(
-            '🎮 [Login] Play profile soft-resolved mongoId=$resolved '
+            '🎮 [Login] Play profile soft-resolved mongoId=$mongoId '
             'userid=$userId usernameReady=$usernameReady',
           );
         } else {
