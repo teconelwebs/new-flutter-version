@@ -27,7 +27,8 @@ import '../../search/presentation/search_screen.dart';
 import '../../profile/data/profile_api_service.dart';
 import '../data/home_api_service.dart';
 import '../data/home_models.dart';
-import '../../chat_ai/presentation/chat_ai_screen.dart';
+// TEMP: Chat AI hidden — uncomment to re-enable.
+// import '../../chat_ai/presentation/chat_ai_screen.dart';
 import 'widgets/home_widgets.dart';
 import 'widgets/custom_bottom_tab_bar.dart';
 import 'widgets/header.dart';
@@ -71,8 +72,9 @@ class _HomeScreenState extends State<HomeScreen>
   String? _loadedPincode;
   String? _displayCity;
   String? _displayPincode;
-  double? _aiX;
-  double? _aiY;
+  // TEMP: Chat AI hidden — uncomment with FAB/overlay.
+  // double? _aiX;
+  // double? _aiY;
 
   void playReel(String reelId) {
     if (mounted) {
@@ -125,8 +127,9 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isGuest = true;
   // ignore: unused_field
   String _userId = 'guest';
-  bool _aiChatVisible = false;
-  bool _aiChatMounted = false;
+  // TEMP: Chat AI hidden — uncomment with FAB/overlay.
+  // bool _aiChatVisible = false;
+  // bool _aiChatMounted = false;
 
   // Stream/Timer references for events
   StreamSubscription? _subConnectivity;
@@ -561,29 +564,22 @@ class _HomeScreenState extends State<HomeScreen>
     final bottomPadding = bottomInset > 0 ? bottomInset + 8 : 20.0;
 
     return PopScope(
-      canPop: !_aiChatVisible,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _aiChatVisible) {
-          setState(() => _aiChatVisible = false);
-        }
-      },
+      canPop: true,
+      onPopInvokedWithResult: (didPop, _) {},
       child: Stack(
         children: [
           Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final double maxWidth = constraints.maxWidth;
-          final double maxHeight = constraints.maxHeight;
-          const double buttonSize = 56.0;
-          const double padding = 16.0;
-
-          // Default initial position near the bottom right (with bottom padding offset)
-          final double defaultX = maxWidth - buttonSize - padding;
-          final double defaultY = maxHeight - buttonSize - (bottomPadding + 52);
-
-          // Clamped positions ensuring the AI icon remains inside visible bounds
-          final double clampedX = (_aiX ?? defaultX).clamp(0.0, maxWidth - buttonSize);
-          final double clampedY = (_aiY ?? defaultY).clamp(0.0, maxHeight - buttonSize);
+          // TEMP Chat AI position math (unused while AI FAB is commented):
+          // final double maxWidth = constraints.maxWidth;
+          // final double maxHeight = constraints.maxHeight;
+          // const double buttonSize = 56.0;
+          // const double padding = 16.0;
+          // final double defaultX = maxWidth - buttonSize - padding;
+          // final double defaultY = maxHeight - buttonSize - (bottomPadding + 52);
+          // final double clampedX = (_aiX ?? defaultX).clamp(0.0, maxWidth - buttonSize);
+          // final double clampedY = (_aiY ?? defaultY).clamp(0.0, maxHeight - buttonSize);
 
           return Stack(
             children: [
@@ -713,95 +709,92 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
                 ),
-              // Floating AI Chat Button Overlay (visible on Home, Category, Cart, and Account tabs)
-              if (_currentIndex != 2 && !_aiChatVisible)
-                Positioned(
-                  left: clampedX,
-                  top: clampedY,
-                  child: GestureDetector(
-                    onPanUpdate: (details) {
-                      setState(() {
-                        _aiX = (clampedX + details.delta.dx).clamp(0.0, maxWidth - buttonSize);
-                        _aiY = (clampedY + details.delta.dy).clamp(0.0, maxHeight - buttonSize);
-                      });
-                    },
-                    onTap: () {
-                      if (_isGuest) {
-                        Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
-                          _checkGuestStatus();
-                        });
-                        return;
-                      }
-                      // Keep WebView mounted so current chat stays when reopened.
-                      // Close only via the AI screen cross icon (no drag-dismiss).
-                      setState(() {
-                        _aiChatMounted = true;
-                        _aiChatVisible = true;
-                      });
-                    },
-                    child: Container(
-                      width: buttonSize,
-                      height: buttonSize,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFFF5404), Color(0xFFFF8500)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            // ignore: deprecated_member_use
-                            color: const Color(0xFFFF5404).withOpacity(0.35),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          const Icon(
-                            Icons.chat_bubble_rounded,
-                            color: Colors.white,
-                            size: 26,
-                          ),
-                          // "AI" Badge overlay
-                          Positioned(
-                            top: 10,
-                            right: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(6),
-                                boxShadow: [
-                                  BoxShadow(
-                                    // ignore: deprecated_member_use
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 2,
-                                    offset: const Offset(0, 1),
-                                  ),
-                                ],
-                              ),
-                              child: const Text(
-                                'AI',
-                                style: TextStyle(
-                                  color: Color(0xFFFF5404),
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+              // TEMP: Floating AI Chat Button — uncomment to re-enable.
+              // if (_currentIndex != 2 && !_aiChatVisible)
+              //   Positioned(
+              //     left: clampedX,
+              //     top: clampedY,
+              //     child: GestureDetector(
+              //       onPanUpdate: (details) {
+              //         setState(() {
+              //           _aiX = (clampedX + details.delta.dx).clamp(0.0, maxWidth - buttonSize);
+              //           _aiY = (clampedY + details.delta.dy).clamp(0.0, maxHeight - buttonSize);
+              //         });
+              //       },
+              //       onTap: () {
+              //         if (_isGuest) {
+              //           Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
+              //             _checkGuestStatus();
+              //           });
+              //           return;
+              //         }
+              //         setState(() {
+              //           _aiChatMounted = true;
+              //           _aiChatVisible = true;
+              //         });
+              //       },
+              //       child: Container(
+              //         width: buttonSize,
+              //         height: buttonSize,
+              //         decoration: BoxDecoration(
+              //           gradient: const LinearGradient(
+              //             colors: [Color(0xFFFF5404), Color(0xFFFF8500)],
+              //             begin: Alignment.topLeft,
+              //             end: Alignment.bottomRight,
+              //           ),
+              //           shape: BoxShape.circle,
+              //           boxShadow: [
+              //             BoxShadow(
+              //               // ignore: deprecated_member_use
+              //               color: const Color(0xFFFF5404).withOpacity(0.35),
+              //               blurRadius: 14,
+              //               offset: const Offset(0, 6),
+              //             ),
+              //           ],
+              //         ),
+              //         child: Stack(
+              //           alignment: Alignment.center,
+              //           children: [
+              //             const Icon(
+              //               Icons.chat_bubble_rounded,
+              //               color: Colors.white,
+              //               size: 26,
+              //             ),
+              //             Positioned(
+              //               top: 10,
+              //               right: 8,
+              //               child: Container(
+              //                 padding: const EdgeInsets.symmetric(
+              //                   horizontal: 4,
+              //                   vertical: 1,
+              //                 ),
+              //                 decoration: BoxDecoration(
+              //                   color: Colors.white,
+              //                   borderRadius: BorderRadius.circular(6),
+              //                   boxShadow: [
+              //                     BoxShadow(
+              //                       // ignore: deprecated_member_use
+              //                       color: Colors.black.withOpacity(0.1),
+              //                       blurRadius: 2,
+              //                       offset: const Offset(0, 1),
+              //                     ),
+              //                   ],
+              //                 ),
+              //                 child: const Text(
+              //                   'AI',
+              //                   style: TextStyle(
+              //                     color: Color(0xFFFF5404),
+              //                     fontSize: 8,
+              //                     fontWeight: FontWeight.w900,
+              //                   ),
+              //                 ),
+              //               ),
+              //             ),
+              //           ],
+              //         ),
+              //       ),
+              //     ),
+              //   ),
               if (_currentIndex != 2 && _currentIndex != 3)
                 ValueListenableBuilder<int>(
                   valueListenable: CartState.cartCountNotifier,
@@ -881,25 +874,25 @@ class _HomeScreenState extends State<HomeScreen>
               },
             ),
           ),
-          // Full-screen AI overlay (covers bottom nav). WebView stays alive when hidden.
-          if (_aiChatMounted && !_isGuest)
-            Positioned.fill(
-              child: Offstage(
-                offstage: !_aiChatVisible,
-                child: Material(
-                  color: Colors.white,
-                  child: SafeArea(
-                    child: ChatAiScreen(
-                      userId: _userId,
-                      isModal: true,
-                      onClose: () {
-                        setState(() => _aiChatVisible = false);
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ),
+          // TEMP: Full-screen AI overlay — uncomment to re-enable.
+          // if (_aiChatMounted && !_isGuest)
+          //   Positioned.fill(
+          //     child: Offstage(
+          //       offstage: !_aiChatVisible,
+          //       child: Material(
+          //         color: Colors.white,
+          //         child: SafeArea(
+          //           child: ChatAiScreen(
+          //             userId: _userId,
+          //             isModal: true,
+          //             onClose: () {
+          //               setState(() => _aiChatVisible = false);
+          //             },
+          //           ),
+          //         ),
+          //       ),
+          //     ),
+          //   ),
         ],
       ),
     );

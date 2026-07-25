@@ -38,7 +38,8 @@ import '../../features/account/presentation/connect_supplier_screen.dart';
 import '../../features/product/presentation/recently_viewed_screen.dart';
 import '../constants/app_routes.dart';
 import '../../features/shop/presentation/shop_screen.dart';
-import '../../features/chat_ai/presentation/chat_ai_screen.dart';
+// TEMP: Chat AI route disabled — uncomment with AppRoutes.chatAi case.
+// import '../../features/chat_ai/presentation/chat_ai_screen.dart';
 
 
 class AppRouter {
@@ -344,12 +345,13 @@ class AppRouter {
           settings: settings,
           builder: (_) => DynamicPromotionScreen(slug: slug),
         );
-      case AppRoutes.chatAi:
-        final userId = settings.arguments as String?;
-        return MaterialPageRoute(
-          settings: settings,
-          builder: (_) => ChatAiScreen(userId: userId),
-        );
+      // TEMP: Chat AI route disabled — uncomment to re-enable.
+      // case AppRoutes.chatAi:
+      //   final userId = settings.arguments as String?;
+      //   return MaterialPageRoute(
+      //     settings: settings,
+      //     builder: (_) => ChatAiScreen(userId: userId),
+      //   );
       default:
         return play.AppRoutes.onGenerateRoute(settings);
     }

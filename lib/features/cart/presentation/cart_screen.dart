@@ -947,6 +947,8 @@ class _CartScreenState extends State<CartScreen>
         defaultValue: subtotalLocal +
             _safeNumber(_cartSummary['shipping_cost']) -
             _safeNumber(_cartSummary['coupon_discount']));
+    final profit = _safeNumber(_cartSummary['profit']);
+    final originalTotal = grandTotal + profit;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF6F6F6),
@@ -1165,7 +1167,7 @@ class _CartScreenState extends State<CartScreen>
                       else
                         // ─── Cart Items + Saved + Summary ─────────────────
                         SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(10, 8, 10, 100),
+                          padding: const EdgeInsets.fromLTRB(10, 8, 10, 120),
                           sliver: SliverList(
                             delegate: SliverChildListDelegate([
                               // Cart items grouped by seller
@@ -1309,82 +1311,147 @@ class _CartScreenState extends State<CartScreen>
                   ),
                 ),
 
-                // ─── Sticky Checkout Button ──────────────────────────────
+                // ─── Sticky bottom bar (Confirm Address style, responsive) ─
                 if (_cartItems.isNotEmpty)
                   Positioned(
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    child: Container(
-                      padding: EdgeInsets.only(
-                        left: 16,
-                        right: 16,
-                        top: 12,
-                        bottom: systemBottomInset(context) + 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: const Border(
-                            top: BorderSide(color: Color(0xFFEEEEEE))),
-                        boxShadow: [
-                          BoxShadow(
-                            // ignore: deprecated_member_use
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 10,
-                            offset: const Offset(0, -4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'To Pay',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF666666),
-                                    fontWeight: FontWeight.w500),
+                    child: Material(
+                      color: Colors.white,
+                      elevation: 8,
+                      shadowColor: Colors.black26,
+                      child: SafeArea(
+                        top: false,
+                        // Embedded under home tabs: don't double-count home indicator.
+                        bottom: !widget.embedded,
+                        minimum: EdgeInsets.only(
+                          bottom: widget.embedded ? 8 : 0,
+                        ),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final narrow = constraints.maxWidth < 360;
+                            return Container(
+                              width: double.infinity,
+                              padding: EdgeInsets.fromLTRB(
+                                narrow ? 10 : 16,
+                                8,
+                                narrow ? 10 : 16,
+                                widget.embedded
+                                    ? 8
+                                    : (systemBottomInset(context) > 0 ? 0 : 8),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '₹${_safeToFixed(grandTotal)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 18,
-                                  color: Color(0xFF111111),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                border: Border(
+                                  top: BorderSide(color: Color(0xFFEEEEEE)),
                                 ),
                               ),
-
-                            ],
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: _handleCheckoutPress,
-                              child: Container(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFB5404),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                alignment: Alignment.center,
-                                child: const Text(
-                                  'Proceed to Checkout',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 15,
-                                    letterSpacing: 0.4,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Price always fully visible — button flexes/shrinks.
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        'To Pay',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF666666),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.baseline,
+                                        textBaseline: TextBaseline.alphabetic,
+                                        children: [
+                                          Text(
+                                            '₹${_safeToFixed(grandTotal)}',
+                                            style: TextStyle(
+                                              fontSize: narrow ? 15 : 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black,
+                                            ),
+                                          ),
+                                          if (profit > 0) ...[
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              '₹${_safeToFixed(originalTotal)}',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                color: Color(0xFF999999),
+                                                decoration:
+                                                    TextDecoration.lineThrough,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ],
                                   ),
-                                ),
+                                  SizedBox(width: narrow ? 8 : 12),
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 44,
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFF008083),
+                                          disabledBackgroundColor:
+                                              const Color(0xFF008083),
+                                          foregroundColor: Colors.white,
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: narrow ? 8 : 12,
+                                            vertical: 0,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(6),
+                                          ),
+                                          elevation: 0,
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        onPressed: _handleCheckoutPress,
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                'Continue to Payment',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: narrow ? 13 : 14,
+                                                ),
+                                              ),
+                                              SizedBox(width: narrow ? 4 : 8),
+                                              Icon(
+                                                Icons.arrow_forward,
+                                                color: Colors.white,
+                                                size: narrow ? 16 : 18,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ),
-                        ],
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ),

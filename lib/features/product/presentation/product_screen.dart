@@ -148,6 +148,9 @@ class _ProductScreenState extends State<ProductScreen> {
 
   Future<void> _selectVariant(String slug) async {
     try {
+      final preservedOffset =
+          _scrollController.hasClients ? _scrollController.offset : null;
+
       final detail = await _api.fetchProductDetail(slugOrId: slug, productId: slug);
       final related = await _api.fetchRelatedProducts(detail.id);
 
@@ -174,12 +177,13 @@ class _ProductScreenState extends State<ProductScreen> {
         _fetchAddress();
       }
 
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          0.0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+      // Stay where the user was (size row) — don't jump to top after variant load.
+      if (preservedOffset != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_scrollController.hasClients) return;
+          final max = _scrollController.position.maxScrollExtent;
+          _scrollController.jumpTo(preservedOffset.clamp(0.0, max));
+        });
       }
     } catch (e) {
       debugPrint('Error loading variant: $e');
