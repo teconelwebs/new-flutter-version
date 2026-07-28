@@ -4,6 +4,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
@@ -1477,36 +1478,57 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            const Expanded(
+                            Expanded(
                               child: Text.rich(
                                 TextSpan(
                                   text: 'I agree to the ',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                       fontSize: 12,
                                       color: Color(0xFF4B5563),
                                       height: 1.3),
                                   children: [
                                     TextSpan(
                                       text: 'Terms & Conditions',
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                           fontWeight: FontWeight.w600,
                                           color: Color(0xFF0F766E)),
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () {
+                                          Navigator.of(context).pushNamed(
+                                            AppRoutes.policy,
+                                            arguments: 'terms-and-conditions',
+                                          );
+                                        },
                                     ),
-                                    TextSpan(text: ', '),
+                                    const TextSpan(text: ', '),
                                     TextSpan(
                                       text: 'Privacy Policy',
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                           fontWeight: FontWeight.w600,
                                           color: Color(0xFF0F766E)),
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () {
+                                          Navigator.of(context).pushNamed(
+                                            AppRoutes.policy,
+                                            arguments: 'privacy-policy',
+                                          );
+                                        },
                                     ),
-                                    TextSpan(text: ' and '),
+                                    const TextSpan(text: ' and '),
                                     TextSpan(
                                       text: 'Anti-Phishing Defense Policy',
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                           fontWeight: FontWeight.w600,
                                           color: Color(0xFF0F766E)),
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = () {
+                                          Navigator.of(context).pushNamed(
+                                            AppRoutes.policy,
+                                            arguments: 'anti-phishing-defense-policy',
+                                          );
+                                        },
                                     ),
-                                    TextSpan(text: '.'),
+                                    const TextSpan(text: '.'),
                                   ],
                                 ),
                               ),

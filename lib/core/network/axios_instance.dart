@@ -132,12 +132,10 @@ class AxiosInstance {
     'MAIN': "https://welfogapi.welfog.com/api/v2",
     'SECOND': "https://welfogapi.welfog.com/api",
     'THIRD': "https://supplier.cruxmall.com",
-
     // Toggle these URLs for local vs live development of the fourth API
     'FOURTH': "https://unnecessitous-domitila-unbudging.ngrok-free.dev/api",
     // 'FOURTH': "http://192.168.1.12:4000/api",
     // 'FOURTH': "https://api.welfog.com/api",
-
     'FIFTH': "https://supplier.welfog.com/api/"
   };
 
