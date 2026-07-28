@@ -1175,6 +1175,9 @@ class ReelsApi {
         .toList();
   }
 
+  // ===========================================================================
+  // UPDATED: NEW UPLOAD REEL LOGIC WITH S3 PRESIGNED URLs & QUEUE WORKER
+  // ===========================================================================
   Future<UploadReelResult> uploadReelFull({
     required File videoFile,
     File? thumbnailFile,
@@ -1193,110 +1196,197 @@ class ReelsApi {
     void Function(double progress, String phase)? onProgress,
   }) async {
     if (!await videoFile.exists()) {
+      debugPrint('❌ [uploadReelFull] Video file not found at path: ${videoFile.path}');
       throw Exception('Video file not found');
     }
 
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('$_baseUrl/reels/full-upload'),
-    );
-    request.headers.addAll(_headers);
-    request.fields['user'] = playUserId;
-    request.fields['userid'] = mainUserId;
-    request.fields['username'] = username;
-    request.fields['caption'] = caption;
-    request.fields['videoStartTime'] = '${videoStartMs.round()}';
-    request.fields['videoEndTime'] = '${videoEndMs.round()}';
+    onProgress?.call(0.02, 'initializing');
+    debugPrint('🚀 [uploadReelFull] Started upload process for user: $playUserId');
 
-    final track = music;
-    final resolvedMusicId = (musicId ?? track?.id ?? '').trim();
-    final hasMongoMusicId = MusicTrack.isMongoId(resolvedMusicId);
+    String rawVideoUrl = '';
+    String? rawThumbnailUrl;
 
-    final audioPayload = <String, dynamic>{
-      'musicVolume': musicVolume.clamp(0.0, 1.0),
-      'originalVolume': originalVolume.clamp(0.0, 1.0),
-    };
+    // STEP 1: Generate S3 Presigned URL & Upload Video
+    try {
+      debugPrint('📹 [uploadReelFull] Requesting presigned URL for video...');
+      final videoExt = p.extension(videoFile.path).isNotEmpty ? p.extension(videoFile.path) : '.mp4';
+      final videoName = 'video-${DateTime.now().millisecondsSinceEpoch}$videoExt';
 
-    if (track != null && track.url.isNotEmpty && !hasMongoMusicId) {
-      audioPayload['url'] = track.url;
-      audioPayload['title'] = track.title;
-      if (track.artist.isNotEmpty) audioPayload['artist'] = track.artist;
-      final artwork = track.coverUrl;
-      if (artwork != null && artwork.isNotEmpty) {
-        audioPayload['artwork'] = artwork;
+      final urlRes = await http.post(
+        Uri.parse('$_baseUrl/reels/generate-upload-url'),
+        headers: _jsonHeaders,
+        body: jsonEncode({
+          'filename': videoName,
+          'fileType': 'video/mp4',
+          'isThumbnail': false,
+        }),
+      );
+
+      if (urlRes.statusCode < 200 || urlRes.statusCode >= 300) {
+        debugPrint('❌ [uploadReelFull] Failed to get video upload URL: HTTP ${urlRes.statusCode} - ${urlRes.body}');
+        throw Exception('Failed to generate video upload URL');
+      }
+
+      final urlData = jsonDecode(urlRes.body);
+      if (urlData['success'] != true) {
+        debugPrint('❌ [uploadReelFull] Generate URL API returned false: ${urlRes.body}');
+        throw Exception('API failed to generate video upload URL');
+      }
+
+      final uploadUrl = urlData['uploadUrl'];
+      rawVideoUrl = urlData['rawUrl'];
+      debugPrint('🔗 [uploadReelFull] Video S3 Presigned URL received.');
+
+      debugPrint('📤 [uploadReelFull] Uploading video file directly to S3...');
+      await _uploadFileToS3WithProgress(
+        file: videoFile,
+        presignedUrl: uploadUrl,
+        contentType: 'video/mp4',
+        startProgress: 0.05,
+        endProgress: 0.85, // Allocate 80% progress to video upload
+        onProgress: onProgress,
+      );
+      debugPrint('✅ [uploadReelFull] Video successfully uploaded to S3: $rawVideoUrl');
+
+    } catch (e) {
+      debugPrint('❌ [uploadReelFull] Error during video S3 upload phase: $e');
+      rethrow;
+    }
+
+    // STEP 2: Generate S3 Presigned URL & Upload Thumbnail (If exists)
+    if (thumbnailFile != null && await thumbnailFile.exists()) {
+      try {
+        debugPrint('🖼️ [uploadReelFull] Requesting presigned URL for thumbnail...');
+        final thumbName = 'thumb-${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+        final thumbUrlRes = await http.post(
+          Uri.parse('$_baseUrl/reels/generate-upload-url'),
+          headers: _jsonHeaders,
+          body: jsonEncode({
+            'filename': thumbName,
+            'fileType': 'image/jpeg',
+            'isThumbnail': true,
+          }),
+        );
+
+        if (thumbUrlRes.statusCode >= 200 && thumbUrlRes.statusCode < 300) {
+          final thumbUrlData = jsonDecode(thumbUrlRes.body);
+          if (thumbUrlData['success'] == true) {
+            final thumbUploadUrl = thumbUrlData['uploadUrl'];
+            rawThumbnailUrl = thumbUrlData['rawUrl'];
+
+            debugPrint('📤 [uploadReelFull] Uploading thumbnail to S3...');
+            await _uploadFileToS3WithProgress(
+              file: thumbnailFile,
+              presignedUrl: thumbUploadUrl,
+              contentType: 'image/jpeg',
+              startProgress: 0.85,
+              endProgress: 0.95, // Allocate 10% progress to thumb upload
+              onProgress: onProgress,
+            );
+            debugPrint('✅ [uploadReelFull] Thumbnail uploaded to S3: $rawThumbnailUrl');
+          } else {
+            debugPrint('⚠️ [uploadReelFull] Thumbnail generate URL failed, proceeding without it.');
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ [uploadReelFull] Error uploading thumbnail (non-fatal, continuing): $e');
       }
     }
 
-    if (hasMongoMusicId) {
-      request.fields['musicId'] = resolvedMusicId;
-    }
-    if (track != null) {
-      request.fields['musicStartTime'] = '${(musicStartMs ?? 0).round()}';
-      request.fields['musicEndTime'] = '${(musicEndMs ?? 0).round()}';
-    }
-    request.fields['audioData'] = jsonEncode(audioPayload);
+    // STEP 3: Send Final Metadata to /full-upload (JSON instead of Multipart)
+    try {
+      debugPrint('📝 [uploadReelFull] Preparing final JSON payload for backend Queue Worker...');
+      final track = music;
+      final resolvedMusicId = (musicId ?? track?.id ?? '').trim();
+      final hasMongoMusicId = MusicTrack.isMongoId(resolvedMusicId);
 
-    request.files.add(
-      await http.MultipartFile.fromPath(
-        'video',
-        videoFile.path,
-        filename: 'video-${DateTime.now().millisecondsSinceEpoch}.mp4',
-        contentType: MediaType.parse('video/mp4'),
-      ),
-    );
+      final audioPayload = <String, dynamic>{
+        'musicVolume': musicVolume.clamp(0.0, 1.0),
+        'originalVolume': originalVolume.clamp(0.0, 1.0),
+      };
 
-    if (thumbnailFile != null && await thumbnailFile.exists()) {
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'thumbnail',
-          thumbnailFile.path,
-          filename: 'thumb-${DateTime.now().millisecondsSinceEpoch}.jpg',
-          contentType: MediaType.parse('image/jpeg'),
-        ),
+      if (track != null && track.url.isNotEmpty && !hasMongoMusicId) {
+        audioPayload['url'] = track.url;
+        audioPayload['title'] = track.title;
+        if (track.artist.isNotEmpty) audioPayload['artist'] = track.artist;
+        final artwork = track.coverUrl;
+        if (artwork != null && artwork.isNotEmpty) {
+          audioPayload['artwork'] = artwork;
+        }
+      }
+
+      final payload = <String, dynamic>{
+        'user': playUserId,
+        'userid': mainUserId,
+        'username': username,
+        'caption': caption,
+        'videoStartTime': videoStartMs.round(),
+        'videoEndTime': videoEndMs.round(),
+        'rawVideoUrl': rawVideoUrl,
+        'rawThumbnailUrl': rawThumbnailUrl,
+        'videoOriginalname': p.basename(videoFile.path),
+        'audioData': audioPayload,
+      };
+
+      if (hasMongoMusicId) {
+        payload['musicId'] = resolvedMusicId;
+      }
+      if (track != null) {
+        payload['musicStartTime'] = (musicStartMs ?? 0).round();
+        payload['musicEndTime'] = (musicEndMs ?? 0).round();
+      }
+
+      debugPrint('🚀 [uploadReelFull] Sending final request to /reels/full-upload...');
+      final response = await http.post(
+        Uri.parse('$_baseUrl/reels/full-upload'),
+        headers: _jsonHeaders, // Sending as application/json
+        body: jsonEncode(payload),
       );
-    }
 
-    onProgress?.call(0.02, 'uploading');
-    final streamed = await _sendMultipartWithProgress(request, onProgress);
+      if (response.statusCode != 200 && response.statusCode != 202) {
+        debugPrint('❌ [uploadReelFull] /full-upload API failed: HTTP ${response.statusCode} - ${response.body}');
+        String msg = 'Upload failed';
+        if (response.body.isNotEmpty) {
+          try {
+            final body = jsonDecode(response.body);
+            if (body is Map && body['message'] != null) {
+              msg = body['message'].toString();
+            }
+          } catch (_) {}
+        }
+        throw Exception('$msg (${response.statusCode})');
+      }
 
-    final response = await http.Response.fromStream(streamed);
-
-    if (response.statusCode != 200 && response.statusCode != 202) {
-      String msg = 'Upload failed';
+      debugPrint('✅ [uploadReelFull] /full-upload API succeeded! Queue job initiated.');
+      var result = const UploadReelResult(
+        message: 'Post shared. Preparing on your profile.',
+      );
       if (response.body.isNotEmpty) {
         try {
           final body = jsonDecode(response.body);
-          if (body is Map && body['message'] != null) {
-            msg = body['message'].toString();
+          if (body is Map) {
+            result = UploadReelResult.fromResponseBody(
+              Map<String, dynamic>.from(body),
+            );
           }
         } catch (_) {}
       }
-      throw Exception('$msg (${response.statusCode})');
-    }
 
-    var result = const UploadReelResult(
-      message: 'Post shared. Preparing on your profile.',
-    );
-    if (response.body.isNotEmpty) {
-      try {
-        final body = jsonDecode(response.body);
-        if (body is Map) {
-          result = UploadReelResult.fromResponseBody(
-            Map<String, dynamic>.from(body),
-          );
-        }
-      } catch (_) {}
-    }
+      onProgress?.call(1.0, 'done');
+      return UploadReelResult(
+        message: result.message,
+        status: result.status,
+        reelId: result.reelId,
+        caption: result.caption,
+        thumbnailUrl: result.thumbnailUrl,
+        qualityVariants: result.qualityVariants,
+      );
 
-    onProgress?.call(1.0, 'done');
-    return UploadReelResult(
-      message: 'Post shared. Preparing on your profile.',
-      status: result.status,
-      reelId: result.reelId,
-      caption: result.caption,
-      thumbnailUrl: result.thumbnailUrl,
-      qualityVariants: result.qualityVariants,
-    );
+    } catch (e) {
+      debugPrint('❌ [uploadReelFull] Final step error: $e');
+      rethrow;
+    }
   }
 
   Future<ReelUploadStatus?> fetchReelUploadStatus(String reelId) async {
@@ -1315,41 +1405,45 @@ class ReelsApi {
     }
   }
 
-  Future<http.StreamedResponse> _sendMultipartWithProgress(
-    http.MultipartRequest request,
+  // Helper function to track S3 Upload Progress
+  Future<void> _uploadFileToS3WithProgress({
+    required File file,
+    required String presignedUrl,
+    required String contentType,
+    required double startProgress,
+    required double endProgress,
     void Function(double progress, String phase)? onProgress,
-  ) async {
-    final total = request.contentLength;
-    final byteStream = request.finalize();
-    var sent = 0;
+  }) async {
+    final total = await file.length();
+    final request = http.StreamedRequest('PUT', Uri.parse(presignedUrl))
+      ..headers['Content-Type'] = contentType
+      ..contentLength = total;
 
-    final trackedStream = byteStream.transform<List<int>>(
+    var sent = 0;
+    final trackedStream = file.openRead().transform<List<int>>(
       StreamTransformer.fromHandlers(
         handleData: (chunk, sink) {
           sent += chunk.length;
           if (total > 0) {
             final fraction = (sent / total).clamp(0.0, 1.0);
-            onProgress?.call(0.04 + (fraction * 0.94), 'uploading');
+            final currentProgress = startProgress + (fraction * (endProgress - startProgress));
+            onProgress?.call(currentProgress, 'uploading');
           }
           sink.add(chunk);
         },
       ),
     );
 
-    final streamedRequest = http.StreamedRequest('POST', request.url)
-      ..headers.addAll(request.headers)
-      ..followRedirects = request.followRedirects
-      ..maxRedirects = request.maxRedirects
-      ..persistentConnection = request.persistentConnection;
-    if (total >= 0) {
-      streamedRequest.contentLength = total;
-    }
-
     final client = http.Client();
     try {
-      final responseFuture = client.send(streamedRequest);
-      await trackedStream.pipe(streamedRequest.sink);
-      return await responseFuture.timeout(const Duration(minutes: 5));
+      final responseFuture = client.send(request);
+      await trackedStream.pipe(request.sink);
+      final response = await responseFuture.timeout(const Duration(minutes: 5));
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final errBody = await response.stream.bytesToString();
+        throw Exception('S3 Upload failed with status ${response.statusCode}: $errBody');
+      }
     } finally {
       client.close();
     }
