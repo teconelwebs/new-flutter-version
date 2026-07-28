@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../../../../core/constants/app_routes.dart';
 
-
 class ProductDetailsWidget extends StatefulWidget {
   final Map<String, dynamic> data;
   final String pincode;
@@ -141,21 +140,30 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
           widget.data['location_id'] ?? widget.data['product']?['location_id'];
 
       // Parse IDs to numbers (int) if possible
-      final dynamic userId = int.tryParse(userIdStr) ?? (userIdStr.isEmpty ? null : userIdStr);
-      
-      final shopLocationIdStr = (dynamicShopLocationId ?? '').toString();
-      final dynamic shopLocationId = int.tryParse(shopLocationIdStr) ?? (shopLocationIdStr.isEmpty ? null : shopLocationIdStr);
+      final dynamic userId =
+          int.tryParse(userIdStr) ?? (userIdStr.isEmpty ? null : userIdStr);
 
-      final productIdStr = (widget.data['id'] ?? widget.data['product']?['id'] ?? widget.data['product_id'] ?? '').toString();
-      final dynamic shopProductId = int.tryParse(productIdStr) ?? (productIdStr.isEmpty ? null : productIdStr);
+      final shopLocationIdStr = (dynamicShopLocationId ?? '').toString();
+      final dynamic shopLocationId = int.tryParse(shopLocationIdStr) ??
+          (shopLocationIdStr.isEmpty ? null : shopLocationIdStr);
+
+      final productIdStr = (widget.data['id'] ??
+              widget.data['product']?['id'] ??
+              widget.data['product_id'] ??
+              '')
+          .toString();
+      final dynamic shopProductId = int.tryParse(productIdStr) ??
+          (productIdStr.isEmpty ? null : productIdStr);
 
       // Parse coordinates to numbers (double) if possible
       final latVal = widget.data['shop_location']?['shop_latitude'] ??
           widget.data['product']?['shop_location']?['shop_latitude'];
       final lngVal = widget.data['shop_location']?['shop_longitude'] ??
           widget.data['product']?['shop_location']?['shop_longitude'];
-      final dynamic shopLatitude = double.tryParse(latVal?.toString() ?? '') ?? latVal;
-      final dynamic shopLongitude = double.tryParse(lngVal?.toString() ?? '') ?? lngVal;
+      final dynamic shopLatitude =
+          double.tryParse(latVal?.toString() ?? '') ?? latVal;
+      final dynamic shopLongitude =
+          double.tryParse(lngVal?.toString() ?? '') ?? lngVal;
 
       final payload = {
         'pincode': pin,
@@ -173,10 +181,11 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
         headers['Authorization'] = 'Bearer $accessToken';
       }
 
-      final uri = Uri.parse('https://welfogapi.welfog.com/api/v2/pincode/check');
-      
-      debugPrint('🔍 Outgoing Pincode Check Payload: ${jsonEncode(payload)}');
-      debugPrint('🔍 Outgoing Headers: $headers');
+      final uri =
+          Uri.parse('https://welfogapi.welfog.com/api/v2/pincode/check');
+
+      // debugPrint('🔍 Outgoing Pincode Check Payload: ${jsonEncode(payload)}');
+      // debugPrint('🔍 Outgoing Headers: $headers');
 
       final response = await http.post(
         uri,
@@ -184,8 +193,8 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
         body: jsonEncode(payload),
       );
 
-      debugPrint('🔍 Response Status Code: ${response.statusCode}');
-      debugPrint('🔍 Response Body: ${response.body}');
+      // debugPrint('🔍 Response Status Code: ${response.statusCode}');
+      // debugPrint('🔍 Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -194,7 +203,8 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
             _deliveryMessage =
                 data['message'] ?? 'Product available for delivery';
             _errorMessage = '';
-            _checkedPincodeDuration = data['duration'] ?? data['data']?['duration'];
+            _checkedPincodeDuration =
+                data['duration'] ?? data['data']?['duration'];
           });
         } else {
           setState(() {
@@ -247,7 +257,8 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
       result += '$hours hr${hours > 1 ? 's' : ''}';
     }
     if (mins > 0) {
-      result += '${result.isNotEmpty ? ' ' : ''}$mins min${mins > 1 ? 's' : ''}';
+      result +=
+          '${result.isNotEmpty ? ' ' : ''}$mins min${mins > 1 ? 's' : ''}';
     }
 
     return result.trim().isNotEmpty ? result.trim() : '0 min';
@@ -391,8 +402,8 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                   children: [
                     // Green capsule rating badge
                     Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
                         color: const Color(0xFF16A34A), // Emerald Green
                         borderRadius: BorderRadius.circular(16),
@@ -678,14 +689,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    'Estimated Delivery ${_formatDeliveryTime(
-                                      _checkedPincodeDuration ??
-                                      widget.data['shop_location']?['duration'] ??
-                                      widget.data['duration'] ??
-                                      widget.data['data']?['duration'] ??
-                                      widget.data['product']?['shop_location']?['duration'] ??
-                                      widget.data['product']?['duration']
-                                    )}',
+                                    'Estimated Delivery ${_formatDeliveryTime(_checkedPincodeDuration ?? widget.data['shop_location']?['duration'] ?? widget.data['duration'] ?? widget.data['data']?['duration'] ?? widget.data['product']?['shop_location']?['duration'] ?? widget.data['product']?['duration'])}',
                                     style: TextStyle(
                                         color: Colors.green.shade800,
                                         fontWeight: FontWeight.w600),
@@ -726,7 +730,10 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
           // Variants Section
           if (variants != null)
             ...variants.entries.where((entry) {
-              final key = entry.key.toLowerCase().replaceAll(RegExp(r'[\s_-]'), '').replaceAll('colour', 'color');
+              final key = entry.key
+                  .toLowerCase()
+                  .replaceAll(RegExp(r'[\s_-]'), '')
+                  .replaceAll('colour', 'color');
               return key != 'colorsizes' && key != 'colorsize';
             }).map((entry) {
               final String variantKey = entry.key;
@@ -779,7 +786,9 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                           return GestureDetector(
                             onTap: () async {
                               final targetSlug = item['slug']?.toString();
-                              if (targetSlug != null && targetSlug.isNotEmpty && targetSlug != widget.data['slug']) {
+                              if (targetSlug != null &&
+                                  targetSlug.isNotEmpty &&
+                                  targetSlug != widget.data['slug']) {
                                 if (widget.onVariantSelected != null) {
                                   setState(() {
                                     _loadingVariantSlug = targetSlug;
@@ -825,15 +834,21 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                                         height: 14,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2.0,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFB5404)),
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                  Color(0xFFFB5404)),
                                         ),
                                       )
                                     : Text(
                                         item['size'] ?? item['name'] ?? '',
                                         style: TextStyle(
                                           fontSize: 14,
-                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                          color: isSelected ? const Color(0xFFFB5404) : const Color(0xFF1F2937),
+                                          fontWeight: isSelected
+                                              ? FontWeight.bold
+                                              : FontWeight.w500,
+                                          color: isSelected
+                                              ? const Color(0xFFFB5404)
+                                              : const Color(0xFF1F2937),
                                         ),
                                       ),
                               ),
@@ -854,7 +869,9 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                           return GestureDetector(
                             onTap: () async {
                               final targetSlug = item['slug']?.toString();
-                              if (targetSlug != null && targetSlug.isNotEmpty && targetSlug != widget.data['slug']) {
+                              if (targetSlug != null &&
+                                  targetSlug.isNotEmpty &&
+                                  targetSlug != widget.data['slug']) {
                                 if (widget.onVariantSelected != null) {
                                   setState(() {
                                     _loadingVariantSlug = targetSlug;
@@ -901,7 +918,9 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                                       height: 14,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2.0,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFB5404)),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                Color(0xFFFB5404)),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -923,7 +942,8 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                                               )
                                             : null,
                                         color: !isGradient
-                                            ? _colorFromHex(colorValue.toString())
+                                            ? _colorFromHex(
+                                                colorValue.toString())
                                             : null,
                                       ),
                                     ),
@@ -946,7 +966,9 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                           return GestureDetector(
                             onTap: () async {
                               final targetSlug = item['slug']?.toString();
-                              if (targetSlug != null && targetSlug.isNotEmpty && targetSlug != widget.data['slug']) {
+                              if (targetSlug != null &&
+                                  targetSlug.isNotEmpty &&
+                                  targetSlug != widget.data['slug']) {
                                 if (widget.onVariantSelected != null) {
                                   setState(() {
                                     _loadingVariantSlug = targetSlug;
@@ -1003,7 +1025,9 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                                             height: 14,
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2.0,
-                                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFB5404)),
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                      Color(0xFFFB5404)),
                                             ),
                                           ),
                                         ),
