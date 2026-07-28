@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
 import '../../../core/constants/app_routes.dart';
 
 class SupplierInfoScreen extends StatefulWidget {
@@ -63,7 +64,7 @@ class _SupplierInfoScreenState extends State<SupplierInfoScreen> {
             final mobile = userData['phone'] ?? userData['mobile'] ?? '';
             if (mobile != null && mobile.toString().isNotEmpty) {
               final mobileRes = await http.get(
-                Uri.parse('https://api.welfog.com/api/users/bymobile/$mobile'),
+                Uri.parse('${play.kPlayApiBaseUrl}/users/bymobile/$mobile'),
                 headers: headers,
               ).timeout(const Duration(seconds: 4));
 
@@ -85,7 +86,7 @@ class _SupplierInfoScreenState extends State<SupplierInfoScreen> {
 
         try {
           final res = await http.get(
-            Uri.parse('https://api.welfog.com/api/users/$idToCheck'),
+            Uri.parse('${play.kPlayApiBaseUrl}/users/$idToCheck'),
             headers: headers,
           ).timeout(const Duration(seconds: 4));
 
@@ -101,7 +102,7 @@ class _SupplierInfoScreenState extends State<SupplierInfoScreen> {
         if (userData == null) {
           try {
             final userpostRes = await http.get(
-              Uri.parse('https://api.welfog.com/api/users/userpost/$idToCheck'),
+              Uri.parse('${play.kPlayApiBaseUrl}/users/userpost/$idToCheck'),
               headers: headers,
             ).timeout(const Duration(seconds: 4));
 

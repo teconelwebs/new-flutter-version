@@ -8,7 +8,7 @@ import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
 class AccountApiService {
   static const String _mainApi = 'https://welfogapi.welfog.com/api/v2';
   static const String _secondApi = 'https://welfogapi.welfog.com/api';
-  static const String _fourthApi = 'https://api.welfog.com/api';
+  static String get _fourthApi => play.kPlayApiBaseUrl;
 
   Future<Map<String, String>> _playHeaders({bool json = false}) async {
     final deviceId = await play.DeviceIdStore.getOrCreate();

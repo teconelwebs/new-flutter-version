@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 
 import 'play_api_config.dart';
 
-const _fourthBaseUrl = kPlayApiBaseUrl;
+final _fourthBaseUrl = kPlayApiBaseUrl;
 
 class PlayProfileService {
   const PlayProfileService({required this.deviceId});
