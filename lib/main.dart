@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app.dart';
 import 'core/services/push_notification_service.dart';
+import 'core/network/axios_instance.dart';
+import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
 import 'firebase_options.dart';
 
 @pragma('vm:entry-point')
@@ -16,6 +18,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize the sub-module API URL from AxiosInstance configuration
+  play.kPlayApiBaseUrl = AxiosInstance.baseUrls['FOURTH']!;
 
   // Android edge-to-edge: content draws under system nav; we pad via MediaQuery.
   if (Platform.isAndroid) {

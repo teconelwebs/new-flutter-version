@@ -9,6 +9,7 @@ export 'services/play_profile_service.dart';
 export 'screens/reels_screen.dart';
 export 'utils/play_session.dart';
 export 'services/device_id_store.dart';
+export 'services/play_api_config.dart';
 
 import 'package:flutter/material.dart';
 import 'utils/play_session.dart';

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
 
 class ConnectSupplierScreen extends StatefulWidget {
   const ConnectSupplierScreen({super.key});
@@ -94,7 +95,7 @@ class _ConnectSupplierScreenState extends State<ConnectSupplierScreen> with Sing
       if (idToCheck.isNotEmpty) {
         try {
           final res = await http.get(
-            Uri.parse('https://api.welfog.com/api/users/$idToCheck'),
+            Uri.parse('${play.kPlayApiBaseUrl}/users/$idToCheck'),
             headers: headers,
           ).timeout(const Duration(seconds: 4));
           if (res.statusCode == 200) {
@@ -129,7 +130,7 @@ class _ConnectSupplierScreenState extends State<ConnectSupplierScreen> with Sing
               final mobile = userData['phone'] ?? userData['mobile'] ?? '';
               if (mobile != null && mobile.toString().isNotEmpty) {
                 final mobileRes = await http.get(
-                  Uri.parse('https://api.welfog.com/api/users/bymobile/$mobile'),
+                  Uri.parse('${play.kPlayApiBaseUrl}/users/bymobile/$mobile'),
                   headers: headers,
                 ).timeout(const Duration(seconds: 4));
                 if (mobileRes.statusCode == 200) {
@@ -300,7 +301,7 @@ class _ConnectSupplierScreenState extends State<ConnectSupplierScreen> with Sing
           String userMobile = '';
           try {
             final getRes = await http.get(
-              Uri.parse('https://api.welfog.com/api/users/$_myProfileId'),
+              Uri.parse('${play.kPlayApiBaseUrl}/users/$_myProfileId'),
               headers: headers,
             );
             if (getRes.statusCode == 200) {
@@ -338,7 +339,7 @@ class _ConnectSupplierScreenState extends State<ConnectSupplierScreen> with Sing
           };
 
           await http.post(
-            Uri.parse('https://api.welfog.com/api/users/'),
+            Uri.parse('${play.kPlayApiBaseUrl}/users/'),
             headers: headers,
             body: jsonEncode(updatePayload),
           );

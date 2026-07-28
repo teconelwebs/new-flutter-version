@@ -11,7 +11,7 @@ import '../services/play_profile_service.dart';
 import 'viewer_id_helper.dart';
 
 const _mainApi = 'https://welfogapi.welfog.com/api/v2';
-const _playApi = kPlayApiBaseUrl;
+final _playApi = kPlayApiBaseUrl;
 const _guestViewerKey = 'guest_viewer_id';
 
 /// Mirrors RN `playProfileHelper.ts` — resolves play profile ids and launch params
