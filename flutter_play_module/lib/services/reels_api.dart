@@ -20,7 +20,7 @@ import '../utils/my_profile_cache.dart';
 import 'device_id_store.dart';
 import 'play_api_config.dart';
 
-const _baseUrl = kPlayApiBaseUrl;
+final _baseUrl = kPlayApiBaseUrl;
 const _secondBaseUrl = 'https://welfogapi.welfog.com/api';
 const _prefetchLimit = 50;
 
