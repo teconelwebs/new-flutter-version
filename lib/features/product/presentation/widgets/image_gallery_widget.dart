@@ -235,7 +235,7 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
   Widget build(BuildContext context) {
     // ignore: unused_local_variable
     final screenWidth = MediaQuery.of(context).size.width;
-    final imageHeight = MediaQuery.of(context).size.height * 0.45;
+    final imageHeight = MediaQuery.of(context).size.height * 0.52;
 
     if (widget.images.isEmpty) {
       return Container(
@@ -267,9 +267,9 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
                 itemBuilder: (context, index) {
                   if (hasVideo && index == 0) {
                     return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 8),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
+                      margin: EdgeInsets.zero,
+                      decoration: const BoxDecoration(
+                        borderRadius: BorderRadius.zero,
                         color: Colors.black,
                       ),
                       clipBehavior: Clip.antiAlias,
@@ -296,13 +296,13 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
                   return GestureDetector(
                     onTap: () => _openFullscreenGallery(actualImageIndex),
                     child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      margin: EdgeInsets.zero,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.zero,
                         color: Colors.white,
                         image: DecorationImage(
                           image: NetworkImage(fullUrl),
-                          fit: BoxFit.contain,
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
@@ -380,26 +380,41 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
                     ],
                   ),
                 ),
+              // Pill dot indicator overlay
+              Positioned(
+                bottom: 12,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(totalCount, (index) {
+                    final isSelected = index == _currentIndex;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      width: isSelected ? 16 : 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(3),
+                        // ignore: deprecated_member_use
+                        color: isSelected
+                            ? const Color(0xFFDC2626)
+                            // ignore: deprecated_member_use
+                            : Colors.white.withOpacity(0.5),
+                        boxShadow: [
+                          BoxShadow(
+                            // ignore: deprecated_member_use
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ),
+              ),
             ],
-          ),
-        ),
-        const SizedBox(height: 4),
-        // Slide indicator count badge positioned cleanly below the image slider
-        Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              // ignore: deprecated_member_use
-              color: Colors.black.withOpacity(0.6),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '${_currentIndex + 1} / $totalCount',
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold),
-            ),
           ),
         ),
       ],

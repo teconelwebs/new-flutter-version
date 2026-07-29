@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
@@ -50,6 +51,7 @@ class _ProductScreenState extends State<ProductScreen> {
 
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _reviewsKey = GlobalKey();
+  final ValueNotifier<double> _scrollOffsetNotifier = ValueNotifier<double>(0.0);
 
   @override
   void initState() {
@@ -58,6 +60,9 @@ class _ProductScreenState extends State<ProductScreen> {
     if (slug != null && slug.trim().isNotEmpty) {
       ProductScreen.currentlyVisibleSlug = slug.trim();
     }
+    _scrollController.addListener(_onScroll);
+    // Set initial status bar icons to light (white) for unscrolled state
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
     _load();
     CartState.loadCartCount();
   }
@@ -70,8 +75,23 @@ class _ProductScreenState extends State<ProductScreen> {
         ProductScreen.currentlyVisibleSlug = null;
       }
     }
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _scrollOffsetNotifier.dispose();
+    // Restore default dark status bar icons when leaving product details
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.hasClients) {
+      final offset = _scrollController.offset;
+      _scrollOffsetNotifier.value = offset;
+      // Update status bar icons color dynamically (light when unscrolled/on image, dark when scrolled)
+      SystemChrome.setSystemUIOverlayStyle(
+        offset > 100 ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
+      );
+    }
   }
 
   void _scrollToReviews() {
@@ -434,14 +454,70 @@ class _ProductScreenState extends State<ProductScreen> {
     final detail = _detail!;
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
+      body: Stack(
+        children: [
+          // Scrollable Content
+          RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              controller: _scrollController,
+              padding: const EdgeInsets.only(top: 0, bottom: 24),
               children: [
-                _ProductHeader(
+                ImageGalleryWidget(
+                  images: detail.images,
+                  videoUrl: detail.videoUrl,
+                  isWishlisted: _isWishlisted,
+                  onWishlistPress: _toggleWishlist,
+                  name: detail.name,
+                  slug: detail.slug,
+                  productId: detail.id,
+                  userId: _userId,
+                  showFloatingActions: false,
+                ),
+                const SizedBox(height: 12),
+                ProductDetailsWidget(
+                  data: detail.rawJson,
+                  pincode: _pincode,
+                  onRatingTap: _scrollToReviews,
+                  onVariantSelected: _selectVariant,
+                ),
+                const SizedBox(height: 12),
+                BuyProductWidget(
+                  data: detail.rawJson,
+                  quantity: _qty,
+                  onQuantityChanged: (newQty) {
+                    setState(() {
+                      _qty = newQty;
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                ProductOtherDetailsWidget(
+                  data: detail.rawJson,
+                ),
+                const SizedBox(height: 12),
+                CustomerReviewsWidget(
+                  key: _reviewsKey,
+                  data: detail.rawJson,
+                ),
+                const SizedBox(height: 12),
+                _buildSuggestedProducts(),
+              ],
+            ),
+          ),
+          // Dynamic Header Overlay
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: ValueListenableBuilder<double>(
+              valueListenable: _scrollOffsetNotifier,
+              builder: (context, offset, _) {
+                final double t = (offset / 180.0).clamp(0.0, 1.0);
+                return _ProductHeader(
                   onBack: () => Navigator.of(context).maybePop(),
                   onSearch: () => Navigator.of(context).pushNamed(AppRoutes.search),
+                  onShare: () => _onShare(context),
                   onWishlist: _toggleWishlist,
                   onCartTap: () async {
                     final prefs = await SharedPreferences.getInstance();
@@ -457,111 +533,29 @@ class _ProductScreenState extends State<ProductScreen> {
                     }
                   },
                   isWishlisted: _isWishlisted,
-                ),
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: _load,
-                    child: ListView(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.only(top: 0, bottom: 24),
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Stack(
-                            children: [
-                              ImageGalleryWidget(
-                                images: detail.images,
-                                videoUrl: detail.videoUrl,
-                                isWishlisted: _isWishlisted,
-                                onWishlistPress: _toggleWishlist,
-                                name: detail.name,
-                                slug: detail.slug,
-                                productId: detail.id,
-                                userId: _userId,
-                                showFloatingActions: false,
-                              ),
-                              Positioned(
-                                top: 16,
-                                right: 16,
-                                child: Builder(
-                                  builder: (buttonContext) {
-                                    return GestureDetector(
-                                      onTap: () => _onShare(buttonContext),
-                                      behavior: HitTestBehavior.opaque,
-                                      child: Container(
-                                        width: 36,
-                                        height: 36,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFFE5E7EB),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Center(
-                                          child: Icon(
-                                            Icons.share_outlined,
-                                            size: 18,
-                                            color: Color(0xFFDC2626),
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ProductDetailsWidget(
-                          data: detail.rawJson,
-                          pincode: _pincode,
-                          onRatingTap: _scrollToReviews,
-                          onVariantSelected: _selectVariant,
-                        ),
-                        const SizedBox(height: 12),
-                        BuyProductWidget(
-                          data: detail.rawJson,
-                          quantity: _qty,
-                          onQuantityChanged: (newQty) {
-                            setState(() {
-                              _qty = newQty;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        ProductOtherDetailsWidget(
-                          data: detail.rawJson,
-                        ),
-                        const SizedBox(height: 12),
-                        CustomerReviewsWidget(
-                          key: _reviewsKey,
-                          data: detail.rawJson,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildSuggestedProducts(),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            ValueListenableBuilder<int>(
-              valueListenable: CartState.cartCountNotifier,
-              builder: (context, cartCount, _) {
-                if (cartCount <= 0) return const SizedBox.shrink();
-                return Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 8.0,
-                  child: ViewCartBanner(
-                    onTap: () {
-                      Navigator.of(context).pushNamed(AppRoutes.cart);
-                    },
-                  ),
+                  t: t,
                 );
               },
             ),
-          ],
-        ),
+          ),
+          // View Cart Banner
+          ValueListenableBuilder<int>(
+            valueListenable: CartState.cartCountNotifier,
+            builder: (context, cartCount, _) {
+              if (cartCount <= 0) return const SizedBox.shrink();
+              return Positioned(
+                left: 0,
+                right: 0,
+                bottom: 8.0,
+                child: ViewCartBanner(
+                  onTap: () {
+                    Navigator.of(context).pushNamed(AppRoutes.cart);
+                  },
+                ),
+              );
+            },
+          ),
+        ],
       ),
       bottomNavigationBar: BuyProductBtnWidget(
         data: detail.rawJson,
@@ -675,37 +669,101 @@ class _ProductHeader extends StatelessWidget {
   const _ProductHeader({
     required this.onBack,
     required this.onSearch,
+    required this.onShare,
     required this.onWishlist,
     required this.onCartTap,
     required this.isWishlisted,
+    required this.t,
   });
 
   final VoidCallback onBack;
   final VoidCallback onSearch;
+  final VoidCallback onShare;
   final VoidCallback onWishlist;
   final VoidCallback onCartTap;
   final bool isWishlisted;
+  final double t;
+
+  Widget _buildHeaderButton({
+    required VoidCallback onTap,
+    required IconData icon,
+    required double iconSize,
+    required Color iconColor,
+    required double t,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Color.lerp(
+          // ignore: deprecated_member_use
+          Colors.black.withOpacity(0.35),
+          Colors.transparent,
+          t,
+        ),
+      ),
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        onPressed: onTap,
+        icon: Icon(icon, size: iconSize, color: iconColor),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
+    final double topSafeArea = MediaQuery.paddingOf(context).top;
+    return Container(
+      height: topSafeArea + 52,
+      padding: EdgeInsets.only(top: topSafeArea, left: 8, right: 8),
+      decoration: BoxDecoration(
+        // ignore: deprecated_member_use
+        color: Colors.white.withOpacity(t),
+        boxShadow: t > 0.1
+            ? [
+                BoxShadow(
+                  // ignore: deprecated_member_use
+                  color: Colors.black.withOpacity(0.05 * t),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
       child: Row(
         children: [
-          IconButton(
-              onPressed: onBack,
-              icon: const Icon(Icons.chevron_left_rounded,
-                  size: 28, color: Color(0xFF111827))),
+          _buildHeaderButton(
+            onTap: onBack,
+            icon: Icons.chevron_left_rounded,
+            iconSize: 28,
+            iconColor: Color.lerp(Colors.white, const Color(0xFF111827), t)!,
+            t: t,
+          ),
           const Spacer(),
-          IconButton(
-              onPressed: onSearch,
-              icon: const Icon(Icons.search_rounded, color: Color(0xFFDC2626))),
-          IconButton(
-            onPressed: onWishlist,
-            icon: Icon(
-              isWishlisted ? Icons.favorite : Icons.favorite_border_rounded,
-              color: const Color(0xFFDC2626),
-            ),
+          _buildHeaderButton(
+            onTap: onSearch,
+            icon: Icons.search_rounded,
+            iconSize: 22,
+            iconColor: Color.lerp(Colors.white, const Color(0xFFDC2626), t)!,
+            t: t,
+          ),
+          _buildHeaderButton(
+            onTap: onShare,
+            icon: Icons.share_outlined,
+            iconSize: 20,
+            iconColor: Color.lerp(Colors.white, const Color(0xFFDC2626), t)!,
+            t: t,
+          ),
+          _buildHeaderButton(
+            onTap: onWishlist,
+            icon: isWishlisted ? Icons.favorite : Icons.favorite_border_rounded,
+            iconSize: 20,
+            iconColor: isWishlisted
+                ? const Color(0xFFDC2626)
+                : Color.lerp(Colors.white, const Color(0xFFDC2626), t)!,
+            t: t,
           ),
           ValueListenableBuilder<int>(
             valueListenable: CartState.cartCountNotifier,
@@ -713,17 +771,17 @@ class _ProductHeader extends StatelessWidget {
               return Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  IconButton(
-                    onPressed: onCartTap,
-                    icon: const Icon(
-                      Icons.shopping_cart_outlined,
-                      color: Color(0xFFDC2626),
-                    ),
+                  _buildHeaderButton(
+                    onTap: onCartTap,
+                    icon: Icons.shopping_cart_outlined,
+                    iconSize: 20,
+                    iconColor: Color.lerp(Colors.white, const Color(0xFFDC2626), t)!,
+                    t: t,
                   ),
                   if (cartCount > 0)
                     Positioned(
-                      top: 4,
-                      right: 4,
+                      top: 0,
+                      right: 0,
                       child: Container(
                         padding: const EdgeInsets.all(2),
                         decoration: const BoxDecoration(
@@ -731,14 +789,14 @@ class _ProductHeader extends StatelessWidget {
                           shape: BoxShape.circle,
                         ),
                         constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
+                          minWidth: 14,
+                          minHeight: 14,
                         ),
                         child: Text(
                           '$cartCount',
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 10,
+                            fontSize: 8,
                             fontWeight: FontWeight.bold,
                           ),
                           textAlign: TextAlign.center,
@@ -749,7 +807,6 @@ class _ProductHeader extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(width: 8),
         ],
       ),
     );

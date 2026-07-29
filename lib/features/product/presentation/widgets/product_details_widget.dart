@@ -341,6 +341,28 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
     final int stock = int.tryParse(rawStock.toString()) ?? 0;
     final bool isOutOfStock = stock <= 0;
 
+    final String stockStatusText;
+    final Color stockBgColor;
+    final Color stockBorderColor;
+    final Color stockTextColor;
+
+    if (isOutOfStock) {
+      stockStatusText = 'Out of Stock';
+      stockBgColor = Colors.red.shade50;
+      stockBorderColor = Colors.red.shade300;
+      stockTextColor = Colors.red.shade600;
+    } else if (stock <= 5) {
+      stockStatusText = 'Only $stock Left';
+      stockBgColor = const Color(0xFFFFF7ED); // amber 50
+      stockBorderColor = const Color(0xFFFDBA74); // amber 300
+      stockTextColor = const Color(0xFFEA580C); // amber 600
+    } else {
+      stockStatusText = 'In Stock';
+      stockBgColor = const Color(0xFFF0FDF4); // green 50
+      stockBorderColor = const Color(0xFF86EFAC); // green 300
+      stockTextColor = const Color(0xFF16A34A); // green 600
+    }
+
     final sellPrice = widget.data['final_price']?['sellPrice'] ??
         widget.data['product']?['final_price']?['sellPrice'] ??
         0.0;
@@ -601,13 +623,16 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      isOutOfStock ? 'Out of Stock' : 'Left Stock',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: isOutOfStock
-                            ? Colors.red.shade600
-                            : const Color(0xFF71717A),
+                    const Visibility(
+                      visible: false,
+                      maintainSize: true,
+                      maintainAnimation: true,
+                      maintainState: true,
+                      child: Text(
+                        'Delivery',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -615,24 +640,21 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                       height: 50,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: isOutOfStock
-                            ? Colors.red.shade50
-                            : const Color(0xFFF3F4F6),
+                        // ignore: deprecated_member_use
+                        color: stockBgColor,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: isOutOfStock
-                              ? Colors.red.shade300
-                              : const Color(0xFFD1D5DB),
+                          // ignore: deprecated_member_use
+                          color: stockBorderColor,
                         ),
                       ),
                       child: Text(
-                        '($stock)',
+                        stockStatusText,
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: isOutOfStock
-                              ? Colors.red.shade600
-                              : const Color(0xFF4B5563),
+                          // ignore: deprecated_member_use
+                          color: stockTextColor,
                         ),
                       ),
                     ),

@@ -78,8 +78,8 @@ class ShopApiService {
         },
       );
 
-      debugPrint('🟢 [API REQ] URL: $uri');
-      debugPrint('🟢 [API REQ] TOKEN EXIST: ${token.isNotEmpty}');
+      // debugPrint('🟢 [API REQ] URL: $uri');
+      // debugPrint('🟢 [API REQ] TOKEN EXIST: ${token.isNotEmpty}');
 
       final response = await http.get(uri, headers: {
         if (token.isNotEmpty) 'Authorization': 'Bearer $token',

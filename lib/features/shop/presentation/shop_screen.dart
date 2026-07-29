@@ -132,7 +132,9 @@ class _ShopScreenState extends State<ShopScreen> {
       if (mounted) {
         setState(() {
           final existingIds = _products.map((p) => p.id).toSet();
-          final newProducts = result.products.where((p) => !existingIds.contains(p.id)).toList();
+          final newProducts = result.products
+              .where((p) => !existingIds.contains(p.id))
+              .toList();
           _products.addAll(newProducts);
           _page = nextPage;
           _totalPages = result.totalPages;
@@ -183,6 +185,7 @@ class _ShopScreenState extends State<ShopScreen> {
     Navigator.of(context).pushNamed(AppRoutes.product, arguments: item);
   }
 
+  // ignore: unused_element
   static double _gridAspectRatio(double screenWidth) {
     if (screenWidth < 360) return 0.64;
     if (screenWidth < 400) return 0.67;
@@ -193,7 +196,6 @@ class _ShopScreenState extends State<ShopScreen> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final cardWidth = (screenWidth - 36) / 2;
-    final gridAspectRatio = _gridAspectRatio(screenWidth);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -261,20 +263,53 @@ class _ShopScreenState extends State<ShopScreen> {
                         ),
                       )
                     else
-                      SliverPadding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        sliver: SliverGrid(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) =>
-                                _buildProductCard(_products[index]),
-                            childCount: _products.length,
-                          ),
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                            childAspectRatio: gridAspectRatio,
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Builder(
+                            builder: (context) {
+                              final leftColumnItems = <ShopProduct>[];
+                              final rightColumnItems = <ShopProduct>[];
+                              for (int i = 0; i < _products.length; i++) {
+                                if (i % 2 == 0) {
+                                  leftColumnItems.add(_products[i]);
+                                } else {
+                                  rightColumnItems.add(_products[i]);
+                                }
+                              }
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: leftColumnItems
+                                          .map((item) => Padding(
+                                                padding: const EdgeInsets.only(
+                                                    bottom: 10),
+                                                child: _buildProductCard(item),
+                                              ))
+                                          .toList(),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: rightColumnItems
+                                          .map((item) => Padding(
+                                                padding: const EdgeInsets.only(
+                                                    bottom: 10),
+                                                child: _buildProductCard(item),
+                                              ))
+                                          .toList(),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                         ),
                       ),
@@ -722,5 +757,4 @@ class _ShopScreenState extends State<ShopScreen> {
       ),
     );
   }
-
 }

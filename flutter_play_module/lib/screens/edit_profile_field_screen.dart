@@ -134,13 +134,7 @@ class _EditProfileFieldScreenState extends State<EditProfileFieldScreen> {
     try {
       await api.updateUserProfile(widget.profileId, payload);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Saved'),
-          backgroundColor: Color(0xFF10B981),
-          duration: Duration(seconds: 1),
-        ),
-      );
+      PlaySessionRegistry.showToast(context, 'Saved');
       Navigator.pop(context, value);
     } catch (e) {
       final msg = e.toString().replaceFirst('Exception: ', '');

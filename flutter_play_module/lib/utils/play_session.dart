@@ -14,6 +14,22 @@ class PlaySessionRegistry {
   static PlaySessionScopeState? _scope;
   static final Set<String> blockedUserIds = {};
 
+  static void Function(BuildContext context, String message)? showToastCallback;
+
+  static void showToast(BuildContext context, String message) {
+    if (showToastCallback != null) {
+      showToastCallback!(context, message);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: const Color(0xFF10B981),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
   static bool _hasLoaded = false;
   static String? _loadedForViewer;
   static String? _loadingForViewer;

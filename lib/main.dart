@@ -9,6 +9,7 @@ import 'core/services/push_notification_service.dart';
 import 'core/network/axios_instance.dart';
 import 'package:welfog_flutter_play/welfog_flutter_play.dart' as play;
 import 'firebase_options.dart';
+import 'core/utils/top_toast.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -21,6 +22,11 @@ void main() async {
 
   // Initialize the sub-module API URL from AxiosInstance configuration
   play.kPlayApiBaseUrl = AxiosInstance.baseUrls['FOURTH']!;
+
+  // Register the custom TopToast callback for play sub-module popups
+  play.PlaySessionRegistry.showToastCallback = (context, message) {
+    TopToast.show(context, message);
+  };
 
   // Android edge-to-edge: content draws under system nav; we pad via MediaQuery.
   if (Platform.isAndroid) {

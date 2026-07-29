@@ -125,9 +125,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         );
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile photo updated'), backgroundColor: Color(0xFF10B981)),
-        );
+        PlaySessionRegistry.showToast(context, 'Profile photo updated');
       }
     } catch (e) {
       if (mounted) {
