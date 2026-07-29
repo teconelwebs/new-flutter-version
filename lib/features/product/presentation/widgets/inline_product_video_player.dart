@@ -379,7 +379,7 @@ class _InlineProductVideoPlayerState extends State<InlineProductVideoPlayer>
                 bufferedColor: Colors.white38,
                 backgroundColor: Colors.white24,
               ),
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: EdgeInsets.zero,
             ),
           ),
         ],

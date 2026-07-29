@@ -72,8 +72,8 @@ class ProductApiService {
         .map((raw) {
           final id = (raw['id'] ?? '').toString();
           final name = (raw['name'] ?? '').toString();
-          final brand = (raw['brand'] ?? raw['data']?['brand'] ?? '')
-              .toString();
+          final brand =
+              (raw['brand'] ?? raw['data']?['brand'] ?? '').toString();
           final price = _toDouble(
             raw['main_price'] ??
                 raw['final_price']?['sellPrice'] ??
@@ -236,17 +236,34 @@ class ProductDetailData {
       }
     }
 
+    final int resolvedStock;
+    final stocksList = json['stocks'];
+    if (stocksList is List && stocksList.isNotEmpty) {
+      final currentId = (json['id'] ?? '').toString();
+      final matchingStock = stocksList.firstWhere(
+        (s) => s is Map && s['product_id']?.toString() == currentId,
+        orElse: () => null,
+      );
+      if (matchingStock != null) {
+        resolvedStock = int.tryParse(matchingStock['qty']?.toString() ?? '0') ?? 0;
+      } else {
+        resolvedStock = int.tryParse(stocksList[0]?['qty']?.toString() ?? '0') ?? 0;
+      }
+    } else {
+      final rawStock = json['stock'] ?? json['product']?['stock'] ?? '0';
+      resolvedStock = int.tryParse(rawStock.toString()) ?? 0;
+    }
+
     return ProductDetailData(
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       slug: (json['slug'] ?? '').toString(),
-      brand:
-          (json['brand_name'] ??
-                  json['brandName'] ??
-                  json['brand'] ??
-                  json['product']?['brand'] ??
-                  '')
-              .toString(),
+      brand: (json['brand_name'] ??
+              json['brandName'] ??
+              json['brand'] ??
+              json['product']?['brand'] ??
+              '')
+          .toString(),
       sellPrice: sell,
       mrpPrice: mrp <= 0 ? sell : mrp,
       discountPercent: discount < 0 ? 0 : discount,
@@ -255,11 +272,7 @@ class ProductDetailData {
       shortDescription: (json['sdescription'] ?? '').toString(),
       images: images,
       features: featureMap,
-      stock:
-          int.tryParse(
-            (json['stock'] ?? json['stocks']?[0]?['qty'] ?? '0').toString(),
-          ) ??
-          0,
+      stock: resolvedStock,
       rawJson: json,
       videoUrl: resolvedVideoUrl,
       videoLink: resolvedVideoLink,
@@ -281,11 +294,11 @@ class ProductReviewBundle {
   final List<ProductReview> reviews;
 
   factory ProductReviewBundle.empty() => const ProductReviewBundle(
-    totalReviews: 0,
-    averageRating: 0,
-    percentages: <int, int>{},
-    reviews: <ProductReview>[],
-  );
+        totalReviews: 0,
+        averageRating: 0,
+        percentages: <int, int>{},
+        reviews: <ProductReview>[],
+      );
 
   factory ProductReviewBundle.fromJson(Map<String, dynamic> json) {
     final rp = json['review_percentages'] is Map<String, dynamic>
@@ -303,9 +316,9 @@ class ProductReviewBundle {
     final reviewsRaw = json['reviews'];
     final reviews = reviewsRaw is List
         ? reviewsRaw
-              .whereType<Map>()
-              .map((e) => ProductReview.fromJson(Map<String, dynamic>.from(e)))
-              .toList()
+            .whereType<Map>()
+            .map((e) => ProductReview.fromJson(Map<String, dynamic>.from(e)))
+            .toList()
         : <ProductReview>[];
 
     return ProductReviewBundle(

@@ -19,12 +19,23 @@ class BuyProductWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rawStock = data['stock'] ??
-        data['product']?['stock'] ??
-        data['stocks']?[0]?['qty'] ??
-        0;
-
-    final int stock = int.tryParse(rawStock.toString()) ?? 0;
+    final int stock;
+    final stocksList = data['stocks'];
+    if (stocksList is List && stocksList.isNotEmpty) {
+      final currentId = data['id']?.toString();
+      final matchingStock = stocksList.firstWhere(
+        (s) => s is Map && s['product_id']?.toString() == currentId,
+        orElse: () => null,
+      );
+      if (matchingStock != null) {
+        stock = int.tryParse(matchingStock['qty']?.toString() ?? '0') ?? 0;
+      } else {
+        stock = int.tryParse(stocksList[0]?['qty']?.toString() ?? '0') ?? 0;
+      }
+    } else {
+      final rawStock = data['stock'] ?? data['product']?['stock'] ?? 0;
+      stock = int.tryParse(rawStock.toString()) ?? 0;
+    }
     final bool isOutOfStock = stock <= 0;
     final int maxLimit = stock < 2 ? stock : 2;
 

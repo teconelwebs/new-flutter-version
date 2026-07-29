@@ -37,13 +37,7 @@ class _ProductCardState extends State<ProductCard> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x14000000),
-                blurRadius: 18,
-                offset: Offset(0, 8),
-              ),
-            ],
+            border: Border.all(color: const Color(0xFFE5E7EB)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

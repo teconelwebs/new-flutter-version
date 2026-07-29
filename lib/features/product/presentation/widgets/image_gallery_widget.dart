@@ -163,9 +163,9 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (context) {
-          int galleryIndex = initialIndex;
           return Scaffold(
             backgroundColor: Colors.black,
+            extendBodyBehindAppBar: true,
             appBar: AppBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
@@ -174,54 +174,21 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ),
-            body: StatefulBuilder(
-              builder: (context, setDialogState) {
-                return Stack(
-                  children: [
-                    PageView.builder(
-                      itemCount: widget.images.length,
-                      controller: PageController(initialPage: initialIndex),
-                      onPageChanged: (idx) {
-                        setDialogState(() => galleryIndex = idx);
-                      },
-                      itemBuilder: (context, idx) {
-                        return Center(
-                          child: InteractiveViewer(
-                            minScale: 0.5,
-                            maxScale: 3.0,
-                            child: Image.network(
-                              widget.images[idx].startsWith('http')
-                                  ? widget.images[idx]
-                                  : 'https://d1f02fefkbso7w.cloudfront.net/${widget.images[idx]}',
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        );
-                      },
+            body: PageView.builder(
+              itemCount: widget.images.length,
+              controller: PageController(initialPage: initialIndex),
+              itemBuilder: (context, idx) {
+                return Center(
+                  child: InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 3.0,
+                    child: Image.network(
+                      widget.images[idx].startsWith('http')
+                          ? widget.images[idx]
+                          : 'https://d1f02fefkbso7w.cloudfront.net/${widget.images[idx]}',
+                      fit: BoxFit.contain,
                     ),
-                    Positioned(
-                      top: 16,
-                      left: 0,
-                      right: 0,
-                      child: Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            // ignore: deprecated_member_use
-                            color: Colors.black.withOpacity(0.6),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '${galleryIndex + 1} / ${widget.images.length}',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 );
               },
             ),

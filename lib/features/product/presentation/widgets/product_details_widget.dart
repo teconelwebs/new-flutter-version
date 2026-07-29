@@ -334,11 +334,31 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
     final brandName =
         (rawBrand is String && rawBrand != 'No Brand') ? rawBrand.trim() : '';
 
-    final rawStock = widget.data['stock'] ??
-        widget.data['product']?['stock'] ??
-        widget.data['stocks']?[0]?['qty'] ??
-        0;
-    final int stock = int.tryParse(rawStock.toString()) ?? 0;
+    final int stock;
+    final stocksList = widget.data['stocks'];
+    if (stocksList is List && stocksList.isNotEmpty) {
+      final currentId = widget.data['id']?.toString();
+      final matchingStock = stocksList.firstWhere(
+        (s) => s is Map && s['product_id']?.toString() == currentId,
+        orElse: () => null,
+      );
+      if (matchingStock != null) {
+        stock = int.tryParse(matchingStock['qty']?.toString() ?? '0') ?? 0;
+      } else {
+        stock = int.tryParse(stocksList[0]?['qty']?.toString() ?? '0') ?? 0;
+      }
+    } else {
+      final rawStock = widget.data['stock'] ?? widget.data['product']?['stock'] ?? 0;
+      stock = int.tryParse(rawStock.toString()) ?? 0;
+    }
+    debugPrint('=== WELFOG DEBUG ===');
+    debugPrint("Product ID: ${widget.data['id']}");
+    debugPrint("slug: ${widget.data['slug']}");
+    debugPrint("stock: ${widget.data['stock']}");
+    debugPrint("product.stock: ${widget.data['product']?['stock']}");
+    debugPrint("stocks: ${widget.data['stocks']}");
+    debugPrint("Evaluated Stock: $stock");
+    debugPrint('====================');
     final bool isOutOfStock = stock <= 0;
 
     final String stockStatusText;

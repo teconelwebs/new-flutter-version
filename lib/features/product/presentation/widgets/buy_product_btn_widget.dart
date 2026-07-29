@@ -11,7 +11,6 @@ import '../../../../core/state/cart_state.dart';
 import '../../../../core/widgets/app_loader.dart';
 import '../../../../core/utils/top_toast.dart';
 
-
 class BuyProductBtnWidget extends StatefulWidget {
   final Map<String, dynamic> data;
   final int selectedQuantity;
@@ -47,13 +46,16 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
       if (userId == null || accessToken == null) return;
 
       final productId = widget.data['id'];
-      final uri = Uri.parse('https://welfogapi.welfog.com/api/wishlists/$userId');
-      final response = await http.get(uri, headers: {'Authorization': 'Bearer $accessToken'});
+      final uri =
+          Uri.parse('https://welfogapi.welfog.com/api/wishlists/$userId');
+      final response = await http
+          .get(uri, headers: {'Authorization': 'Bearer $accessToken'});
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
         final wishlistItems = data['data'] as List? ?? [];
-        final isInWishlist = wishlistItems.any((item) => item['product']?['id'] == productId);
+        final isInWishlist =
+            wishlistItems.any((item) => item['product']?['id'] == productId);
         if (mounted) {
           setState(() {
             _wishlist = isInWishlist;
@@ -96,10 +98,28 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
         colorsList = colors;
       }
 
-      final String colorCode = colorsList.isNotEmpty ? colorsList[0].toString() : 'default';
-      final int duration = int.tryParse(widget.data['shop_location']?['duration']?.toString() ?? '0') ?? 0;
-      final int productId = int.tryParse(widget.data['id']?.toString() ?? '0') ?? 0;
-      final int stockId = int.tryParse(widget.data['stocks']?[0]?['id']?.toString() ?? '0') ?? 0;
+      final String colorCode =
+          colorsList.isNotEmpty ? colorsList[0].toString() : 'default';
+      final int duration = int.tryParse(
+              widget.data['shop_location']?['duration']?.toString() ?? '0') ??
+          0;
+      final int productId =
+          int.tryParse(widget.data['id']?.toString() ?? '0') ?? 0;
+
+      final stocksList = widget.data['stocks'];
+      int stockId = 0;
+      if (stocksList is List && stocksList.isNotEmpty) {
+        final currentId = widget.data['id']?.toString();
+        final matchingStock = stocksList.firstWhere(
+          (s) => s is Map && s['product_id']?.toString() == currentId,
+          orElse: () => null,
+        );
+        if (matchingStock != null) {
+          stockId = int.tryParse(matchingStock['id']?.toString() ?? '0') ?? 0;
+        } else {
+          stockId = int.tryParse(stocksList[0]?['id']?.toString() ?? '0') ?? 0;
+        }
+      }
 
       final payload = {
         'color_code': colorCode,
@@ -129,7 +149,8 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
           try {
             final lat = prefs.getString('latitude') ?? '0';
             final long = prefs.getString('longitude') ?? '0';
-            final cartUri = Uri.parse('https://welfogapi.welfog.com/api/v2/carts/$userId');
+            final cartUri =
+                Uri.parse('https://welfogapi.welfog.com/api/v2/carts/$userId');
             final cartRes = await http.post(
               cartUri,
               headers: {
@@ -141,7 +162,10 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
 
             if (cartRes.statusCode == 200) {
               final cartData = jsonDecode(cartRes.body) as List?;
-              final cartList = cartData?.expand((c) => c['cart_items'] as List? ?? []).toList() ?? [];
+              final cartList = cartData
+                      ?.expand((c) => c['cart_items'] as List? ?? [])
+                      .toList() ??
+                  [];
               int count = 0;
               for (var it in cartList) {
                 count += int.tryParse(it['quantity']?.toString() ?? '0') ?? 0;
@@ -161,7 +185,8 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
           }
         } else {
           if (mounted) {
-            TopToast.show(context, resData['message'] ?? 'Failed to add item to cart.');
+            TopToast.show(
+                context, resData['message'] ?? 'Failed to add item to cart.');
           }
         }
       }
@@ -179,12 +204,23 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final rawStock = widget.data['stock'] ??
-        widget.data['product']?['stock'] ??
-        widget.data['stocks']?[0]?['qty'] ??
-        0;
-
-    final int stock = int.tryParse(rawStock.toString()) ?? 0;
+    final int stock;
+    final stocksList = widget.data['stocks'];
+    if (stocksList is List && stocksList.isNotEmpty) {
+      final currentId = widget.data['id']?.toString();
+      final matchingStock = stocksList.firstWhere(
+        (s) => s is Map && s['product_id']?.toString() == currentId,
+        orElse: () => null,
+      );
+      if (matchingStock != null) {
+        stock = int.tryParse(matchingStock['qty']?.toString() ?? '0') ?? 0;
+      } else {
+        stock = int.tryParse(stocksList[0]?['qty']?.toString() ?? '0') ?? 0;
+      }
+    } else {
+      final rawStock = widget.data['stock'] ?? widget.data['product']?['stock'] ?? 0;
+      stock = int.tryParse(rawStock.toString()) ?? 0;
+    }
     final bool isOutOfStock = stock <= 0;
 
     return Container(
@@ -203,7 +239,9 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isOutOfStock
                         ? const Color(0xFF9CA3AF)
-                        : (_loading || _buyNowLoading ? const Color(0xFF333333) : Colors.black),
+                        : (_loading || _buyNowLoading
+                            ? const Color(0xFF333333)
+                            : Colors.black),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -234,7 +272,9 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isOutOfStock
                         ? const Color(0xFF9CA3AF)
-                        : (_buyNowLoading || _loading ? const Color(0xFF0D6E6F) : const Color(0xFF008083)),
+                        : (_buyNowLoading || _loading
+                            ? const Color(0xFF0D6E6F)
+                            : const Color(0xFF008083)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
