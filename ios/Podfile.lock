@@ -106,10 +106,14 @@ PODS:
   - shared_preferences_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
+  - speech_to_text (0.0.1):
+    - Flutter
+    - Try
   - sqflite_darwin (0.0.4):
     - Flutter
     - FlutterMacOS
   - TOCropViewController (3.1.2)
+  - Try (2.1.1)
   - url_launcher_ios (0.0.1):
     - Flutter
   - v_video_compressor (1.2.1):
@@ -141,6 +145,7 @@ DEPENDENCIES:
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
+  - speech_to_text (from `.symlinks/plugins/speech_to_text/ios`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
   - v_video_compressor (from `.symlinks/plugins/v_video_compressor/ios`)
@@ -162,6 +167,7 @@ SPEC REPOS:
     - nanopb
     - PromisesObjC
     - TOCropViewController
+    - Try
 
 EXTERNAL SOURCES:
   app_links:
@@ -198,6 +204,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/share_plus/ios"
   shared_preferences_foundation:
     :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
+  speech_to_text:
+    :path: ".symlinks/plugins/speech_to_text/ios"
   sqflite_darwin:
     :path: ".symlinks/plugins/sqflite_darwin/darwin"
   url_launcher_ios:
@@ -240,8 +248,10 @@ SPEC CHECKSUMS:
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   share_plus: 50da8cb520a8f0f65671c6c6a99b3617ed10a58a
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
+  speech_to_text: ae2abc312e619ff1c53e675a9fc4d785a15c03bb
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
   TOCropViewController: a916930c465b5d9445a74d95e0c0da931771b4df
+  Try: 5ef669ae832617b3cee58cb2c6f99fb767a4ff96
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
   v_video_compressor: 9016c3f6e5a9928c4f112b4832beedcfb7c7011f
   video_player_avfoundation: 3453f792138786248960ca029747fcd9f318ef52

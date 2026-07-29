@@ -89,7 +89,10 @@
 	<string>Allow Welfog to access your location to show nearby stores, estimate delivery times, and auto-fill your delivery address.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Allow Welfog to access your microphone for voice search and recording audio or video reviews.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Allow Welfog to use speech recognition for voice searching products.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+
 	<string>Allow Welfog to access your location to help you track your live delivery status even when the app is in the background.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>

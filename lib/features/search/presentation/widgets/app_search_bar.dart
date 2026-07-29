@@ -1,6 +1,24 @@
 import 'package:flutter/material.dart';
 
 class AppSearchBar extends StatelessWidget {
+  const AppSearchBar.editable({
+    super.key,
+    required this.controller,
+    this.focusNode,
+    this.onChanged,
+    this.onSubmitted,
+    this.onClear,
+    this.onMicTap,
+    this.autofocus = false,
+    this.hintText = 'Search products',
+    this.showBackButton = true,
+    this.onBack,
+  })  : onTap = null,
+        prefixText = null,
+        highlightText = null,
+        highlightColor = null,
+        fadeAnimation = null;
+
   const AppSearchBar.readOnly({
     super.key,
     required this.onTap,
@@ -13,27 +31,11 @@ class AppSearchBar extends StatelessWidget {
         onChanged = null,
         onSubmitted = null,
         onClear = null,
+        onMicTap = null,
         autofocus = false,
         hintText = 'Search products',
         showBackButton = false,
         onBack = null;
-
-  const AppSearchBar.editable({
-    super.key,
-    required this.controller,
-    this.focusNode,
-    this.onChanged,
-    this.onSubmitted,
-    this.onClear,
-    this.autofocus = false,
-    this.hintText = 'Search products',
-    this.showBackButton = true,
-    this.onBack,
-  })  : onTap = null,
-        prefixText = null,
-        highlightText = null,
-        highlightColor = null,
-        fadeAnimation = null;
 
   final VoidCallback? onTap;
   final String? prefixText;
@@ -46,10 +48,12 @@ class AppSearchBar extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   final VoidCallback? onClear;
+  final VoidCallback? onMicTap;
   final bool autofocus;
   final String? hintText;
   final bool showBackButton;
   final VoidCallback? onBack;
+
 
   static const Color _bgColor = Color(0xFFF5F5F5);
   static const Color _iconColor = Color(0xFF666666);
@@ -116,18 +120,33 @@ class AppSearchBar extends StatelessWidget {
             child: _buildField(context, fontSize),
           ),
           if (controller != null) ...[
-            if (hasText)
+            if (hasText) ...[
               _BarIconButton(
                 icon: Icons.close_rounded,
                 size: 18,
                 onTap: onClear,
               ),
-            _BarIconButton(
-              icon: Icons.search,
-              size: 22,
-              onTap: hasText ? () => onSubmitted?.call(controller!.text) : null,
-            ),
+              _BarIconButton(
+                icon: Icons.search,
+                size: 22,
+                onTap: () => onSubmitted?.call(controller!.text),
+              ),
+            ] else ...[
+              if (onMicTap != null)
+                _BarIconButton(
+                  icon: Icons.mic_rounded,
+                  size: 22,
+                  onTap: onMicTap,
+                )
+              else
+                const _BarIconButton(
+                  icon: Icons.search,
+                  size: 22,
+                  onTap: null,
+                ),
+            ],
           ],
+
         ],
       ),
     );

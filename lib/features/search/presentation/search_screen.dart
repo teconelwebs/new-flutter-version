@@ -7,6 +7,8 @@ import '../../account/data/account_api_service.dart';
 import '../../product/data/models/product_item.dart';
 import '../data/search_api_service.dart';
 import 'widgets/app_search_bar.dart';
+import 'widgets/voice_search_sheet.dart';
+
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key, this.embedded = false, this.initialQuery});
@@ -212,38 +214,54 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: EdgeInsets.only(
-                top: 8,
-                bottom: MediaQuery.sizeOf(context).width < 360 ? 8 : 10,
-              ),
-              child: AppSearchBar.editable(
-                controller: _queryCtrl,
-                focusNode: _focusNode,
-                autofocus: !widget.embedded,
-                hintText: 'Search products',
-                showBackButton: !widget.embedded,
-                onBack: () => Navigator.of(context).pop(),
-                onChanged: _onQueryChanged,
-                onSubmitted: _performSearch,
-                onClear: () {
-                  _queryCtrl.clear();
-                  _onQueryChanged('');
-                },
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Column(
+          children: [
+            Container(
+              color: Colors.white,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    top: 8,
+                    bottom: MediaQuery.sizeOf(context).width < 360 ? 8 : 10,
+                  ),
+                  child: AppSearchBar.editable(
+                    controller: _queryCtrl,
+                    focusNode: _focusNode,
+                    autofocus: !widget.embedded,
+                    hintText: 'Search products',
+                    showBackButton: !widget.embedded,
+                    onBack: () => Navigator.of(context).pop(),
+                    onChanged: _onQueryChanged,
+                    onSubmitted: _performSearch,
+                    onClear: () {
+                      _queryCtrl.clear();
+                      _onQueryChanged('');
+                    },
+                    onMicTap: () async {
+                      final text = await VoiceSearchSheet.show(context);
+                      if (text != null && text.trim().isNotEmpty) {
+                        _queryCtrl.text = text.trim();
+                        _onQueryChanged(text.trim());
+                        _performSearch(text.trim());
+                      }
+                    },
+                  ),
+                ),
               ),
             ),
-          ),
-          Expanded(child: _buildDiscovery()),
-        ],
+            Expanded(child: _buildDiscovery()),
+          ],
+        ),
       ),
     );
   }
+
 
   Widget _buildDiscovery() {
     final q = _queryCtrl.text.trim();
@@ -368,6 +386,7 @@ class _SearchScreenState extends State<SearchScreen> {
           )
         else
           GridView.builder(
+            padding: const EdgeInsets.only(top: 8, bottom: 0),
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _categories.length.clamp(0, 9),
@@ -428,7 +447,7 @@ class _SearchScreenState extends State<SearchScreen> {
               );
             },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
           _buildPromoCard(),
           _buildWishlistSection(),
       ],
@@ -437,7 +456,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildPromoCard() {
     return Container(
-      margin: const EdgeInsets.only(top: 4, bottom: 12),
+      margin: const EdgeInsets.only(top: 0, bottom: 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF6F7F9),
         border: Border.all(color: const Color(0xFFEDF2F7)),

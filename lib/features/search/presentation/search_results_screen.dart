@@ -736,6 +736,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         titleSpacing: 0,
         backgroundColor: Colors.white,
         elevation: 0,
+        scrolledUnderElevation: 0,
         title: Text(
           _query.isNotEmpty ? _query : 'Products',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black),

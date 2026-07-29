@@ -264,7 +264,7 @@ class _SearchScreenState extends State<SearchScreen> {
       },
       child: profileScreenWrapper(
         child: Scaffold(
-          backgroundColor: const Color(0xFFF8F9FA),
+          backgroundColor: Colors.white,
           body: SafeArea(
             child: Column(
               children: [
