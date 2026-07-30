@@ -14,12 +14,16 @@ import '../../../../core/utils/top_toast.dart';
 class BuyProductBtnWidget extends StatefulWidget {
   final Map<String, dynamic> data;
   final int selectedQuantity;
+  final bool showQuantitySelector;
+  final ValueChanged<int> onQuantityChanged;
 
   // ignore: use_super_parameters
   const BuyProductBtnWidget({
     Key? key,
     required this.data,
     required this.selectedQuantity,
+    required this.showQuantitySelector,
+    required this.onQuantityChanged,
   }) : super(key: key);
 
   @override
@@ -222,79 +226,242 @@ class _BuyProductBtnWidgetState extends State<BuyProductBtnWidget> {
       stock = int.tryParse(rawStock.toString()) ?? 0;
     }
     final bool isOutOfStock = stock <= 0;
+    final int maxLimit = stock < 2 ? stock : 2;
+
+    final double price = double.tryParse(
+          (widget.data['final_price']?['sellPrice'] ?? widget.data['price'] ?? 0).toString(),
+        ) ??
+        0.0;
+
+    void increaseQuantity() {
+      if (isOutOfStock) return;
+      if (widget.selectedQuantity < maxLimit) {
+        widget.onQuantityChanged(widget.selectedQuantity + 1);
+      } else {
+        TopToast.show(context, 'Maximum purchase limit is 2 units');
+      }
+    }
+
+    void decreaseQuantity() {
+      if (widget.selectedQuantity > 1) {
+        widget.onQuantityChanged(widget.selectedQuantity - 1);
+      }
+    }
+
+    String formatPrice(double value) {
+      final int val = value.round();
+      final String str = val.toString();
+      final RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+      return str.replaceAllMapped(reg, (Match m) => '${m[1]},');
+    }
 
     return Container(
-      color: const Color(0xFFFFF6F2),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: SafeArea(
         top: false,
         maintainBottomViewPadding: true,
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // ADD TO CART BUTTON
-            Expanded(
-              child: SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isOutOfStock
-                        ? const Color(0xFF9CA3AF)
-                        : (_loading || _buyNowLoading
-                            ? const Color(0xFF333333)
-                            : Colors.black),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    elevation: 0,
-                  ),
-                  onPressed: (isOutOfStock || _loading || _buyNowLoading)
-                      ? null
-                      : () => _addToCart(false),
-                  child: _loading
-                      ? const AppLoader.button()
-                      : const Text(
-                          'Add to Cart',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
+            AnimatedSize(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              child: (widget.showQuantitySelector && !isOutOfStock)
+                  ? AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: 1.0,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // Total Price (Inline text and value)
+                              Text.rich(
+                                TextSpan(
+                                  text: 'Total Price: ',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF4B5563),
+                                  ),
+                                  children: [
+                                    TextSpan(
+                                      text: '₹${formatPrice(price * widget.selectedQuantity)}',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF1F2937),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Quantity Selector Pill: - 1 +
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF3F4F6), // soft grey background
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Minus Button
+                                    GestureDetector(
+                                      onTap: decreaseQuantity,
+                                      child: Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: const BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black12,
+                                              blurRadius: 3,
+                                              offset: Offset(0, 1),
+                                            ),
+                                          ],
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: const Icon(
+                                          Icons.remove,
+                                          color: Color(0xFF1F2937),
+                                          size: 18,
+                                        ),
+                                      ),
+                                    ),
+                                    // Quantity text
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                                      child: Text(
+                                        '${widget.selectedQuantity}',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF1F2937),
+                                        ),
+                                      ),
+                                    ),
+                                    // Plus Button
+                                    GestureDetector(
+                                      onTap: increaseQuantity,
+                                      child: Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: const BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black12,
+                                              blurRadius: 3,
+                                              offset: Offset(0, 1),
+                                            ),
+                                          ],
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: const Icon(
+                                          Icons.add,
+                                          color: Color(0xFF1F2937),
+                                          size: 18,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                ),
-              ),
+                          const SizedBox(height: 12),
+                          const Divider(color: Color(0xFFE5E7EB), height: 1, thickness: 1),
+                          const SizedBox(height: 12),
+                        ],
+                      ),
+                    )
+                  : const SizedBox.shrink(),
             ),
-            const SizedBox(width: 12),
-            // BUY NOW BUTTON
-            Expanded(
-              child: SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isOutOfStock
-                        ? const Color(0xFF9CA3AF)
-                        : (_buyNowLoading || _loading
-                            ? const Color(0xFF0D6E6F)
-                            : const Color(0xFF008083)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    elevation: 0,
-                  ),
-                  onPressed: (isOutOfStock || _buyNowLoading || _loading)
-                      ? null
-                      : () => _addToCart(true),
-                  child: _buyNowLoading
-                      ? const AppLoader.button()
-                      : const Text(
-                          'Buy Now',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                          ),
+            Row(
+              children: [
+                // ADD TO CART BUTTON
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE6F4F1), // light teal background
+                        foregroundColor: const Color(0xFF008083), // text color teal
+                        side: const BorderSide(color: Color(0xFFB2DFDB), width: 1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
+                        elevation: 0,
+                      ),
+                      onPressed: (isOutOfStock || _loading || _buyNowLoading)
+                          ? null
+                          : () => _addToCart(false),
+                      child: _loading
+                          ? const AppLoader.button()
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.shopping_cart_outlined,
+                                  size: 20,
+                                  color: Color(0xFF008083),
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Add to Cart',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                // BUY NOW BUTTON
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isOutOfStock
+                            ? const Color(0xFF9CA3AF)
+                            : const Color(0xFF008083), // solid teal background
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 0,
+                      ),
+                      onPressed: (isOutOfStock || _buyNowLoading || _loading)
+                          ? null
+                          : () => _addToCart(true),
+                      child: _buyNowLoading
+                          ? const AppLoader.button()
+                          : const Text(
+                              'Buy Now',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

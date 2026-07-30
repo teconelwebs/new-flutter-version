@@ -63,112 +63,160 @@ class BuyProductWidget extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    String formatPrice(double value) {
+      final int val = value.round();
+      final String str = val.toString();
+      final RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+      return str.replaceAllMapped(reg, (Match m) => '${m[1]},');
+    }
+
     return Padding(
-      padding: const EdgeInsets.only(left: 20, right: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Total Price Label & Calculated Value
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // Top Divider stretched edge-to-edge
+          Builder(
+            builder: (context) {
+              final screenWidth = MediaQuery.of(context).size.width;
+              return Transform.scale(
+                scaleX: screenWidth / (screenWidth - 40),
+                child: const Divider(color: Color(0xFFE5E7EB), height: 1, thickness: 1),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Total Price',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
+              // Total Price (Inline text and value)
+              Expanded(
+                child: Row(
+                  children: [
+                    const Text(
+                      'Total Price: ',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF4B5563),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Flexible(
+                      child: Text(
+                        '₹${formatPrice(price * quantity)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF111827),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              // const SizedBox(height: 4),
-              Text(
-                '₹ ${(price * quantity).toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF111827),
+              const SizedBox(width: 12),
+
+              // Stepper Box
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Row(
+                  children: [
+                    // Minus Button
+                    GestureDetector(
+                      onTap: decreaseQuantity,
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFFFFF),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0x0D000000),
+                              blurRadius: 2,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Opacity(
+                          opacity: quantity <= 1 ? 0.3 : 1.0,
+                          child: const Text(
+                            '−',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1F2937),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Qty Text
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: Text(
+                        '$quantity',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF111827),
+                        ),
+                      ),
+                    ),
+
+                    // Plus Button
+                    GestureDetector(
+                      onTap: increaseQuantity,
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFFFFF),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0x0D000000),
+                              blurRadius: 2,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Opacity(
+                          opacity: quantity >= maxLimit ? 0.3 : 1.0,
+                          child: const Text(
+                            '+',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1F2937),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-
-          // Stepper Box
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9FAFB),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: Row(
-              children: [
-                // Minus
-                GestureDetector(
-                  onTap: decreaseQuantity,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEEF2F7),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Opacity(
-                      opacity: quantity <= 1 ? 0.45 : 1.0,
-                      child: const Text(
-                        '−',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF374151),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Qty Text
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: SizedBox(
-                    width: 20,
-                    child: Text(
-                      '$quantity',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF111827),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-
-                // Plus
-                GestureDetector(
-                  onTap: increaseQuantity,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF008083),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Opacity(
-                      opacity: quantity >= maxLimit ? 0.45 : 1.0,
-                      child: const Text(
-                        '+',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 12),
+          // Bottom Divider stretched edge-to-edge
+          Builder(
+            builder: (context) {
+              final screenWidth = MediaQuery.of(context).size.width;
+              return Transform.scale(
+                scaleX: screenWidth / (screenWidth - 40),
+                child: const Divider(color: Color(0xFFE5E7EB), height: 1, thickness: 1),
+              );
+            },
           ),
         ],
       ),

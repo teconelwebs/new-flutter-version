@@ -8,7 +8,6 @@ import 'package:http/http.dart' as http;
 import '../../../core/constants/app_routes.dart';
 import '../../../core/widgets/app_loader.dart';
 import '../../../core/widgets/no_internet_widget.dart';
-import '../../../core/widgets/view_cart_banner.dart';
 import '../../../core/state/cart_state.dart';
 import '../data/models/product_item.dart';
 import '../data/product_api_service.dart';
@@ -51,6 +50,8 @@ class _ProductScreenState extends State<ProductScreen> {
 
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _reviewsKey = GlobalKey();
+  final GlobalKey _quantitySelectorKey = GlobalKey();
+  bool _showStickyQuantity = false;
   final ValueNotifier<double> _scrollOffsetNotifier = ValueNotifier<double>(0.0);
 
   @override
@@ -91,6 +92,25 @@ class _ProductScreenState extends State<ProductScreen> {
       SystemChrome.setSystemUIOverlayStyle(
         offset > 100 ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
       );
+
+      // Check if body quantity selector has scrolled off screen
+      final RenderObject? renderObject = _quantitySelectorKey.currentContext?.findRenderObject();
+      if (renderObject is RenderBox && mounted) {
+        final position = renderObject.localToGlobal(Offset.zero);
+        // If bottom of widget is above the top portion of the screen (e.g. 100px from top)
+        final bool shouldShow = (position.dy + renderObject.size.height) < 100;
+        if (shouldShow != _showStickyQuantity) {
+          setState(() {
+            _showStickyQuantity = shouldShow;
+          });
+        }
+      } else {
+        if (_showStickyQuantity && mounted) {
+          setState(() {
+            _showStickyQuantity = false;
+          });
+        }
+      }
     }
   }
 
@@ -461,7 +481,7 @@ class _ProductScreenState extends State<ProductScreen> {
             onRefresh: _load,
             child: ListView(
               controller: _scrollController,
-              padding: const EdgeInsets.only(top: 0, bottom: 24),
+              padding: const EdgeInsets.only(top: 0, bottom: 48),
               children: [
                 ImageGalleryWidget(
                   images: detail.images,
@@ -474,34 +494,55 @@ class _ProductScreenState extends State<ProductScreen> {
                   userId: _userId,
                   showFloatingActions: false,
                 ),
-                const SizedBox(height: 12),
-                ProductDetailsWidget(
-                  data: detail.rawJson,
-                  pincode: _pincode,
-                  onRatingTap: _scrollToReviews,
-                  onVariantSelected: _selectVariant,
+                Transform.translate(
+                  offset: const Offset(0, -24),
+                  child: Column(
+                    children: [
+                      // Main details container with rounded top corners
+                      Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 16),
+                            ProductDetailsWidget(
+                              data: detail.rawJson,
+                              pincode: _pincode,
+                              onRatingTap: _scrollToReviews,
+                              onVariantSelected: _selectVariant,
+                            ),
+                            const SizedBox(height: 12),
+                            BuyProductWidget(
+                              key: _quantitySelectorKey,
+                              data: detail.rawJson,
+                              quantity: _qty,
+                              onQuantityChanged: (newQty) {
+                                setState(() {
+                                  _qty = newQty;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            ProductOtherDetailsWidget(
+                              data: detail.rawJson,
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      CustomerReviewsWidget(
+                        key: _reviewsKey,
+                        data: detail.rawJson,
+                      ),
+                      const SizedBox(height: 6),
+                      _buildSuggestedProducts(),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 12),
-                BuyProductWidget(
-                  data: detail.rawJson,
-                  quantity: _qty,
-                  onQuantityChanged: (newQty) {
-                    setState(() {
-                      _qty = newQty;
-                    });
-                  },
-                ),
-                const SizedBox(height: 12),
-                ProductOtherDetailsWidget(
-                  data: detail.rawJson,
-                ),
-                const SizedBox(height: 12),
-                CustomerReviewsWidget(
-                  key: _reviewsKey,
-                  data: detail.rawJson,
-                ),
-                const SizedBox(height: 12),
-                _buildSuggestedProducts(),
               ],
             ),
           ),
@@ -538,28 +579,34 @@ class _ProductScreenState extends State<ProductScreen> {
               },
             ),
           ),
-          // View Cart Banner
-          ValueListenableBuilder<int>(
-            valueListenable: CartState.cartCountNotifier,
-            builder: (context, cartCount, _) {
-              if (cartCount <= 0) return const SizedBox.shrink();
-              return Positioned(
-                left: 0,
-                right: 0,
-                bottom: 8.0,
-                child: ViewCartBanner(
-                  onTap: () {
-                    Navigator.of(context).pushNamed(AppRoutes.cart);
-                  },
-                ),
-              );
-            },
-          ),
+          // View Cart Banner (Commented out per user request)
+          // ValueListenableBuilder<int>(
+          //   valueListenable: CartState.cartCountNotifier,
+          //   builder: (context, cartCount, _) {
+          //     if (cartCount <= 0) return const SizedBox.shrink();
+          //     return Positioned(
+          //       left: 0,
+          //       right: 0,
+          //       bottom: 8.0,
+          //       child: ViewCartBanner(
+          //         onTap: () {
+          //           Navigator.of(context).pushNamed(AppRoutes.cart);
+          //         },
+          //       ),
+          //     );
+          //   },
+          // ),
         ],
       ),
       bottomNavigationBar: BuyProductBtnWidget(
         data: detail.rawJson,
         selectedQuantity: _qty,
+        showQuantitySelector: _showStickyQuantity,
+        onQuantityChanged: (newQty) {
+          setState(() {
+            _qty = newQty;
+          });
+        },
       ),
     );
   }
@@ -570,11 +617,9 @@ class _ProductScreenState extends State<ProductScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
-          const SizedBox(height: 12),
           Row(
             children: [
-              const Text('Suggested Products',
+              const Text('Related Products',
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
               const Spacer(),
               TextButton(
@@ -605,15 +650,29 @@ class _ProductScreenState extends State<ProductScreen> {
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                child: const Text('Explore All',
-                    style: TextStyle(
-                        color: Color(0xFF111827), fontWeight: FontWeight.w700)),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'More Products',
+                      style: TextStyle(
+                        color: Color(0xFFFB5404),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      color: Color(0xFFFB5404),
+                      size: 16,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           if (_related.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 14),

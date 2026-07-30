@@ -77,7 +77,6 @@ class ShopApiService {
           'page': '$page',
         },
       );
-
       // debugPrint('🟢 [API REQ] URL: $uri');
       // debugPrint('🟢 [API REQ] TOKEN EXIST: ${token.isNotEmpty}');
 

@@ -349,42 +349,51 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
                 ),
               // Pill dot indicator overlay
               Positioned(
-                bottom: 12,
+                bottom: 28,
                 left: 0,
                 right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(totalCount, (index) {
-                    final isSelected = index == _currentIndex;
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      width: isSelected ? 16 : 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(3),
-                        // ignore: deprecated_member_use
-                        color: isSelected
-                            ? const Color(0xFFDC2626)
-                            // ignore: deprecated_member_use
-                            : Colors.white.withOpacity(0.5),
-                        boxShadow: [
-                          BoxShadow(
-                            // ignore: deprecated_member_use
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 2,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      // ignore: deprecated_member_use
+                      color: Colors.black.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: _buildThreeDotIndicator(totalCount),
+                  ),
                 ),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildThreeDotIndicator(int totalCount) {
+    if (totalCount <= 1) return const SizedBox.shrink();
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(totalCount, (index) {
+        final isSelected = index == _currentIndex;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          width: isSelected ? 8.0 : 6.0,
+          height: isSelected ? 8.0 : 6.0,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isSelected
+                ? const Color(0xFFFB5404)
+                // ignore: deprecated_member_use
+                : Colors.white.withOpacity(0.6),
+          ),
+        );
+      }),
     );
   }
 }

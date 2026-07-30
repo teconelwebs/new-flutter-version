@@ -33,6 +33,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
   bool _checkingDelivery = false;
   String _lastCheckedPin = '';
   dynamic _checkedPincodeDuration;
+  bool _showPincodeInput = false;
 
   int _apiTotalReviews = 0;
   double _apiRating = 0.0;
@@ -205,6 +206,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
             _errorMessage = '';
             _checkedPincodeDuration =
                 data['duration'] ?? data['data']?['duration'];
+            _showPincodeInput = false;
           });
         } else {
           setState(() {
@@ -319,6 +321,44 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
     }
   }
 
+  Widget _buildStockBadge(String statusText, Color bgColor, Color borderColor,
+      Color textColor, bool isOutOfStock) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: isOutOfStock
+                  ? Colors.red
+                  : (statusText.toLowerCase().contains('only')
+                      ? const Color(0xFFEA580C)
+                      : const Color(0xFF16A34A)),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            statusText,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Brand parsing
@@ -331,8 +371,14 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
         widget.data['brand']?['name'] ??
         widget.data['brand']?['title'];
 
-    final brandName =
-        (rawBrand is String && rawBrand != 'No Brand') ? rawBrand.trim() : '';
+    String brandName = '';
+    if (rawBrand is String) {
+      final trimmed = rawBrand.trim();
+      final lower = trimmed.toLowerCase().replaceAll(' ', '');
+      if (lower != 'nobrand' && lower != 'non-brand' && lower != 'nonbrand') {
+        brandName = trimmed;
+      }
+    }
 
     final int stock;
     final stocksList = widget.data['stocks'];
@@ -348,7 +394,8 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
         stock = int.tryParse(stocksList[0]?['qty']?.toString() ?? '0') ?? 0;
       }
     } else {
-      final rawStock = widget.data['stock'] ?? widget.data['product']?['stock'] ?? 0;
+      final rawStock =
+          widget.data['stock'] ?? widget.data['product']?['stock'] ?? 0;
       stock = int.tryParse(rawStock.toString()) ?? 0;
     }
     debugPrint('=== WELFOG DEBUG ===');
@@ -439,50 +486,30 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
               onTap: widget.onRatingTap,
               behavior: HitTestBehavior.opaque,
               child: Padding(
-                padding: const EdgeInsets.only(top: 2, bottom: 4),
+                padding: const EdgeInsets.only(top: 4, bottom: 4),
                 child: Row(
                   children: [
-                    // Green capsule rating badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF16A34A), // Emerald Green
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        children: [
-                          Text(
-                            _apiRating > 0
-                                ? _apiRating.toStringAsFixed(1)
-                                : '0.0',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 3),
-                          const Icon(Icons.star, color: Colors.white, size: 11),
-                        ],
-                      ),
+                    Row(
+                      children: List.generate(5, (idx) {
+                        return Icon(
+                          _apiRating >= idx + 1
+                              ? Icons.star
+                              : (_apiRating > idx
+                                  ? Icons.star_half_rounded
+                                  : Icons.star_border),
+                          color: const Color(0xFFFFB800),
+                          size: 14,
+                        );
+                      }),
                     ),
-                    const SizedBox(width: 6),
-
-                    // Rating & Review counts
+                    const SizedBox(width: 8),
                     Text(
-                      '$_totalRatings Ratings | $_apiTotalReviews Reviews',
+                      '${_apiRating.toStringAsFixed(1)} · $_totalRatings Ratings & Reviews',
                       style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF4B5563),
+                        fontSize: 12,
+                        color: Color(0xFF6B7280),
                         fontWeight: FontWeight.w500,
                       ),
-                    ),
-                    const SizedBox(width: 2),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: Color(0xFF9CA3AF),
-                      size: 14,
                     ),
                   ],
                 ),
@@ -491,108 +518,296 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
 
           // Price info
           Padding(
-            padding: const EdgeInsets.only(top: 2, bottom: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.only(top: 4, bottom: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      '₹$sellPrice',
-                      style: const TextStyle(
-                        color: Color(0xFF333333),
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    if (mrpPrice > sellPrice)
-                      Text(
-                        '₹$mrpPrice',
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          decoration: TextDecoration.lineThrough,
-                        ),
-                      ),
-                    const SizedBox(width: 8),
-                    if (discountPercentage > 0)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
-                            '$discountPercentage% ',
+                            '₹$sellPrice',
                             style: const TextStyle(
-                              color: Colors.green,
-                              fontSize: 14,
+                              color: Color(0xFF1F2937),
+                              fontSize: 22,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const Icon(Icons.arrow_downward,
-                              color: Colors.green, size: 12),
+                          const SizedBox(width: 8),
+                          if (mrpPrice > sellPrice)
+                            Flexible(
+                              child: Text(
+                                '₹$mrpPrice',
+                                style: const TextStyle(
+                                  color: Color(0xFF9CA3AF),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          const SizedBox(width: 8),
+                          if (discountPercentage > 0)
+                            Text(
+                              '$discountPercentage% OFF',
+                              style: const TextStyle(
+                                color: Color(0xFFFB5404),
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                         ],
                       ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 1),
+                const SizedBox(width: 8),
+                _buildStockBadge(stockStatusText, stockBgColor,
+                    stockBorderColor, stockTextColor, isOutOfStock),
+              ],
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Inclusive of all taxes',
+              style: TextStyle(
+                color: Color(0xFF16A34A),
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ),
+
+          // Check Delivery
+          if (_lastCheckedPin.isEmpty) ...[
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 const Text(
-                  'Inclusive of all taxes',
+                  'Check Delivery',
                   style: TextStyle(
-                    color: Colors.green,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 11,
+                      color: Color(0xFF71717A), fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                IntrinsicHeight(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFFB5404), width: 1.2),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 20),
+                            child: TextField(
+                              controller: _pincodeController,
+                              keyboardType: TextInputType.number,
+                              maxLength: 6,
+                              buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                              style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF1F2937)),
+                              onChanged: (value) {
+                                setState(() {});
+                              },
+                              decoration: const InputDecoration(
+                                hintText: 'Enter Pincode',
+                                hintStyle: TextStyle(color: Colors.grey, fontWeight: FontWeight.normal),
+                                counterText: '',
+                                contentPadding: EdgeInsets.symmetric(vertical: 14),
+                                isDense: true,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                errorBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                                focusedErrorBorder: InputBorder.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: isCheckDisabled || _checkingDelivery
+                              ? null
+                              : () => _checkDelivery(_pincodeController.text),
+                          child: Container(
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.symmetric(horizontal: 28),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFFEF2EB), // peach background
+                              borderRadius: BorderRadius.only(
+                                topRight: Radius.circular(23),
+                                bottomRight: Radius.circular(23),
+                              ),
+                              border: Border(
+                                left: BorderSide(color: Color(0xFFE5E7EB), width: 1.2),
+                              ),
+                            ),
+                            child: Text(
+                              _checkingDelivery ? 'Checking...' : 'Apply',
+                              style: const TextStyle(
+                                color: Color(0xFFFB5404),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
-          ),
-
-          // Pincode and Stock Row
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Check Delivery
-              Expanded(
-                flex: 7,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Check Delivery',
-                      style: TextStyle(
-                          color: Color(0xFF71717A),
-                          fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      height: 50,
+          ] else ...[
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Divider stretched edge-to-edge
+                Builder(
+                  builder: (context) {
+                    final screenWidth = MediaQuery.of(context).size.width;
+                    return Transform.scale(
+                      scaleX: screenWidth / (screenWidth - 40),
+                      child: const Divider(
+                          color: Color(0xFFE5E7EB), height: 1, thickness: 1),
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  color: Colors.transparent,
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2EB), // peach background
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.location_on,
+                          color: Color(0xFFFB5404),
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Deliver to',
+                              style: TextStyle(
+                                color: Color(0xFF71717A),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _lastCheckedPin,
+                              style: const TextStyle(
+                                color: Color(0xFF1F2937),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _showPincodeInput = !_showPincodeInput;
+                            if (_showPincodeInput) {
+                              _pincodeController.text = _lastCheckedPin;
+                            } else {
+                              _pincodeController.clear();
+                            }
+                          });
+                        },
+                        child: _showPincodeInput
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFB5404), // solid orange
+                                  borderRadius: BorderRadius.circular(20), // pill shape
+                                ),
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 6),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFFFB5404)),
+                                ),
+                                child: const Text(
+                                  'Change',
+                                  style: TextStyle(
+                                    color: Color(0xFFFB5404),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_showPincodeInput) ...[
+                  const SizedBox(height: 12),
+                  IntrinsicHeight(
+                    child: Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFD1D5DB)),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0xFFFB5404), width: 1.2),
                       ),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Expanded(
-                            child: Align(
-                              alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 20),
                               child: TextField(
                                 controller: _pincodeController,
                                 keyboardType: TextInputType.number,
                                 maxLength: 6,
+                                buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
                                 style: const TextStyle(
-                                  fontSize: 15,
-                                  height: 1.2,
-                                  color: Color(0xFF1F2937),
-                                ),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF1F2937)),
                                 onChanged: (value) {
                                   setState(() {});
                                 },
                                 decoration: const InputDecoration(
                                   hintText: 'Enter Pincode',
+                                  hintStyle: TextStyle(color: Colors.grey, fontWeight: FontWeight.normal),
                                   counterText: '',
-                                  contentPadding:
-                                      EdgeInsets.symmetric(horizontal: 10),
+                                  contentPadding: EdgeInsets.symmetric(vertical: 14),
                                   isDense: true,
                                   border: InputBorder.none,
                                   enabledBorder: InputBorder.none,
@@ -605,89 +820,85 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                             ),
                           ),
                           GestureDetector(
-                            onTap: isCheckDisabled
+                            onTap: isCheckDisabled || _checkingDelivery
                                 ? null
                                 : () => _checkDelivery(_pincodeController.text),
                             child: Container(
-                              width: 75,
-                              height: 50,
                               alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: isCheckDisabled
-                                    ? const Color(0xFFCCCCCC)
-                                    : const Color(0xFFFB5404),
-                                borderRadius: const BorderRadius.only(
-                                  topRight: Radius.circular(7),
-                                  bottomRight: Radius.circular(7),
+                              padding: const EdgeInsets.symmetric(horizontal: 28),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFFEF2EB), // peach background
+                                borderRadius: BorderRadius.only(
+                                  topRight: Radius.circular(23),
+                                  bottomRight: Radius.circular(23),
+                                ),
+                                border: Border(
+                                  left: BorderSide(color: Color(0xFFE5E7EB), width: 1.2),
                                 ),
                               ),
                               child: Text(
-                                _checkingDelivery ? 'Checking...' : 'Check',
+                                _checkingDelivery ? 'Checking...' : 'Apply',
                                 style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600),
+                                  color: Color(0xFFFB5404),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-
-              // Stock Status
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Visibility(
-                      visible: false,
-                      maintainSize: true,
-                      maintainAnimation: true,
-                      maintainState: true,
-                      child: Text(
-                        'Delivery',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
+                  ),
+                ],
+                if (_deliveryMessage.isNotEmpty) ...[
+                  const SizedBox(
+                      height: 6), // slightly increased vertical space
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 6), // slightly increased vertical padding
+                    color: Colors.transparent,
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.local_shipping_outlined,
+                          color: Color(0xFFFB5404),
+                          size: 18,
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Estimated Delivery ${_formatDeliveryTime(_checkedPincodeDuration ?? widget.data['shop_location']?['duration'] ?? widget.data['duration'] ?? widget.data['data']?['duration'] ?? widget.data['product']?['shop_location']?['duration'] ?? widget.data['product']?['duration'])}',
+                            style: const TextStyle(
+                              color: Color(0xFF15803D), // green color
+                              fontWeight: FontWeight.w500, // less bold
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Container(
-                      height: 50,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        // ignore: deprecated_member_use
-                        color: stockBgColor,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          // ignore: deprecated_member_use
-                          color: stockBorderColor,
-                        ),
-                      ),
-                      child: Text(
-                        stockStatusText,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          // ignore: deprecated_member_use
-                          color: stockTextColor,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
+                ],
+                const SizedBox(height: 10),
+                // Bottom Divider stretched edge-to-edge
+                Builder(
+                  builder: (context) {
+                    final screenWidth = MediaQuery.of(context).size.width;
+                    return Transform.scale(
+                      scaleX: screenWidth / (screenWidth - 40),
+                      child: const Divider(
+                          color: Color(0xFFE5E7EB), height: 1, thickness: 1),
+                    );
+                  },
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
 
-          // Pincode check responses
+          // Pincode check responses (outside)
           if (_checkingDelivery ||
-              _deliveryMessage.isNotEmpty ||
-              _errorMessage.isNotEmpty)
+              (_errorMessage.isNotEmpty && _lastCheckedPin.isEmpty))
             Padding(
               padding: const EdgeInsets.only(top: 4, bottom: 6),
               child: _checkingDelivery
@@ -713,71 +924,60 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                         ],
                       ),
                     )
-                  : Column(
-                      children: [
-                        if (_deliveryMessage.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.green.shade300),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.local_shipping,
-                                    color: Color(0xFFFB5404), size: 18),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    'Estimated Delivery ${_formatDeliveryTime(_checkedPincodeDuration ?? widget.data['shop_location']?['duration'] ?? widget.data['duration'] ?? widget.data['data']?['duration'] ?? widget.data['product']?['shop_location']?['duration'] ?? widget.data['product']?['duration'])}',
-                                    style: TextStyle(
-                                        color: Colors.green.shade800,
-                                        fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                              ],
+                  : Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.red.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error,
+                              color: Colors.red.shade600, size: 18),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              _errorMessage,
+                              style: TextStyle(
+                                  color: Colors.red.shade600,
+                                  fontWeight: FontWeight.w600),
                             ),
                           ),
-                        if (_errorMessage.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.red.shade300),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.error,
-                                    color: Colors.red.shade600, size: 18),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    _errorMessage,
-                                    style: TextStyle(
-                                        color: Colors.red.shade600,
-                                        fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
             ),
 
           // Variants Section
           if (variants != null)
-            ...variants.entries.where((entry) {
-              final key = entry.key
-                  .toLowerCase()
-                  .replaceAll(RegExp(r'[\s_-]'), '')
-                  .replaceAll('colour', 'color');
-              return key != 'colorsizes' && key != 'colorsize';
-            }).map((entry) {
+            ...(() {
+              final list = variants.entries.where((entry) {
+                final key = entry.key
+                    .toLowerCase()
+                    .replaceAll(RegExp(r'[\s_-]'), '')
+                    .replaceAll('colour', 'color');
+                return key != 'colorsizes' && key != 'colorsize';
+              }).toList();
+
+              // Sort list: put color first, size second
+              list.sort((a, b) {
+                final aKey = a.key.toLowerCase();
+                final bKey = b.key.toLowerCase();
+                final aIsColor =
+                    aKey.contains('color') || aKey.contains('colour');
+                final bIsColor =
+                    bKey.contains('color') || bKey.contains('colour');
+
+                if (aIsColor && !bIsColor) return -1;
+                if (!aIsColor && bIsColor) return 1;
+                return 0;
+              });
+
+              return list;
+            }())
+                .map((entry) {
               final String variantKey = entry.key;
               final rawVal = entry.value;
               final List<dynamic> variantValues = [];
@@ -861,7 +1061,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                                 color: isSelected
                                     ? const Color(0xFFFEF6F1)
                                     : Colors.white,
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: isSelected
                                       ? const Color(0xFFFB5404)
@@ -944,7 +1144,7 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
                                 color: isSelectedColor
                                     ? const Color(0xFFFEF6F1)
                                     : Colors.white,
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
                                   color: isSelectedColor
                                       ? const Color(0xFFFB5404)
