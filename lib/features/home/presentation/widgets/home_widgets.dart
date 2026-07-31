@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 
 import '../../data/home_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -77,10 +79,15 @@ class HomeHeader extends StatelessWidget {
                   height: 30,
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: Image.network(
-                      _brandLogoUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: _brandLogoUrl,
                       fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Text(
+                      fadeInDuration: Duration.zero,
+                      fadeOutDuration: Duration.zero,
+                      placeholder: (context, url) => const ShimmerLoading(
+                        borderRadius: BorderRadius.all(Radius.circular(4)),
+                      ),
+                      errorWidget: (context, url, error) => const Text(
                         'Welfog',
                         style: TextStyle(
                           fontSize: 24,
@@ -306,10 +313,15 @@ class _BannerCarouselState extends State<BannerCarousel> with TickerProviderStat
                     final banner = items[i];
                     return ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        banner.image,
+                      child: CachedNetworkImage(
+                        imageUrl: banner.image,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        fadeInDuration: Duration.zero,
+                        fadeOutDuration: Duration.zero,
+                        placeholder: (context, url) => const ShimmerLoading(
+                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                        ),
+                        errorWidget: (context, url, error) => Container(
                           color: const Color(0xFFECEFF3),
                           child: const Center(child: Icon(Icons.image_not_supported)),
                         ),
@@ -424,11 +436,16 @@ class _PromoBannerImageState extends State<PromoBannerImage> {
         aspectRatio: _displayAspectRatio,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(10),
-          child: Image.network(
-            widget.imageUrl,
+          child: CachedNetworkImage(
+            imageUrl: widget.imageUrl,
             width: double.infinity,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
+            fadeInDuration: Duration.zero,
+            fadeOutDuration: Duration.zero,
+            placeholder: (context, url) => const ShimmerLoading(
+              borderRadius: BorderRadius.all(Radius.circular(10)),
+            ),
+            errorWidget: (context, url, error) => Container(
               color: const Color(0xFFECEFF3),
               alignment: Alignment.center,
               child: const Icon(Icons.image_not_supported_outlined, size: 32),
@@ -805,10 +822,16 @@ class _HomeProductCardState extends State<HomeProductCard> {
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
                       child: Container(
                         color: const Color(0xFFF8F9FA),
-                        child: Image.network(
-                          p.image,
+                        child: CachedNetworkImage(
+                          imageUrl: p.image,
                           fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Container(
+                          memCacheWidth: 250,
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
+                          placeholder: (context, url) => const ShimmerLoading(
+                            borderRadius: BorderRadius.all(Radius.circular(10)),
+                          ),
+                          errorWidget: (context, url, error) => Container(
                             color: const Color(0xFFF2F4F7),
                             child: const Center(child: Icon(Icons.shopping_bag_outlined)),
                           ),

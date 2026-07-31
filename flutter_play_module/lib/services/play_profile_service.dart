@@ -118,11 +118,10 @@ class PlayProfileService {
       if (existingId.isNotEmpty) {
         final existingUsername = (existing['username'] ?? '').toString();
         // Never overwrite a real username with a provisional one.
-        final nextUsername =
-            isPlaceholderUsername(username, mainUserId) &&
-                    !isPlaceholderUsername(existingUsername, mainUserId)
-                ? existingUsername
-                : username;
+        final nextUsername = isPlaceholderUsername(username, mainUserId) &&
+                !isPlaceholderUsername(existingUsername, mainUserId)
+            ? existingUsername
+            : username;
 
         _log(
           'existing profile mongoId=$existingId — '
@@ -132,9 +131,7 @@ class PlayProfileService {
           playMongoId: existingId,
           mainUserId: mainUserId,
           username: nextUsername,
-          name: name.isNotEmpty
-              ? name
-              : (existing['name'] ?? '').toString(),
+          name: name.isNotEmpty ? name : (existing['name'] ?? '').toString(),
           existing: existing,
           mobile: mobile,
         );
@@ -262,9 +259,8 @@ class PlayProfileService {
           ? name.trim()
           : (existing['name'] ?? '').toString(),
       existing: existing,
-      mobile: mobile.isNotEmpty
-          ? mobile
-          : (existing['mobile'] ?? '').toString(),
+      mobile:
+          mobile.isNotEmpty ? mobile : (existing['mobile'] ?? '').toString(),
     );
   }
 
@@ -429,9 +425,8 @@ class PlayProfileService {
         return false;
       }
 
-      final current = (userMap['userid'] ?? userMap['user_id'] ?? '')
-          .toString()
-          .trim();
+      final current =
+          (userMap['userid'] ?? userMap['user_id'] ?? '').toString().trim();
       if (current == userId) {
         _log('userid already set on play profile: $userId');
         return true;
@@ -453,9 +448,8 @@ class PlayProfileService {
 
       // Verify — partial PUTs used to return 200 without actually saving.
       final verified = await _fetchUserMap(mongoId);
-      final saved = (verified?['userid'] ?? verified?['user_id'] ?? '')
-          .toString()
-          .trim();
+      final saved =
+          (verified?['userid'] ?? verified?['user_id'] ?? '').toString().trim();
       final ok = saved == userId;
       _log(
         'userid verify after PUT — '

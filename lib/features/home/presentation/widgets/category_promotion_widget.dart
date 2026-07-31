@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 import '../../../../core/network/axios_instance.dart';
 import '../../../../core/constants/app_routes.dart';
 
@@ -339,12 +341,17 @@ class _CategoryPromotionWidgetState extends State<CategoryPromotionWidget> {
               aspectRatio: 2.3, // Fully responsive aspect ratio instead of a fixed height
               child: Stack(
                 children: [
-                  Image.network(
-                    imageUrl,
-                    fit: BoxFit.fill, // BoxFit.fill shows the entire image cleanly without side/phone cutoffs
+                  CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.fill,
                     width: double.infinity,
                     height: double.infinity,
-                    errorBuilder: (_, __, ___) => Container(
+                    fadeInDuration: Duration.zero,
+                    fadeOutDuration: Duration.zero,
+                    placeholder: (context, url) => const ShimmerLoading(
+                      borderRadius: BorderRadius.all(Radius.circular(16)),
+                    ),
+                    errorWidget: (context, url, error) => Container(
                       color: Colors.grey.shade100,
                       alignment: Alignment.center,
                       child: const Icon(Icons.broken_image, color: Colors.grey),
@@ -596,12 +603,17 @@ class _PromoSectionSliderState extends State<_PromoSectionSlider> with TickerPro
                         borderRadius: BorderRadius.circular(16),
                         child: Stack(
                           children: [
-                            Image.network(
-                              imageUrl,
-                              fit: BoxFit.fill, // BoxFit.fill shows the entire image cleanly without side/phone cutoffs
+                            CachedNetworkImage(
+                              imageUrl: imageUrl,
+                              fit: BoxFit.fill,
                               width: double.infinity,
                               height: double.infinity,
-                              errorBuilder: (_, __, ___) => Container(
+                              fadeInDuration: Duration.zero,
+                              fadeOutDuration: Duration.zero,
+                              placeholder: (context, url) => const ShimmerLoading(
+                                borderRadius: BorderRadius.all(Radius.circular(16)),
+                              ),
+                              errorWidget: (context, url, error) => Container(
                                 color: Colors.grey.shade100,
                                 alignment: Alignment.center,
                                 child: const Icon(Icons.broken_image, color: Colors.grey),

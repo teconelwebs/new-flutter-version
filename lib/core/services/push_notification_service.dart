@@ -745,7 +745,8 @@ class PushNotificationService {
       id: stableId,
       title: title,
       body: body.isEmpty ? 'You have a new update' : body,
-      payload: jsonEncode(data), data: {},
+      payload: jsonEncode(data),
+      data: {},
     );
   }
 
@@ -827,8 +828,8 @@ class PushNotificationService {
         final statusUrl = Uri.parse(
           'https://welfogapi.welfog.com/api/notification/token-status?user_id=$userId&device_id=$deviceId',
         );
-        debugPrint(
-            "💾 Checking token registration status on server: $statusUrl");
+        // debugPrint(
+        //     "💾 Checking token registration status on server: $statusUrl");
         final checkRes = await http.get(statusUrl);
 
         if (checkRes.statusCode == 200) {
@@ -839,8 +840,8 @@ class PushNotificationService {
             debugPrint("💾 Server reports token is already active/registered.");
           } else {
             shouldRegister = true;
-            debugPrint(
-                "💾 Server reports token is inactive or not registered.");
+            // debugPrint(
+            //     "💾 Server reports token is inactive or not registered.");
           }
         } else {
           shouldRegister = true;
@@ -850,12 +851,12 @@ class PushNotificationService {
       }
 
       if (!shouldRegister) {
-        debugPrint(
-            "💾 FCM sync skipped: Token is already saved locally and registered on server.");
+        // debugPrint(
+        //     "💾 FCM sync skipped: Token is already saved locally and registered on server.");
         return;
       }
 
-      debugPrint("💾 Fetching and saving new token to backend server...");
+      // debugPrint("💾 Fetching and saving new token to backend server...");
 
       final saveUrl =
           Uri.parse('https://welfogapi.welfog.com/api/notification/save-token');

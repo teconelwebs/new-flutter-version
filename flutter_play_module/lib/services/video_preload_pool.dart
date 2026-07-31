@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:video_player/video_player.dart';
 
 import '../models/reel.dart';
@@ -83,6 +85,34 @@ class VideoPreloadPool {
 
   Future<void> warm(String reelId, String url, {bool priority = false}) async {
     if (url.isEmpty) return;
+    
+    // Fetch and log file size asynchronously
+    unawaited(() async {
+      try {
+        final response = await http.head(Uri.parse(url));
+        final sizeHeader = response.headers['content-length'];
+        if (sizeHeader != null) {
+          final sizeInBytes = int.tryParse(sizeHeader) ?? 0;
+          final sizeInMb = sizeInBytes / (1024 * 1024);
+          
+          // ignore: avoid_print
+          print('--------------------------------------------------');
+          // ignore: avoid_print
+          print('📹 [VideoPreloadPool] VIDEO PRELOAD REPORT');
+          // ignore: avoid_print
+          print('   • Original Video File Size: ${sizeInMb.toStringAsFixed(3)} MB');
+          // ignore: avoid_print
+          print('   • Playback Compression: Streaming at S3 compressed size.');
+          // ignore: avoid_print
+          print('   • URL: $url');
+          // ignore: avoid_print
+          print('--------------------------------------------------');
+        }
+      } catch (e) {
+        debugPrint('⚠️ [VideoPreloadPool] failed to fetch video size: $e');
+      }
+    }());
+
     if (_controllers.containsKey(reelId)) {
       if (priority) await _initFutures[reelId];
       return;

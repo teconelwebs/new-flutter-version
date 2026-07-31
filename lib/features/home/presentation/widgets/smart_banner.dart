@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'shimmer_placeholder.dart';
 
 class SmartBanner extends StatefulWidget {
@@ -59,27 +60,31 @@ class _SmartBannerState extends State<SmartBanner> {
             if (widget.uri != null)
               Opacity(
                 opacity: showShimmer ? 0.0 : 1.0,
-                child: Image.network(
-                  widget.uri!,
+                child: CachedNetworkImage(
+                  imageUrl: widget.uri!,
                   width: double.infinity,
                   height: double.infinity,
                   fit: widget.resizeMode,
-                  errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, size: 28)),
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) {
-                      // Trigger callback when loading completes successfully
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted && _loadedUri != widget.uri) {
-                          setState(() {
-                            _loadedUri = widget.uri;
-                          });
-                          // Fetch natural dimensions of the image
-                          _resolveImageDimensions(widget.uri!);
-                        }
-                      });
-                      return child;
-                    }
-                    return const SizedBox.shrink();
+                  fadeInDuration: Duration.zero,
+                  fadeOutDuration: Duration.zero,
+                  errorWidget: (_, __, ___) => const Center(child: Icon(Icons.broken_image, size: 28)),
+                  imageBuilder: (context, imageProvider) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted && _loadedUri != widget.uri) {
+                        setState(() {
+                          _loadedUri = widget.uri;
+                        });
+                        _resolveImageDimensions(widget.uri!);
+                      }
+                    });
+                    return Container(
+                      decoration: BoxDecoration(
+                        image: DecorationImage(
+                          image: imageProvider,
+                          fit: widget.resizeMode,
+                        ),
+                      ),
+                    );
                   },
                 ),
               ),
@@ -93,8 +98,8 @@ class _SmartBannerState extends State<SmartBanner> {
   void _resolveImageDimensions(String url) {
     if (widget.onImageSize == null) return;
     
-    final Image image = Image.network(url);
-    image.image.resolve(const ImageConfiguration()).addListener(
+    final imageProvider = CachedNetworkImageProvider(url);
+    imageProvider.resolve(const ImageConfiguration()).addListener(
       ImageStreamListener((ImageInfo info, bool _) {
         if (mounted) {
           widget.onImageSize!(

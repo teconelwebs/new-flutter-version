@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 
@@ -748,11 +749,13 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
               fit: StackFit.expand,
               children: [
                 if (hasThumb && !_playbackStarted)
-                  Image.network(
-                    widget.reel.thumbnailUrl!,
+                  CachedNetworkImage(
+                    imageUrl: widget.reel.thumbnailUrl!,
                     fit: BoxFit.cover,
-                    gaplessPlayback: true,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    fadeInDuration: Duration.zero,
+                    fadeOutDuration: Duration.zero,
+                    memCacheWidth: 600,
+                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
                   ),
                 if (_initialized && _controller != null)
                   FittedBox(

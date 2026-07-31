@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 import '../../../../core/constants/app_routes.dart';
 
 class CategoryWidget extends StatefulWidget {
@@ -299,12 +301,19 @@ class _CategoryWidgetState extends State<CategoryWidget> {
               alignment: Alignment.center,
               child: isAll
                   ? _buildAllIconGrid()
-                  : Image.network(
-                      category['icon_url'] ?? "",
+                  : CachedNetworkImage(
+                      imageUrl: category['icon_url'] ?? "",
                       width: 40,
                       height: 40,
                       fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Icon(
+                      memCacheWidth: 80,
+                      fadeInDuration: Duration.zero,
+                      fadeOutDuration: Duration.zero,
+                      placeholder: (context, url) => const ShimmerLoading.circular(
+                        width: 40,
+                        height: 40,
+                      ),
+                      errorWidget: (context, url, error) => const Icon(
                         Icons.category,
                         color: Colors.grey,
                         size: 24,

@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 import '../../data/home_models.dart';
 
 double _safeBannerAspectRatio(double? ratio, {double fallback = 3.0}) {
@@ -78,17 +80,20 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
     for (int i = 0; i < _slides.length; i++) {
       final imgUrl = _slides[i].image;
       if (imgUrl.trim().isEmpty) continue;
-      final Image image = Image.network(imgUrl);
       
-      image.image.resolve(const ImageConfiguration()).addListener(
+      final imageProvider = CachedNetworkImageProvider(imgUrl);
+      imageProvider.resolve(const ImageConfiguration()).addListener(
         ImageStreamListener((ImageInfo info, bool _) {
           final double ratio = info.image.height > 0
               ? info.image.width / info.image.height
               : 3.0;
           if (mounted) {
-            setState(() {
-              _aspectRatios[i] = _safeBannerAspectRatio(ratio);
-            });
+            final newRatio = _safeBannerAspectRatio(ratio);
+            if (_aspectRatios[i] != newRatio) {
+              setState(() {
+                _aspectRatios[i] = newRatio;
+              });
+            }
           }
         }),
       );
@@ -208,10 +213,15 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
                                 alignment: Alignment.center,
                                 child: const Icon(Icons.image, size: 40),
                               )
-                            : Image.network(
-                                slide.image,
+                            : CachedNetworkImage(
+                                imageUrl: slide.image,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
+                                fadeInDuration: Duration.zero,
+                                fadeOutDuration: Duration.zero,
+                                placeholder: (context, url) => const ShimmerLoading(
+                                  borderRadius: BorderRadius.all(Radius.circular(12)),
+                                ),
+                                errorWidget: (context, url, error) => Container(
                                   color: Colors.grey.shade300,
                                   alignment: Alignment.center,
                                   child: const Icon(Icons.image, size: 40),

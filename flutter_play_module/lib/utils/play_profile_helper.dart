@@ -332,10 +332,10 @@ class PlayProfileHelper {
       final ready = map != null &&
           !PlayProfileService.isPlaceholderUsername(username, mainUserId);
       final posts = await _postCountForMongoId(id);
-      debugPrint(
-        '🎮 [PlayProfile] candidate mongoId=$id '
-        'username="$username" ready=$ready postHint=$posts',
-      );
+      // debugPrint(
+      //   '🎮 [PlayProfile] candidate mongoId=$id '
+      //   'username="$username" ready=$ready postHint=$posts',
+      // );
 
       if (ready) {
         if (bestReady == null ||
@@ -357,25 +357,25 @@ class PlayProfileHelper {
     }
 
     if (bestReady != null) {
-      debugPrint(
-        '🎮 [PlayProfile] canonical=mongoId=$bestReady (real username)',
-      );
+      // debugPrint(
+      //   '🎮 [PlayProfile] canonical=mongoId=$bestReady (real username)',
+      // );
       return bestReady;
     }
 
     if (bestByPosts != null && bestPosts > 0) {
-      debugPrint(
-        '🎮 [PlayProfile] canonical=mongoId=$bestByPosts (posts=$bestPosts)',
-      );
+      // debugPrint(
+      //   '🎮 [PlayProfile] canonical=mongoId=$bestByPosts (posts=$bestPosts)',
+      // );
       return bestByPosts;
     }
 
     // No username / posts — prefer newest stub (just created), not oldest pending.
     ids.sort();
     final newest = ids.last;
-    debugPrint(
-      '🎮 [PlayProfile] canonical=mongoId=$newest (newest stub, no ready username)',
-    );
+    // debugPrint(
+    //   '🎮 [PlayProfile] canonical=mongoId=$newest (newest stub, no ready username)',
+    // );
     return newest;
   }
 
@@ -422,10 +422,10 @@ class PlayProfileHelper {
       );
     }
 
-    debugPrint(
-      '🎮 [PlayProfile] resolveCanonical → mongoId=$chosen '
-      'shopUserId=$mainUserId mobile=$mobile',
-    );
+    // debugPrint(
+    //   '🎮 [PlayProfile] resolveCanonical → mongoId=$chosen '
+    //   'shopUserId=$mainUserId mobile=$mobile',
+    // );
     return chosen;
   }
 
@@ -488,10 +488,10 @@ class PlayProfileHelper {
         if (preferredId != null &&
             isValidObjectId(preferredId) &&
             preferredId != canonical) {
-          debugPrint(
-            '🎮 [PlayProfile] preferredId=$preferredId ignored — '
-            'canonical=$canonical',
-          );
+          // debugPrint(
+          //   '🎮 [PlayProfile] preferredId=$preferredId ignored — '
+          //   'canonical=$canonical',
+          // );
         }
         return canonical;
       }
@@ -642,7 +642,7 @@ class PlayProfileHelper {
     if (prefs.getString('play_username_ready') == '1') {
       final cached = prefs.getString('play_profile_user_name') ?? '';
       if (!PlayProfileService.isPlaceholderUsername(cached, mainUserId)) {
-        debugPrint('🎮 [PlayProfile] username ready (cache): @$cached');
+        // debugPrint('🎮 [PlayProfile] username ready (cache): @$cached');
         return true;
       }
     }
@@ -658,8 +658,7 @@ class PlayProfileHelper {
           await _fetchPlayUserMap(mainUserId: mainUserId),
         if (mobile != null && mobile.isNotEmpty)
           await _fetchPlayUserMap(mobile: mobile),
-        if (storedMongo != null)
-          await _fetchPlayUserMap(mongoId: storedMongo),
+        if (storedMongo != null) await _fetchPlayUserMap(mongoId: storedMongo),
       ];
 
       Map<String, dynamic>? readyMap;
@@ -672,10 +671,10 @@ class PlayProfileHelper {
           username,
           mainUserId,
         );
-        debugPrint(
-          '🎮 [PlayProfile] ready-check mongoId=${map['_id']} '
-          'username="$username" ready=$ready',
-        );
+        // debugPrint(
+        //   '🎮 [PlayProfile] ready-check mongoId=${map['_id']} '
+        //   'username="$username" ready=$ready',
+        // );
         if (ready) {
           readyMap = map;
           break;
@@ -692,7 +691,7 @@ class PlayProfileHelper {
         }
         await prefs.setString('play_username_ready', '1');
         await prefs.setString('play_profile_user_name', username);
-        debugPrint('🎮 [PlayProfile] username ready: @$username');
+        // debugPrint('🎮 [PlayProfile] username ready: @$username');
         return true;
       }
 
@@ -705,16 +704,16 @@ class PlayProfileHelper {
           await prefs.setString('play_profile_id', id);
         }
         await prefs.setString('play_username_ready', '0');
-        debugPrint(
-          '🎮 [PlayProfile] username NOT ready (placeholder): "$username"',
-        );
+        // debugPrint(
+        //   '🎮 [PlayProfile] username NOT ready (placeholder): "$username"',
+        // );
         return false;
       }
 
-      debugPrint(
-        '🎮 [PlayProfile] username NOT ready — no play profile found '
-        '(mainUserId=$mainUserId mobile=$mobile)',
-      );
+      // debugPrint(
+      //   '🎮 [PlayProfile] username NOT ready — no play profile found '
+      //   '(mainUserId=$mainUserId mobile=$mobile)',
+      // );
       await prefs.setString('play_username_ready', '0');
       return false;
     } catch (e) {
@@ -729,15 +728,15 @@ class PlayProfileHelper {
     final userId = (prefs.getString('user_id') ?? '').trim();
     final mobile = (prefs.getString('mobile') ?? '').trim();
     final trimmedName = name.trim();
-    debugPrint(
-      '🎮 [PlayProfile] bootstrapAfterNameSave START '
-      'baseUrl=$_playApi userId=$userId mobile=$mobile name=$trimmedName',
-    );
+    // debugPrint(
+    //   '🎮 [PlayProfile] bootstrapAfterNameSave START '
+    //   'baseUrl=$_playApi userId=$userId mobile=$mobile name=$trimmedName',
+    // );
     if (userId.isEmpty || mobile.isEmpty || trimmedName.isEmpty) {
-      debugPrint(
-        '🎮 [PlayProfile] bootstrapAfterNameSave skipped — '
-        'userId=$userId mobile=$mobile name=$trimmedName',
-      );
+      // debugPrint(
+      //   '🎮 [PlayProfile] bootstrapAfterNameSave skipped — '
+      //   'userId=$userId mobile=$mobile name=$trimmedName',
+      // );
       return;
     }
 
@@ -762,11 +761,11 @@ class PlayProfileHelper {
         mainUserId: userId,
       );
 
-      debugPrint(
-        '🎮 [PlayProfile] bootstrapAfterNameSave done — '
-        'baseUrl=$_playApi mongoId=$playUserId userid=$userId '
-        'name=$trimmedName (username sheet still required)',
-      );
+      // debugPrint(
+      //   '🎮 [PlayProfile] bootstrapAfterNameSave done — '
+      //   'baseUrl=$_playApi mongoId=$playUserId userid=$userId '
+      //   'name=$trimmedName (username sheet still required)',
+      // );
     } catch (e) {
       debugPrint(
         '🎮 [PlayProfile] bootstrapAfterNameSave failed baseUrl=$_playApi: $e',
@@ -825,9 +824,9 @@ class PlayProfileHelper {
     final mobile = (prefs.getString('mobile') ?? '').trim();
     final userId = (prefs.getString('user_id') ?? '').trim();
     if (mobile.isEmpty || userId.isEmpty) {
-      debugPrint(
-        '🎮 [PlayProfile] update-userid skipped — mobile=$mobile userId=$userId',
-      );
+      // debugPrint(
+      //   '🎮 [PlayProfile] update-userid skipped — mobile=$mobile userId=$userId',
+      // );
       return;
     }
 
@@ -835,25 +834,27 @@ class PlayProfileHelper {
     final url = '$_playApi/music/update-userid';
     final payload = {'mobile': mobile, 'userid': userId};
     try {
-      debugPrint('🎮 [PlayProfile] PUT $url payload=$payload');
+      // debugPrint('🎮 [PlayProfile] PUT $url payload=$payload');
       // ignore: avoid_print
-      print('🚀 [PlayProfile] Sending PUT request to update User ID...');
+      // print('🚀 [PlayProfile] Sending PUT request to update User ID...');
       final response = await http.put(
         Uri.parse(url),
         headers: await _playHeaders(),
         body: jsonEncode(payload),
       );
-      debugPrint(
-        '🎮 [PlayProfile] update-userid status=${response.statusCode} '
-        'body=${response.body}',
-      );
+      // debugPrint(
+      //   '🎮 [PlayProfile] update-userid status=${response.statusCode} '
+      //   'body=${response.body}',
+      // );
       if (response.statusCode >= 200 && response.statusCode < 300) {
         await prefs.setString('fourth_userid', userId);
         // ignore: avoid_print
-        print('✅ [PlayProfile] SUCCESS: User ID updated successfully! status=${response.statusCode}, body=${response.body}');
+        print(
+            '✅ [PlayProfile] SUCCESS: User ID updated successfully! status=${response.statusCode}, body=${response.body}');
       } else {
         // ignore: avoid_print
-        print('❌ [PlayProfile] FAILED: Server returned status=${response.statusCode}, body=${response.body}');
+        print(
+            '❌ [PlayProfile] FAILED: Server returned status=${response.statusCode}, body=${response.body}');
       }
     } catch (e) {
       debugPrint('🎮 [PlayProfile] update-userid failed: $e');
@@ -868,15 +869,16 @@ class PlayProfileHelper {
     final prefs = await SharedPreferences.getInstance();
     final mainUserId = (prefs.getString('user_id') ?? '').trim();
     if (mainUserId.isEmpty) {
-      debugPrint('🎮 [PlayProfile] ensureMainUserId skipped — no login user_id');
+      // debugPrint(
+      //     '🎮 [PlayProfile] ensureMainUserId skipped — no login user_id');
       return;
     }
 
     final playMongoId = await ensurePlayProfileMongoId();
     if (playMongoId == null || playMongoId.isEmpty) {
-      debugPrint(
-        '🎮 [PlayProfile] ensureMainUserId skipped — no play mongo profile yet',
-      );
+      // debugPrint(
+      //   '🎮 [PlayProfile] ensureMainUserId skipped — no play mongo profile yet',
+      // );
       return;
     }
 
@@ -888,10 +890,10 @@ class PlayProfileHelper {
     );
     if (ok) {
       await prefs.setString('fourth_userid', mainUserId);
-      debugPrint(
-        '🎮 [PlayProfile] ensureMainUserId done — '
-        'playMongoId=$playMongoId userid=$mainUserId',
-      );
+      // debugPrint(
+      //   '🎮 [PlayProfile] ensureMainUserId done — '
+      //   'playMongoId=$playMongoId userid=$mainUserId',
+      // );
     }
   }
 

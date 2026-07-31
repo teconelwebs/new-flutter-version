@@ -54,6 +54,18 @@ class _ProductScreenState extends State<ProductScreen> {
   bool _showStickyQuantity = false;
   final ValueNotifier<double> _scrollOffsetNotifier = ValueNotifier<double>(0.0);
 
+  bool _isNetworkError(dynamic error) {
+    if (error == null) return false;
+    final str = error.toString().toLowerCase();
+    return str.contains('socketexception') ||
+           str.contains('timeout') ||
+           str.contains('failed host lookup') ||
+           str.contains('connection failed') ||
+           str.contains('network') ||
+           str.contains('connect') ||
+           str.contains('clientexception');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -449,6 +461,7 @@ class _ProductScreenState extends State<ProductScreen> {
   Widget build(BuildContext context) {
     if (_detail == null) {
       if (_error != null) {
+        final bool isNetErr = _isNetworkError(_error);
         return Scaffold(
           appBar: AppBar(
             backgroundColor: Colors.white,
@@ -459,11 +472,79 @@ class _ProductScreenState extends State<ProductScreen> {
               onPressed: () => Navigator.of(context).pop(),
             ),
           ),
-          body: NoInternetWidget(
-            onRetry: _load,
-            title: 'Connection Error',
-            message: _error!,
-          ),
+          body: isNetErr
+              ? NoInternetWidget(
+                  onRetry: _load,
+                  title: 'Connection Error',
+                  message: _error!,
+                )
+              : Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFFEF2F2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.error_outline_rounded,
+                            size: 72,
+                            color: Color(0xFFEF4444),
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+                        const Text(
+                          'Product Unavailable',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1F2937),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          "We couldn't retrieve the details for this product. It may have been removed or is temporarily unavailable.",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B7280),
+                            height: 1.4,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 32),
+                        ElevatedButton(
+                          onPressed: _load,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFB5404),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.refresh_rounded, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                'Try Again',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                                      ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
         );
       }
       return const Scaffold(

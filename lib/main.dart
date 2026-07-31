@@ -20,6 +20,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Expand Flutter Image Cache thresholds (256 MB max)
+  PaintingBinding.instance.imageCache
+    ..maximumSize = 1000
+    ..maximumSizeBytes = 256 << 20;
+
   // Initialize the sub-module API URL from AxiosInstance configuration
   play.kPlayApiBaseUrl = AxiosInstance.baseUrls['FOURTH']!;
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/widgets/shimmer_loading.dart';
 import '../../data/models/product_item.dart';
 import 'inline_product_video_player.dart';
 import 'inline_video_focus_coordinator.dart';
@@ -119,10 +121,16 @@ class _ProductCardState extends State<ProductCard> {
                                   ? const Center(
                                       child: Icon(Icons.shopping_bag_outlined, size: 34),
                                     )
-                                  : Image.network(
-                                      widget.item.imageUrl,
+                                  : CachedNetworkImage(
+                                      imageUrl: widget.item.imageUrl,
                                       fit: BoxFit.contain,
-                                      errorBuilder: (_, __, ___) => const Center(
+                                      memCacheWidth: 250,
+                                      fadeInDuration: Duration.zero,
+                                      fadeOutDuration: Duration.zero,
+                                      placeholder: (context, url) => const ShimmerLoading(
+                                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                                      ),
+                                      errorWidget: (context, url, error) => const Center(
                                         child: Icon(Icons.image_not_supported_outlined, size: 26),
                                       ),
                                     )),
