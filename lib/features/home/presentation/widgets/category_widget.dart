@@ -10,8 +10,17 @@ import '../../../../core/constants/app_routes.dart';
 class CategoryWidget extends StatefulWidget {
   final int pullRefreshKey;
   final ValueChanged<int>? onTabChange;
+  /// Pauses the auto-scroll timer while this screen is hidden behind another
+  /// tab (e.g. IndexedStack keeps it mounted). Defaults to true so existing
+  /// call sites keep their current behavior.
+  final bool isActive;
 
-  const CategoryWidget({super.key, this.pullRefreshKey = 0, this.onTabChange});
+  const CategoryWidget({
+    super.key,
+    this.pullRefreshKey = 0,
+    this.onTabChange,
+    this.isActive = true,
+  });
 
   @override
   State<CategoryWidget> createState() => _CategoryWidgetState();
@@ -58,7 +67,9 @@ class _CategoryWidgetState extends State<CategoryWidget> {
     _categories = [allCategory];
 
     _initCategoriesData();
-    _startAutoScroll();
+    if (widget.isActive) {
+      _startAutoScroll();
+    }
   }
 
   @override
@@ -67,6 +78,17 @@ class _CategoryWidgetState extends State<CategoryWidget> {
     if (widget.pullRefreshKey > 0 &&
         widget.pullRefreshKey != oldWidget.pullRefreshKey) {
       _fetchCategories(fromRefresh: true);
+    }
+    if (widget.isActive != oldWidget.isActive) {
+      if (widget.isActive) {
+        if (_autoScrollTimer == null) {
+          _startAutoScroll();
+        }
+      } else {
+        // Screen hidden behind another tab — stop ticking in the background.
+        _autoScrollTimer?.cancel();
+        _autoScrollTimer = null;
+      }
     }
   }
 

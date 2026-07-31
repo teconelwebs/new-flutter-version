@@ -86,6 +86,14 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
   bool _recoveringVideo = false;
   double _progress = 0;
   bool _draggingProgress = false;
+  // Progress ticks many times/sec while playing — route it through a
+  // ValueNotifier so only the progress bar rebuilds, not the whole reel Stack.
+  final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(0.0);
+
+  void _updateProgress(double value) {
+    _progress = value;
+    _progressNotifier.value = value;
+  }
 
   @override
   void initState() {
@@ -107,6 +115,7 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
   @override
   void dispose() {
     _controller?.removeListener(_onVideoTick);
+    _progressNotifier.dispose();
     super.dispose();
   }
 
@@ -130,7 +139,7 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
         _paused = false;
         _deactivatePlayback();
         widget.pool.stop(widget.reel.id);
-        if (mounted) setState(() => _progress = 0);
+        if (mounted) setState(() => _updateProgress(0));
       }
     } else if (widget.openCommentsOnStart &&
         !oldWidget.openCommentsOnStart &&
@@ -219,7 +228,7 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
         await c.seekTo(Duration.zero);
         if (mounted) {
           setState(() {
-            _progress = 0;
+            _updateProgress(0);
             _playbackStarted = false;
           });
         }
@@ -254,7 +263,7 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
         }
         setState(() {
           _initialized = true;
-          _progress = 0;
+          _updateProgress(0);
         });
       }
       if (c.value.isPlaying && !_playbackStarted) {
@@ -274,7 +283,9 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
     if (durMs <= 0) return;
     final next = (c.value.position.inMilliseconds / durMs).clamp(0.0, 1.0);
     if ((next - _progress).abs() >= 0.003) {
-      setState(() => _progress = next);
+      // No setState here on purpose — only the progress bar (via
+      // ValueListenableBuilder) should rebuild on every playback tick.
+      _updateProgress(next);
     }
   }
 
@@ -285,19 +296,19 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
     if (dur.inMilliseconds <= 0) return;
     final target = Duration(milliseconds: (value * dur.inMilliseconds).round());
     await c.seekTo(target);
-    if (mounted) setState(() => _progress = value.clamp(0.0, 1.0));
+    if (mounted) setState(() => _updateProgress(value.clamp(0.0, 1.0)));
   }
 
   void _onProgressSeekStart(double value) {
     setState(() {
       _draggingProgress = true;
-      _progress = value.clamp(0.0, 1.0);
+      _updateProgress(value.clamp(0.0, 1.0));
     });
   }
 
   void _onProgressSeekUpdate(double value) {
     if (!_draggingProgress) return;
-    setState(() => _progress = value.clamp(0.0, 1.0));
+    setState(() => _updateProgress(value.clamp(0.0, 1.0)));
   }
 
   Future<void> _onProgressSeekEnd() async {
@@ -345,7 +356,7 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
         setState(() {
           _initialized = true;
           _playbackStarted = controller.value.isPlaying;
-          _progress = 0;
+          _updateProgress(0);
         });
       }
     } else {
@@ -370,7 +381,7 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
     _controller = null;
     _initialized = false;
     _playbackStarted = false;
-    _progress = 0;
+    _updateProgress(0);
 
     await Future<void>.delayed(Duration(milliseconds: fallback != null ? 300 : 800));
     if (!mounted) {
@@ -405,7 +416,7 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
     _controller = null;
     _initialized = false;
     _playbackStarted = false;
-    _progress = 0;
+    _updateProgress(0);
   }
 
   Future<void> _fetchProducts() async {
@@ -981,12 +992,17 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
           left: layout.safeLeft,
           right: layout.safeRight,
           bottom: layout.progressBarBottom,
-          child: ReelProgressBar(
-            progress: _progress,
-            visible: widget.isActive && _initialized && _controller != null,
-            onSeekStart: _onProgressSeekStart,
-            onSeekUpdate: _onProgressSeekUpdate,
-            onSeekEnd: _onProgressSeekEnd,
+          child: ValueListenableBuilder<double>(
+            valueListenable: _progressNotifier,
+            builder: (context, progress, _) {
+              return ReelProgressBar(
+                progress: progress,
+                visible: widget.isActive && _initialized && _controller != null,
+                onSeekStart: _onProgressSeekStart,
+                onSeekUpdate: _onProgressSeekUpdate,
+                onSeekEnd: _onProgressSeekEnd,
+              );
+            },
           ),
         ),
         if (_toast != null)

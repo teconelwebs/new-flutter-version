@@ -13,10 +13,15 @@ double _safeBannerAspectRatio(double? ratio, {double fallback = 3.0}) {
 
 class BannerWidget extends StatefulWidget {
   final List<HomeBanner> slides;
+  /// Pauses the auto-advance animation while this screen is hidden behind
+  /// another tab (e.g. IndexedStack keeps it mounted). Defaults to true so
+  /// existing call sites keep their current behavior.
+  final bool isActive;
 
   const BannerWidget({
     super.key,
     required this.slides,
+    this.isActive = true,
   });
 
   @override
@@ -52,7 +57,9 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
 
     _slides = widget.slides;
     _precalculateAspectRatios();
-    _startAutoCarousel();
+    if (widget.isActive) {
+      _startAutoCarousel();
+    }
   }
 
   @override
@@ -64,7 +71,17 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
         _activePage = 0;
       });
       _precalculateAspectRatios();
-      _startAutoCarousel();
+      if (widget.isActive) {
+        _startAutoCarousel();
+      }
+    }
+    if (widget.isActive != oldWidget.isActive) {
+      if (widget.isActive) {
+        _startAutoCarousel();
+      } else {
+        // Screen hidden behind another tab — stop ticking in the background.
+        _progressController.stop();
+      }
     }
   }
 
@@ -218,6 +235,12 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
                                 fit: BoxFit.cover,
                                 fadeInDuration: Duration.zero,
                                 fadeOutDuration: Duration.zero,
+                                // Cap decoded resolution to screen width — avoids
+                                // holding full-size banner bitmaps in memory.
+                                memCacheWidth:
+                                    (MediaQuery.of(context).size.width *
+                                            MediaQuery.of(context).devicePixelRatio)
+                                        .round(),
                                 placeholder: (context, url) => const ShimmerLoading(
                                   borderRadius: BorderRadius.all(Radius.circular(12)),
                                 ),

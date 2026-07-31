@@ -591,6 +591,7 @@ class _HomeScreenState extends State<HomeScreen>
                     bundleFuture: _bundleFuture,
                     displayCity: _displayCity,
                     displayPincode: _displayPincode,
+                    isActive: _currentIndex == 0,
                     onLocationTap: () {
                       if (_isGuest) {
                         Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
@@ -909,6 +910,10 @@ class _HomeTab extends StatefulWidget {
   final String? displayCity;
   final String? displayPincode;
   final VoidCallback? onLocationTap;
+  /// True only when the Home tab is the currently visible tab. Used to pause
+  /// background timers/animations (placeholder rotation, category auto-scroll)
+  /// while this tab is hidden behind another tab in the IndexedStack.
+  final bool isActive;
 
   const _HomeTab({
     required this.onSearch,
@@ -920,6 +925,7 @@ class _HomeTab extends StatefulWidget {
     this.displayCity,
     this.displayPincode,
     this.onLocationTap,
+    this.isActive = true,
   });
 
   @override
@@ -1083,10 +1089,14 @@ class _HomeTabState extends State<_HomeTab> {
                     child: CategoryWidget(
                       pullRefreshKey: _pullRefreshKey,
                       onTabChange: widget.onTabChange,
+                      isActive: widget.isActive,
                     ),
                   ),
                   SliverToBoxAdapter(
-                    child: BannerWidget(slides: bundle.mobileSlider),
+                    child: BannerWidget(
+                      slides: bundle.mobileSlider,
+                      isActive: widget.isActive,
+                    ),
                   ),
                   if (_recentProducts.isNotEmpty)
                     SliverToBoxAdapter(
@@ -1230,6 +1240,7 @@ class _HomeTabState extends State<_HomeTab> {
               city: widget.displayCity ?? bundle.city,
               pincode: widget.displayPincode ?? bundle.pincode,
               isGuest: widget.isGuest,
+              isActive: widget.isActive,
               onSearchTap: widget.onSearch,
               promptLogin: widget.promptLogin,
               onLocationTap: widget.onLocationTap,

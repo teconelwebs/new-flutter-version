@@ -696,6 +696,7 @@ class PlayProfileHelper {
       }
 
       if (anyMap != null) {
+        // ignore: unused_local_variable
         final username = (anyMap['username'] ?? '').toString();
         final id = (anyMap['_id'] ?? '').toString();
         if (isValidObjectId(id)) {

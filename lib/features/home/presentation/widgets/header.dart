@@ -22,6 +22,10 @@ class Header extends StatefulWidget {
   final VoidCallback? onSearchTap;
   final VoidCallback? promptLogin;
   final VoidCallback? onLocationTap;
+  /// Pauses the placeholder rotation timer/animation while this screen is
+  /// hidden behind another tab (e.g. IndexedStack keeps it mounted).
+  /// Defaults to true so existing call sites keep their current behavior.
+  final bool isActive;
 
   // ignore: use_super_parameters
   const Header({
@@ -37,6 +41,7 @@ class Header extends StatefulWidget {
     this.onSearchTap,
     this.promptLogin,
     this.onLocationTap,
+    this.isActive = true,
   }) : super(key: key);
 
   @override
@@ -86,12 +91,31 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_fadeController);
     _fadeController.value = 1.0; // Start fully visible
 
-    _startPlaceholderRotation();
+    if (widget.isActive) {
+      _startPlaceholderRotation();
+    }
     _fetchUnreadNotificationsCount();
 
     // Scroll listeners for dynamic scaling/slide-up
     if (widget.scrollController != null) {
       widget.scrollController!.addListener(_onScroll);
+    }
+  }
+
+  @override
+  void didUpdateWidget(Header oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive != oldWidget.isActive) {
+      if (widget.isActive) {
+        // Resume only if not already running (avoid double timers).
+        if (_placeholderTimer == null) {
+          _startPlaceholderRotation();
+        }
+      } else {
+        // Screen hidden behind another tab — stop ticking in the background.
+        _placeholderTimer?.cancel();
+        _placeholderTimer = null;
+      }
     }
   }
 
