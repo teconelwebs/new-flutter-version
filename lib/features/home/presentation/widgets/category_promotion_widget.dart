@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/utils/persistent_image_cache_manager.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
 import '../../../../core/network/axios_instance.dart';
 import '../../../../core/constants/app_routes.dart';
@@ -356,6 +357,7 @@ class _CategoryPromotionWidgetState extends State<CategoryPromotionWidget> {
                     height: double.infinity,
                     fadeInDuration: Duration.zero,
                     fadeOutDuration: Duration.zero,
+                    cacheManager: PersistentImageCacheManager.instance,
                     placeholder: (context, url) => const ShimmerLoading(
                       borderRadius: BorderRadius.all(Radius.circular(16)),
                     ),
@@ -637,6 +639,7 @@ class _PromoSectionSliderState extends State<_PromoSectionSlider> with TickerPro
                               height: double.infinity,
                               fadeInDuration: Duration.zero,
                               fadeOutDuration: Duration.zero,
+                              cacheManager: PersistentImageCacheManager.instance,
                               placeholder: (context, url) => const ShimmerLoading(
                                 borderRadius: BorderRadius.all(Radius.circular(16)),
                               ),

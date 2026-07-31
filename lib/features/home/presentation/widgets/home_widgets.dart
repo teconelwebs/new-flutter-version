@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/utils/persistent_image_cache_manager.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
 
 import '../../data/home_models.dart';
@@ -335,6 +336,9 @@ class _BannerCarouselState extends State<BannerCarousel> with TickerProviderStat
                         fit: BoxFit.cover,
                         fadeInDuration: Duration.zero,
                         fadeOutDuration: Duration.zero,
+                        // Application-Support-backed cache — avoids iOS purging
+                        // the default temp-dir cache and re-downloading.
+                        cacheManager: PersistentImageCacheManager.instance,
                         placeholder: (context, url) => const ShimmerLoading(
                           borderRadius: BorderRadius.all(Radius.circular(12)),
                         ),

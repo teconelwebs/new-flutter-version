@@ -63,9 +63,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, RouteAware {
   int _currentIndex = 0;
   int _previousIndex = 0;
+  // True while a screen (e.g. product details) is pushed on top of Home.
+  // Plain Timer.periodic loops (unlike AnimationController tickers) keep
+  // firing even while a route is covered/offstage, so this flag is used to
+  // explicitly pause Home's background timers/animations until the user
+  // comes back — avoiding a rebuild/paint burst on the final "back to Home".
+  bool _routeCovered = false;
   String _shareReelId = '';
   final HomeApiService _homeApi = HomeApiService();
   late Future<HomeBundle> _bundleFuture;
@@ -213,10 +219,38 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      play.appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void didPushNext() {
+    // A new screen (e.g. product details) was pushed on top of Home.
+    if (mounted && !_routeCovered) {
+      debugPrint('⏸️ [HomeScreen] covered by a pushed route — pausing background timers/animations');
+      setState(() => _routeCovered = true);
+    }
+  }
+
+  @override
+  void didPopNext() {
+    // Back to Home — resume paused timers/animations.
+    if (mounted && _routeCovered) {
+      debugPrint('▶️ [HomeScreen] back on top — resuming background timers/animations');
+      setState(() => _routeCovered = false);
+    }
+  }
+
+  @override
   void dispose() {
     if (HomeScreen.activeState == this) {
       HomeScreen.activeState = null;
     }
+    play.appRouteObserver.unsubscribe(this);
     play.customClosePlayCallback = null;
     // Keep homeReady true during brief rebuilds; routing no longer depends on it.
     _subConnectivity?.cancel();
@@ -591,7 +625,7 @@ class _HomeScreenState extends State<HomeScreen>
                     bundleFuture: _bundleFuture,
                     displayCity: _displayCity,
                     displayPincode: _displayPincode,
-                    isActive: _currentIndex == 0,
+                    isActive: _currentIndex == 0 && !_routeCovered,
                     onLocationTap: () {
                       if (_isGuest) {
                         Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
@@ -603,9 +637,17 @@ class _HomeScreenState extends State<HomeScreen>
                         _,
                       ) async {
                         await _loadActiveAddressFromPrefs();
-                        setState(() {
-                          _bundleFuture = _fetchBundleWithPincodeTracking();
-                        });
+                        // Only refetch the whole home bundle when the pincode
+                        // actually changed — same guard used on tab-switch —
+                        // otherwise every back-from-address hits the API again.
+                        final prefs = await SharedPreferences.getInstance();
+                        final savedPincode =
+                            prefs.getString('postal_code') ?? '302001';
+                        if (savedPincode != _loadedPincode) {
+                          setState(() {
+                            _bundleFuture = _fetchBundleWithPincodeTracking();
+                          });
+                        }
                       });
                     },
                     onRefresh: () async {
