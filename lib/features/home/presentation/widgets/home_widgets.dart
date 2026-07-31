@@ -151,9 +151,14 @@ class BannerCarousel extends StatefulWidget {
   const BannerCarousel({
     super.key,
     required this.items,
+    this.isActive = true,
   });
 
   final List<HomeBanner> items;
+  /// Pauses the auto-advance progress animation while this screen is hidden
+  /// behind another tab (e.g. IndexedStack keeps it mounted). Defaults to
+  /// true so existing call sites keep their current behavior.
+  final bool isActive;
 
   @override
   State<BannerCarousel> createState() => _BannerCarouselState();
@@ -182,7 +187,9 @@ class _BannerCarouselState extends State<BannerCarousel> with TickerProviderStat
     _progressAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_progressController);
     _progressController.addStatusListener(_onProgressStatusChanged);
     _precalculateAspectRatios();
-    _startProgressFill();
+    if (widget.isActive) {
+      _startProgressFill();
+    }
   }
 
   List<HomeBanner> get _validItems =>
@@ -198,7 +205,17 @@ class _BannerCarouselState extends State<BannerCarousel> with TickerProviderStat
         _controller.jumpToPage(0);
       }
       _precalculateAspectRatios();
-      _startProgressFill();
+      if (widget.isActive) {
+        _startProgressFill();
+      }
+    }
+    if (widget.isActive != oldWidget.isActive) {
+      if (widget.isActive) {
+        _startProgressFill();
+      } else {
+        // Screen hidden behind another tab — stop ticking in the background.
+        _progressController.stop();
+      }
     }
   }
 

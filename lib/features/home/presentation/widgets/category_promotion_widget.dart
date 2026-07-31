@@ -86,8 +86,16 @@ class PromotionDataItem {
 
 class CategoryPromotionWidget extends StatefulWidget {
   final String categoryId;
+  /// Pauses the inner promo-slider animation while this screen is hidden
+  /// behind another tab (e.g. IndexedStack keeps it mounted). Defaults to
+  /// true so existing call sites keep their current behavior.
+  final bool isActive;
 
-  const CategoryPromotionWidget({super.key, required this.categoryId});
+  const CategoryPromotionWidget({
+    super.key,
+    required this.categoryId,
+    this.isActive = true,
+  });
 
   @override
   State<CategoryPromotionWidget> createState() => _CategoryPromotionWidgetState();
@@ -437,7 +445,10 @@ class _CategoryPromotionWidgetState extends State<CategoryPromotionWidget> {
                 if (defaultPromos.length == 1)
                   _buildPromoItem(defaultPromos.first)
                 else
-                  _PromoSectionSlider(items: defaultPromos),
+                  _PromoSectionSlider(
+                    items: defaultPromos,
+                    isActive: widget.isActive,
+                  ),
               ],
               if (htmlPromos.isNotEmpty)
                 ...htmlPromos.map(_buildPromoItem),
@@ -451,8 +462,9 @@ class _CategoryPromotionWidgetState extends State<CategoryPromotionWidget> {
 
 class _PromoSectionSlider extends StatefulWidget {
   final List<PromotionDataItem> items;
+  final bool isActive;
 
-  const _PromoSectionSlider({required this.items});
+  const _PromoSectionSlider({required this.items, this.isActive = true});
 
   @override
   State<_PromoSectionSlider> createState() => _PromoSectionSliderState();
@@ -477,7 +489,22 @@ class _PromoSectionSliderState extends State<_PromoSectionSlider> with TickerPro
     );
     _progressAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_progressController);
     _progressController.addStatusListener(_onProgressStatusChanged);
-    _startProgressFill();
+    if (widget.isActive) {
+      _startProgressFill();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _PromoSectionSlider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive != oldWidget.isActive) {
+      if (widget.isActive) {
+        _startProgressFill();
+      } else {
+        // Screen hidden behind another tab — stop ticking in the background.
+        _progressController.stop();
+      }
+    }
   }
 
   void _onProgressStatusChanged(AnimationStatus status) {

@@ -1188,9 +1188,16 @@ class _HomeTabState extends State<_HomeTab> {
                         ),
                       ),
                     ),
-                  ...sections.map(
-                    (s) => SliverToBoxAdapter(
-                      child: Column(
+                  // Lazy-built per section (was an eager .map spread) — with many
+                  // categories, eagerly building every section meant every
+                  // BannerCarousel's animation ran simultaneously even when
+                  // scrolled far off-screen, causing raster jank. Now a section
+                  // (and its carousel) only mounts once it's near the viewport.
+                  SliverList.builder(
+                    itemCount: sections.length,
+                    itemBuilder: (context, index) {
+                      final s = sections[index];
+                      return Column(
                         children: [
                           if (s.products.isNotEmpty)
                             Padding(
@@ -1223,12 +1230,18 @@ class _HomeTabState extends State<_HomeTab> {
                           if (s.bannerData.isNotEmpty)
                             Padding(
                               padding: const EdgeInsets.only(top: 10),
-                              child: BannerCarousel(items: s.bannerData),
+                              child: BannerCarousel(
+                                items: s.bannerData,
+                                isActive: widget.isActive,
+                              ),
                             ),
-                          CategoryPromotionWidget(categoryId: s.id),
+                          CategoryPromotionWidget(
+                            categoryId: s.id,
+                            isActive: widget.isActive,
+                          ),
                         ],
-                      ),
-                    ),
+                      );
+                    },
                   ),
                   const SliverToBoxAdapter(child: SizedBox(height: 20)),
                 ],

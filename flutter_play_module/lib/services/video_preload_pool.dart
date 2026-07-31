@@ -92,21 +92,21 @@ class VideoPreloadPool {
         final response = await http.head(Uri.parse(url));
         final sizeHeader = response.headers['content-length'];
         if (sizeHeader != null) {
-          final sizeInBytes = int.tryParse(sizeHeader) ?? 0;
-          final sizeInMb = sizeInBytes / (1024 * 1024);
+          // final sizeInBytes = int.tryParse(sizeHeader) ?? 0;
+          // final sizeInMb = sizeInBytes / (1024 * 1024);
           
           // ignore: avoid_print
           print('--------------------------------------------------');
           // ignore: avoid_print
-          print('📹 [VideoPreloadPool] VIDEO PRELOAD REPORT');
+          // print('📹 [VideoPreloadPool] VIDEO PRELOAD REPORT');
           // ignore: avoid_print
-          print('   • Original Video File Size: ${sizeInMb.toStringAsFixed(3)} MB');
+          // print('   • Original Video File Size: ${sizeInMb.toStringAsFixed(3)} MB');
           // ignore: avoid_print
-          print('   • Playback Compression: Streaming at S3 compressed size.');
+          // print('   • Playback Compression: Streaming at S3 compressed size.');
           // ignore: avoid_print
-          print('   • URL: $url');
+          // print('   • URL: $url');
           // ignore: avoid_print
-          print('--------------------------------------------------');
+          // print('--------------------------------------------------');
         }
       } catch (e) {
         debugPrint('⚠️ [VideoPreloadPool] failed to fetch video size: $e');
