@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class CashfreeWebViewPage extends StatefulWidget {
@@ -48,6 +51,20 @@ class _CashfreeWebViewPageState extends State<CashfreeWebViewPage> {
               Navigator.of(context).pop(true);
               return NavigationDecision.prevent;
             }
+
+            // Android's WebView (unlike iOS's WKWebView) does not forward
+            // non-http(s) URL schemes (upi://, intent://, tez://, phonepe://,
+            // paytmmp://, etc.) to the OS on its own — Cashfree's page relies
+            // on that to open a specific UPI app. So on Android we detect
+            // these and launch them natively; iOS keeps its existing
+            // behaviour untouched since it doesn't have this issue.
+            final scheme = Uri.tryParse(url)?.scheme.toLowerCase() ?? '';
+            final isHttp = scheme == 'http' || scheme == 'https';
+            if (Platform.isAndroid && !isHttp && scheme.isNotEmpty) {
+              _launchExternalUrl(url);
+              return NavigationDecision.prevent;
+            }
+
             return NavigationDecision.navigate;
           },
         ),
@@ -94,6 +111,25 @@ class _CashfreeWebViewPageState extends State<CashfreeWebViewPage> {
 ''';
 
     _controller.loadHtmlString(html, baseUrl: 'https://api.welfog.com');
+  }
+
+  Future<void> _launchExternalUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No UPI app found to handle this payment.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No UPI app found to handle this payment.')),
+        );
+      }
+    }
   }
 
   @override
