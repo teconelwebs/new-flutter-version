@@ -82,10 +82,12 @@ class _CategoryWidgetState extends State<CategoryWidget> {
     if (widget.isActive != oldWidget.isActive) {
       if (widget.isActive) {
         if (_autoScrollTimer == null) {
+          debugPrint('▶️ [CategoryWidget] resuming auto-scroll timer');
           _startAutoScroll();
         }
       } else {
         // Screen hidden behind another tab — stop ticking in the background.
+        debugPrint('⏸️ [CategoryWidget] pausing auto-scroll timer');
         _autoScrollTimer?.cancel();
         _autoScrollTimer = null;
       }

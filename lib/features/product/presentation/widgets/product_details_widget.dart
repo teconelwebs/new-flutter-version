@@ -398,14 +398,6 @@ class _ProductDetailsWidgetState extends State<ProductDetailsWidget> {
           widget.data['stock'] ?? widget.data['product']?['stock'] ?? 0;
       stock = int.tryParse(rawStock.toString()) ?? 0;
     }
-    debugPrint('=== WELFOG DEBUG ===');
-    debugPrint("Product ID: ${widget.data['id']}");
-    debugPrint("slug: ${widget.data['slug']}");
-    debugPrint("stock: ${widget.data['stock']}");
-    debugPrint("product.stock: ${widget.data['product']?['stock']}");
-    debugPrint("stocks: ${widget.data['stocks']}");
-    debugPrint("Evaluated Stock: $stock");
-    debugPrint('====================');
     final bool isOutOfStock = stock <= 0;
 
     final String stockStatusText;

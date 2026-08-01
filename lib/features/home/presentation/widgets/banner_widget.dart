@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/utils/persistent_image_cache_manager.dart';
 import '../../../../core/widgets/shimmer_loading.dart';
 import '../../data/home_models.dart';
 
@@ -235,6 +236,10 @@ class _BannerWidgetState extends State<BannerWidget> with TickerProviderStateMix
                                 fit: BoxFit.cover,
                                 fadeInDuration: Duration.zero,
                                 fadeOutDuration: Duration.zero,
+                                // Application-Support-backed cache — avoids iOS
+                                // purging the default temp-dir cache and
+                                // re-downloading the same banner repeatedly.
+                                cacheManager: PersistentImageCacheManager.instance,
                                 // Cap decoded resolution to screen width — avoids
                                 // holding full-size banner bitmaps in memory.
                                 memCacheWidth:
