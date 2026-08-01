@@ -78,7 +78,7 @@ class HelpCenterScreen extends StatelessWidget {
       {
         'title': 'Email',
         'label': 'info@welfog.com',
-        'link': 'mailto:info@welfog.com',
+        'link': null,
       },
     ];
 

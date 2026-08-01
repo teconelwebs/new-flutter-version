@@ -227,6 +227,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 TextField(
                   controller: _nameCtrl,
                   textCapitalization: TextCapitalization.words,
+                  maxLength: 50,
+                  buildCounter: (ctx, {required currentLength, required isFocused, maxLength}) => null,
                   decoration: _inputDecoration('Your name'),
                 ),
                 const SizedBox(height: 14),
@@ -241,6 +243,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 TextField(
                   controller: _emailCtrl,
                   keyboardType: TextInputType.emailAddress,
+                  maxLength: 50,
+                  buildCounter: (ctx, {required currentLength, required isFocused, maxLength}) => null,
                   decoration: _inputDecoration('Email address'),
                 ),
                 const SizedBox(height: 14),

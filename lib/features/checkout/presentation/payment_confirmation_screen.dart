@@ -777,15 +777,19 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
 
   // Called by the native SDK on failure/cancellation. We still verify
   // server-side (a debit could have gone through even if the SDK reports an
-  // error), and only fall back to the raw error message if verification
-  // doesn't confirm a paid order.
+  // error). The SDK's own raw message (e.g. "Action has been cancelled")
+  // is only logged for debugging — we always surface a consistent
+  // "Transaction has been failed" message to the user instead, since the
+  // exact SDK wording can be misleading (e.g. sounds like nothing happened
+  // even when the order should be treated as failed).
   void _onCashfreeNativePaymentError(
       CFErrorResponse errorResponse, String orderId) {
-    debugPrint(
-        '[PaymentConfirmation] Cashfree native payment error: ${errorResponse.getMessage()}');
+    debugPrint('[PaymentConfirmation] Cashfree native payment error: '
+        'status=${errorResponse.getStatus()} code=${errorResponse.getCode()} '
+        'type=${errorResponse.getType()} message=${errorResponse.getMessage()}');
     _verifyAndFinalizeOrder(
       orderId,
-      fallbackErrorMessage: errorResponse.getMessage(),
+      fallbackErrorMessage: 'Transaction has been failed. Please try again.',
     );
   }
 

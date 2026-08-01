@@ -82,8 +82,8 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
 
     if (message.isEmpty) {
       _errors['message'] = 'Please enter your message';
-    } else if (message.length > 150) {
-      _errors['message'] = 'Message cannot exceed 150 characters';
+    } else if (message.length > 300) {
+      _errors['message'] = 'Message cannot exceed 300 characters';
     }
 
     final correctCaptcha = _captchaNum1 + _captchaNum2;
@@ -402,6 +402,16 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
               controller: controller,
               keyboardType: keyboardType,
               maxLines: multiline ? 4 : 1,
+              maxLength: errorKey == 'name'
+                  ? 50
+                  : errorKey == 'email'
+                      ? 50
+                      : errorKey == 'phone'
+                          ? 10
+                          : errorKey == 'message'
+                              ? 300
+                              : null,
+              buildCounter: (ctx, {required currentLength, required isFocused, maxLength}) => null,
               decoration: InputDecoration(
                 hintText: placeholder,
                 hintStyle: const TextStyle(color: Color(0xFF888888), fontSize: 14),
