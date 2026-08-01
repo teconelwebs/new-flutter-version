@@ -2,11 +2,18 @@
 // Converted from: app/(tabs)/Checkout2.tsx
 
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_cashfree_pg_sdk/api/cferrorresponse/cferrorresponse.dart';
+import 'package:flutter_cashfree_pg_sdk/api/cfpayment/cfwebcheckoutpayment.dart';
+import 'package:flutter_cashfree_pg_sdk/api/cfpaymentgateway/cfpaymentgatewayservice.dart';
+import 'package:flutter_cashfree_pg_sdk/api/cfsession/cfsession.dart';
+import 'package:flutter_cashfree_pg_sdk/utils/cfenums.dart';
+import 'package:flutter_cashfree_pg_sdk/utils/cfexceptions.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/state/cart_state.dart';
@@ -54,10 +61,24 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
   String? _addressId;
   bool _showAllProducts = false;
 
+  // Android-only: Cashfree's official native SDK is used instead of the
+  // generic webview (see CashfreeWebViewPage) because Android's WebView +
+  // Cashfree JS checkout combo doesn't reliably surface the UPI-app-intent
+  // list — only the native SDK's own payment activity does that correctly.
+  // iOS keeps using CashfreeWebViewPage untouched.
+  final CFPaymentGatewayService _cfPaymentGatewayService =
+      CFPaymentGatewayService();
+
   @override
   void initState() {
     super.initState();
     _generateCaptcha();
+    if (Platform.isAndroid) {
+      _cfPaymentGatewayService.setCallback(
+        _onCashfreeNativePaymentVerify,
+        _onCashfreeNativePaymentError,
+      );
+    }
   }
 
   @override
@@ -673,12 +694,18 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
             );
           }
         } else if (_selectedPayment == 'pay_online') {
-          // Cashfree online redirection fallback using clean Webview model mock/trigger
           final String sessionId = resData['payment_session_id'] ?? '';
           final String orderId =
               resData['transaction_id'] ?? resData['order_id'] ?? '';
 
-          _launchCashfreeWebViewFlow(sessionId, orderId);
+          if (Platform.isAndroid) {
+            // Native Cashfree SDK — opens Cashfree's own payment activity
+            // with proper UPI-app-intent support.
+            await _launchCashfreeNativeFlow(sessionId, orderId);
+          } else {
+            // iOS — unchanged webview + JS checkout flow.
+            _launchCashfreeWebViewFlow(sessionId, orderId);
+          }
         }
       }
     } catch (e) {
@@ -701,7 +728,75 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
       ),
     );
 
-    // If the webview closed, check payment status
+    // Webview closed (user completed/cancelled/dismissed it) — always verify
+    // with the backend, since that's the only source of truth for payment
+    // status regardless of what happened client-side.
+    await _verifyAndFinalizeOrder(orderId);
+  }
+
+  // Android only. Opens Cashfree's native payment activity (proper UPI
+  // app-intent support, cards, netbanking, etc.) via the official SDK.
+  // Result arrives asynchronously through _onCashfreeNativePaymentVerify /
+  // _onCashfreeNativePaymentError, registered once in initState.
+  Future<void> _launchCashfreeNativeFlow(
+      String sessionId, String orderId) async {
+    if (sessionId.isEmpty || orderId.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Unable to start payment. Please try again.';
+        });
+      }
+      return;
+    }
+
+    try {
+      final session = CFSessionBuilder()
+          .setEnvironment(CFEnvironment.PRODUCTION)
+          .setOrderId(orderId)
+          .setPaymentSessionId(sessionId)
+          .build();
+      final cfWebCheckout =
+          CFWebCheckoutPaymentBuilder().setSession(session).build();
+      _cfPaymentGatewayService.doPayment(cfWebCheckout);
+    } on CFException catch (e) {
+      debugPrint('[PaymentConfirmation] Cashfree native SDK error: ${e.message}');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to launch payment. Please try again.';
+        });
+      }
+    }
+  }
+
+  // Called by the native SDK once the user completes the native checkout
+  // flow (success on Cashfree's side). We still verify server-side before
+  // treating the order as paid — same rule as the webview flow.
+  void _onCashfreeNativePaymentVerify(String orderId) {
+    _verifyAndFinalizeOrder(orderId);
+  }
+
+  // Called by the native SDK on failure/cancellation. We still verify
+  // server-side (a debit could have gone through even if the SDK reports an
+  // error), and only fall back to the raw error message if verification
+  // doesn't confirm a paid order.
+  void _onCashfreeNativePaymentError(
+      CFErrorResponse errorResponse, String orderId) {
+    debugPrint(
+        '[PaymentConfirmation] Cashfree native payment error: ${errorResponse.getMessage()}');
+    _verifyAndFinalizeOrder(
+      orderId,
+      fallbackErrorMessage: errorResponse.getMessage(),
+    );
+  }
+
+  // Shared by both the webview (iOS) and native SDK (Android) flows: hits
+  // the backend to confirm the real payment status, then either finalizes
+  // the order (clears cart, navigates to success) or surfaces an error.
+  Future<void> _verifyAndFinalizeOrder(
+    String orderId, {
+    String? fallbackErrorMessage,
+  }) async {
+    if (!mounted) return;
     setState(() {
       _isPlacingOrder = true;
       _errorMessage = '';
@@ -751,18 +846,21 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
           }
         } else {
           setState(() {
-            _errorMessage = 'Payment unsuccessful. Please try another method.';
+            _errorMessage = fallbackErrorMessage ??
+                'Payment unsuccessful. Please try another method.';
           });
         }
       } else {
         setState(() {
-          _errorMessage = 'Unable to verify payment. Please try again.';
+          _errorMessage = fallbackErrorMessage ??
+              'Unable to verify payment. Please try again.';
         });
       }
     } catch (e) {
       debugPrint('Payment verification error: $e');
       setState(() {
-        _errorMessage = 'Unable to verify payment. Please try again.';
+        _errorMessage = fallbackErrorMessage ??
+            'Unable to verify payment. Please try again.';
       });
     } finally {
       if (mounted) {
