@@ -278,12 +278,19 @@ class _BannerCarouselState extends State<BannerCarousel> with TickerProviderStat
     final items = _validItems;
     for (int i = 0; i < items.length; i++) {
       final imgUrl = items[i].image;
-      final image = NetworkImage(imgUrl);
+      // Use CachedNetworkImageProvider so aspect-ratio resolution hits the
+      // same PersistentImageCacheManager disk cache as the display widget —
+      // avoids a redundant network round-trip on every cold start.
+      final image = CachedNetworkImageProvider(
+        imgUrl,
+        cacheManager: PersistentImageCacheManager.instance,
+      );
       image.resolve(const ImageConfiguration()).addListener(
         ImageStreamListener((ImageInfo info, bool _) {
-          final ratio = info.image.height > 0
-              ? info.image.width / info.image.height
-              : 3.0;
+          final w = info.image.width;
+          final h = info.image.height;
+          debugPrint('[Home] Banner #$i actual size: ${w}×${h}px | url: $imgUrl');
+          final ratio = h > 0 ? w / h : 3.0;
           if (mounted) {
             setState(() => _aspectRatios[i] = _safeBannerAspectRatio(ratio));
           }
@@ -431,11 +438,19 @@ class _PromoBannerImageState extends State<PromoBannerImage> {
 
   void _loadAspectRatio() {
     if (widget.imageUrl.trim().isEmpty) return;
-    final image = NetworkImage(widget.imageUrl);
+    // Use CachedNetworkImageProvider so the aspect-ratio resolution reuses
+    // the PersistentImageCacheManager disk cache — no extra network hit.
+    final image = CachedNetworkImageProvider(
+      widget.imageUrl,
+      cacheManager: PersistentImageCacheManager.instance,
+    );
     image.resolve(const ImageConfiguration()).addListener(
       ImageStreamListener((ImageInfo info, bool _) {
-        if (info.image.height <= 0) return;
-        final ratio = info.image.width / info.image.height;
+        final w = info.image.width;
+        final h = info.image.height;
+        debugPrint('[Home] PromoBanner actual size: ${w}×${h}px | url: ${widget.imageUrl}');
+        if (h <= 0) return;
+        final ratio = w / h;
         if (mounted && ratio.isFinite && ratio > 0) {
           setState(() => _aspectRatio = ratio);
         }
@@ -463,6 +478,7 @@ class _PromoBannerImageState extends State<PromoBannerImage> {
             fit: BoxFit.cover,
             fadeInDuration: Duration.zero,
             fadeOutDuration: Duration.zero,
+            cacheManager: PersistentImageCacheManager.instance,
             placeholder: (context, url) => const ShimmerLoading(
               borderRadius: BorderRadius.all(Radius.circular(10)),
             ),
@@ -748,6 +764,12 @@ class _HomeProductCardState extends State<HomeProductCard> {
     final discount = p.mrp > p.price && p.price > 0
         ? (((p.mrp - p.price) / p.mrp) * 100).round()
         : 0;
+
+    final displayPx = (widget.cardWidth ?? 0).toInt();
+    debugPrint('[Home] Product card "${p.name}" (id:${p.id})'
+        ' | display: ${displayPx}×${displayPx}px'
+        ' | memCacheWidth: 250px'
+        ' | url: ${p.image}');
 
     final contentSection = Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 9),
