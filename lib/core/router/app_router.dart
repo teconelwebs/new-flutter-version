@@ -37,6 +37,7 @@ import '../../features/account/presentation/supplier_info_screen.dart';
 import '../../features/account/presentation/connect_supplier_screen.dart';
 import '../../features/product/presentation/recently_viewed_screen.dart';
 import '../constants/app_routes.dart';
+import '../deeplink/deep_link_service.dart';
 import '../../features/shop/presentation/shop_screen.dart';
 // TEMP: Chat AI route disabled — uncomment with AppRoutes.chatAi case.
 // import '../../features/chat_ai/presentation/chat_ai_screen.dart';
@@ -66,12 +67,16 @@ class AppRouter {
         : (name.startsWith('/') ? name : '/$name');
     final uri = Uri.tryParse(normalizedName);
     if (uri != null) {
-      final segments = uri.pathSegments;
-      final productsIdx = segments.indexOf('products');
-      if (productsIdx != -1 && segments.length > productsIdx + 1) {
-        final slug = segments[productsIdx + 1];
-        if (slug.isNotEmpty) {
-          final trimmed = slug.trim();
+      // Reuses the same product-slug resolution rules as the AppLinks
+      // listener in HomeScreen (see DeepLinkService), so this special-case
+      // parsing for raw-URL route names (e.g. nav.pushNamed('/products/x'))
+      // doesn't duplicate the pattern-matching logic in two places. The
+      // dedupe checks below are unchanged from before this refactor.
+      final resolution = DeepLinkService.resolve(uri);
+      if (resolution.action == DeepLinkAction.pushRoute &&
+          resolution.routeName == AppRoutes.product) {
+        final trimmed = resolution.arguments as String? ?? '';
+        if (trimmed.isNotEmpty) {
           if (trimmed == ProductScreen.currentlyVisibleSlug) {
             debugPrint('DeepLink Router: Slug $trimmed is already visible, ignoring push.');
             return null;

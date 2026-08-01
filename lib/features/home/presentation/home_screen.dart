@@ -16,6 +16,7 @@ import '../../../core/widgets/view_cart_banner.dart';
 import 'package:app_links/app_links.dart';
 import '../../account/presentation/account_screen.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/deeplink/deep_link_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/storage/session_store.dart';
 import '../../../core/state/cart_state.dart';
@@ -354,74 +355,75 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _handleUriRouting(Uri uri) {
-    final segments = uri.pathSegments;
-    if (segments.isEmpty) return;
+    if (uri.pathSegments.isEmpty) return;
 
-    debugPrint('DeepLink: Received $uri, segments: $segments');
+    debugPrint('DeepLink: Received $uri, segments: ${uri.pathSegments}');
 
-    final productsIdx = segments.indexOf('products');
-    if (productsIdx != -1 && segments.length > productsIdx + 1) {
-      final slug = segments[productsIdx + 1];
-      if (slug.isNotEmpty) {
-        final trimmed = slug.trim();
-        if (trimmed == ProductScreen.currentlyVisibleSlug) {
-          debugPrint(
-              'DeepLink: ProductScreen for slug $trimmed is already visible, skipping push.');
+    final resolution = DeepLinkService.resolve(uri);
+
+    switch (resolution.action) {
+      case DeepLinkAction.none:
+        debugPrint('DeepLink: No matching in-app destination for $uri');
+        return;
+
+      case DeepLinkAction.playReel:
+        final reelId = resolution.reelId ?? '';
+        if (reelId.isEmpty) return;
+        // Preserves the exact existing product-share dedupe behaviour —
+        // untouched from before this refactor.
+        debugPrint('DeepLink: Parsed play reel ID: $reelId');
+        if (mounted) {
+          setState(() {
+            _shareReelId = reelId;
+            _currentIndex = 2; // Switch to Play tab
+          });
+          _updateStatusBarColor();
+        }
+        return;
+
+      case DeepLinkAction.pushRoute:
+        final routeName = resolution.routeName;
+        if (routeName == null) return;
+
+        // Product route keeps its original, dedicated dedupe checks
+        // (ProductScreen.currentlyVisibleSlug + AppRouter.shouldIgnoreSlug)
+        // exactly as before this refactor — untouched.
+        if (routeName == AppRoutes.product) {
+          final slug = resolution.arguments as String?;
+          if (slug == null || slug.isEmpty) return;
+          if (slug == ProductScreen.currentlyVisibleSlug) {
+            debugPrint(
+                'DeepLink: ProductScreen for slug $slug is already visible, skipping push.');
+            return;
+          }
+          if (AppRouter.shouldIgnoreSlug(slug)) {
+            debugPrint('DeepLink: Skip duplicate push for slug: $slug');
+            return;
+          }
+          if (!mounted) return;
+          Navigator.of(context).pushNamed(routeName, arguments: slug);
           return;
         }
-        if (AppRouter.shouldIgnoreSlug(trimmed)) {
-          debugPrint('DeepLink: Skip duplicate push for slug: $trimmed');
+
+        // Home (either "https://welfog.com/" or "/dashboard") — this
+        // listener already lives inside HomeScreen, so there's nothing to
+        // push; just avoid stacking a duplicate HomeScreen on top of
+        // itself.
+        if (routeName == AppRoutes.home) {
+          debugPrint('DeepLink: Already on Home — no navigation needed.');
+          return;
+        }
+
+        // All other new website-link routes share one generalized
+        // duplicate-push guard (see DeepLinkService.shouldIgnore).
+        if (DeepLinkService.shouldIgnore(resolution)) {
+          debugPrint('DeepLink: Skip duplicate push for $routeName');
           return;
         }
         if (!mounted) return;
-        Navigator.of(context).pushNamed(
-          AppRoutes.product,
-          arguments: trimmed,
-        );
-      }
-      return;
-    }
-
-    // Play/Video Share deep links:
-    // Pattern 1: /api/plays/r/{reelId}-{shareUserId} or /plays/r/{reelId}-{shareUserId}
-    // Pattern 2: /api/plays/dl/reel/{reelId}/user/{shareUserId}
-    // Pattern 3: /sepreel/{reelId}
-    String parsedReelId = '';
-
-    final playReelIdx = segments.indexOf('r');
-    if (playReelIdx != -1 &&
-        playReelIdx > 0 &&
-        segments[playReelIdx - 1] == 'plays' &&
-        segments.length > playReelIdx + 1) {
-      final slug = segments[playReelIdx + 1];
-      final match =
-          RegExp(r'^([0-9a-fA-F]{24})-([a-zA-Z0-9]+)$').firstMatch(slug);
-      if (match != null) {
-        parsedReelId = match.group(1) ?? '';
-      }
-    } else if (segments.contains('plays') &&
-        segments.contains('dl') &&
-        segments.contains('reel')) {
-      final reelIdx = segments.indexOf('reel');
-      if (reelIdx != -1 && segments.length > reelIdx + 1) {
-        parsedReelId = segments[reelIdx + 1];
-      }
-    } else if (segments.contains('sepreel')) {
-      final sepIdx = segments.indexOf('sepreel');
-      if (sepIdx != -1 && segments.length > sepIdx + 1) {
-        parsedReelId = segments[sepIdx + 1];
-      }
-    }
-
-    if (parsedReelId.isNotEmpty) {
-      debugPrint('DeepLink: Parsed play reel ID: $parsedReelId');
-      if (mounted) {
-        setState(() {
-          _shareReelId = parsedReelId;
-          _currentIndex = 2; // Switch to Play tab
-        });
-        _updateStatusBarColor();
-      }
+        Navigator.of(context)
+            .pushNamed(routeName, arguments: resolution.arguments);
+        return;
     }
   }
 

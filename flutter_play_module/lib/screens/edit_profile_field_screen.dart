@@ -69,10 +69,11 @@ class _EditProfileFieldScreenState extends State<EditProfileFieldScreen> {
       };
 
   int? get _maxLength => switch (widget.field) {
+        ProfileEditField.name => 50,
+        ProfileEditField.email => 50,
         ProfileEditField.mobile => 10,
         ProfileEditField.bio => 150,
         ProfileEditField.username => 30,
-        _ => null,
       };
 
   int get _maxLines => widget.field == ProfileEditField.bio ? 5 : 1;
