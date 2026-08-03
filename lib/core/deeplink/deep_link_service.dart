@@ -5,7 +5,7 @@ import '../constants/app_routes.dart';
 /// What the app should do with a resolved deep link.
 enum DeepLinkAction { pushRoute, playReel, none }
 
-/// Pure result of resolving an incoming [Uri] (from https://welfog.com/...,
+/// Pure result of resolving an incoming [Uri] (from https://www.welfog.com/...,
 /// welfog://..., or api.welfog.com/products/...) to an in-app destination.
 ///
 /// This is a plain data object — no BuildContext/Navigator/setState here —
@@ -71,7 +71,7 @@ class DeepLinkService {
     final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
 
     if (segments.isEmpty) {
-      // https://welfog.com/ — nothing to navigate to, caller is already
+      // https://www.welfog.com/ — nothing to navigate to, caller is already
       // expected to be on/near Home.
       return DeepLinkResolution.route(AppRoutes.home);
     }

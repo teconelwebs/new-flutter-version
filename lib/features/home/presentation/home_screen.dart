@@ -405,7 +405,7 @@ class _HomeScreenState extends State<HomeScreen>
           return;
         }
 
-        // Home (either "https://welfog.com/" or "/dashboard") — this
+        // Home (either "https://www.welfog.com/" or "/dashboard") — this
         // listener already lives inside HomeScreen, so there's nothing to
         // push; just avoid stacking a duplicate HomeScreen on top of
         // itself.

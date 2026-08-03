@@ -1,0 +1,32 @@
+nginx.conf 
+
+# Ye rule assetlinks file ko redirect hone se rokega
+location ^~ /.well-known/assetlinks.json {
+    default_type application/json;
+    root /var/www/welfog;  # Yahan website ke actual root folder ka path aayega
+    allow all;
+}
+
+
+.htaccess
+
+RewriteEngine On
+
+# 1. Pehle check karo ki URL assetlinks.json TOH NAHI hai
+RewriteCond %{REQUEST_URI} !^/\.well-known/assetlinks\.json [NC]
+
+# 2. Phir check karo ki bina 'www' wala domain hai
+RewriteCond %{HTTP_HOST} ^welfog\.com$ [NC]
+
+# 3. Agar upar ki dono baatein true hain, tabhi 'www' par bhejo
+RewriteRule ^(.*)$ https://www.welfog.com/$1 [R=301,L]
+
+
+server.js & app.js
+
+// Ye line baki kisi bhi redirect ya middleware se pehle aani chahiye
+app.get('/.well-known/assetlinks.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    // File ko directly 200 OK ke sath serve kar do
+    res.status(200).sendFile(__dirname + '/public/.well-known/assetlinks.json');
+});

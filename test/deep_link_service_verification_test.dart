@@ -5,95 +5,95 @@ import 'package:welfog/core/constants/app_routes.dart';
 void main() {
   test('all provided website links resolve to the expected route', () {
     final cases = <String, Map<String, dynamic>>{
-      'https://welfog.com/': {
+      'https://www.welfog.com/': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.home,
       },
-      'https://welfog.com/product_details/26197118/bhagat-singh-photo-frame-home-decor-photo-frame-9x12-inch-photo-frame-bhagat-singh-ki-frame-26197118':
+      'https://www.welfog.com/product_details/26197118/bhagat-singh-photo-frame-home-decor-photo-frame-9x12-inch-photo-frame-bhagat-singh-ki-frame-26197118':
           {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.product,
         'arguments':
             'bhagat-singh-photo-frame-home-decor-photo-frame-9x12-inch-photo-frame-bhagat-singh-ki-frame-26197118',
       },
-      'https://welfog.com/shop/sharma-enterprises-jpr-1760?id=384': {
+      'https://www.welfog.com/shop/sharma-enterprises-jpr-1760?id=384': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.shop,
         'arguments': {'slug': 'sharma-enterprises-jpr-1760', 'shop_id': '384'},
       },
-      'https://welfog.com/search?keyword=text': {
+      'https://www.welfog.com/search?keyword=text': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.searchResults,
         'arguments': {'query': 'text'},
       },
-      'https://welfog.com/cart': {
+      'https://www.welfog.com/cart': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.cart,
       },
-      'https://welfog.com/checkout?=delivery_address': {
+      'https://www.welfog.com/checkout?=delivery_address': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.confirmAddress,
       },
-      'https://welfog.com/process_to_payment?make_payment': {
+      'https://www.welfog.com/process_to_payment?make_payment': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.paymentConfirmation,
       },
-      'https://welfog.com/dashboard': {
+      'https://www.welfog.com/dashboard': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.home,
       },
-      'https://welfog.com/account/orders': {
+      'https://www.welfog.com/account/orders': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.orders,
       },
-      'https://welfog.com/account/order_details?id=2608012': {
+      'https://www.welfog.com/account/order_details?id=2608012': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.orderDetails,
         'arguments': {'oid': '2608012'},
       },
-      'https://welfog.com/account/addresses': {
+      'https://www.welfog.com/account/addresses': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.address,
       },
-      'https://welfog.com/account/wishlist': {
+      'https://www.welfog.com/account/wishlist': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.wishlist,
       },
-      'https://welfog.com/help': {
+      'https://www.welfog.com/help': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.helpCenter,
       },
-      'https://welfog.com/faqs/': {
+      'https://www.welfog.com/faqs/': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.faq,
       },
-      'https://welfog.com/track_order/': {
+      'https://www.welfog.com/track_order/': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.trackOrder,
       },
-      'https://welfog.com/contact': {
+      'https://www.welfog.com/contact': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.contactSupport,
       },
-      'https://welfog.com/about': {
+      'https://www.welfog.com/about': {
         'action': DeepLinkAction.none,
       },
-      'https://welfog.com/page/terms-and-conditions': {
+      'https://www.welfog.com/page/terms-and-conditions': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.policy,
         'arguments': 'terms-and-conditions',
       },
-      'https://welfog.com/page/anti-phishing-defense-policy': {
+      'https://www.welfog.com/page/anti-phishing-defense-policy': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.policy,
         'arguments': 'anti-phishing-defense-policy',
       },
-      'https://welfog.com/page/privacy-policy': {
+      'https://www.welfog.com/page/privacy-policy': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.policy,
         'arguments': 'privacy-policy',
       },
-      'https://welfog.com/notifications': {
+      'https://www.welfog.com/notifications': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.notifications,
       },
@@ -124,12 +124,12 @@ void main() {
     expect(productResult.arguments, 'some-product-slug');
 
     final playR = DeepLinkService.resolve(
-        Uri.parse('https://welfog.com/plays/r/6a36555a7751b49fd61dfcc0-abc123'));
+        Uri.parse('https://www.welfog.com/plays/r/6a36555a7751b49fd61dfcc0-abc123'));
     expect(playR.action, DeepLinkAction.playReel);
     expect(playR.reelId, '6a36555a7751b49fd61dfcc0');
 
     final playDl = DeepLinkService.resolve(
-        Uri.parse('https://welfog.com/api/plays/dl/reel/665f2a/user/9'));
+        Uri.parse('https://www.welfog.com/api/plays/dl/reel/665f2a/user/9'));
     expect(playDl.action, DeepLinkAction.playReel);
     expect(playDl.reelId, '665f2a');
 
