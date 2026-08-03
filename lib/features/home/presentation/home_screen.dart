@@ -343,11 +343,17 @@ class _HomeScreenState extends State<HomeScreen>
       debugPrint('DeepLink Error: $err');
     });
 
-    // 2. Handle initial link if app was launched from cold state
+    // 2. Handle initial link if app was launched from cold state.
+    // Wrapped in addPostFrameCallback so the Navigator is fully mounted
+    // before we attempt pushNamed — without this, pushRoute actions silently
+    // fail on cold-start while playReel (which uses setState) appears to
+    // "work", causing all cold-start links to land on the Play tab.
     try {
       final initialUri = await appLinks.getInitialLink();
       if (initialUri != null) {
-        _handleUriRouting(initialUri);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _handleUriRouting(initialUri);
+        });
       }
     } catch (e) {
       debugPrint('DeepLink Initial Link Error: $e');
@@ -406,11 +412,22 @@ class _HomeScreenState extends State<HomeScreen>
         }
 
         // Home (either "https://www.welfog.com/" or "/dashboard") — this
-        // listener already lives inside HomeScreen, so there's nothing to
-        // push; just avoid stacking a duplicate HomeScreen on top of
-        // itself.
+        // listener already lives inside HomeScreen, so no pushNamed needed.
+        // Always switch to tab 0 (Home). If a ?tab= argument was passed,
+        // switch to that specific tab instead.
         if (routeName == AppRoutes.home) {
-          debugPrint('DeepLink: Already on Home — no navigation needed.');
+          final args = resolution.arguments;
+          final tabIndex = (args is Map && args['tab'] is int)
+              ? args['tab'] as int
+              : 0; // default: Home tab
+          debugPrint('DeepLink: Switching to tab $tabIndex from home/dashboard link.');
+          if (mounted) {
+            setState(() {
+              if (_currentIndex != 2) _previousIndex = _currentIndex;
+              _currentIndex = tabIndex;
+            });
+            _updateStatusBarColor();
+          }
           return;
         }
 

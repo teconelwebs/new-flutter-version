@@ -163,7 +163,20 @@ class DeepLinkService {
         return DeepLinkResolution.route(AppRoutes.paymentConfirmation);
 
       case 'dashboard':
-        return DeepLinkResolution.route(AppRoutes.home);
+        // /dashboard?tab=profile → switch to account tab (index 4)
+        // /dashboard?tab=play    → switch to play tab   (index 2)
+        // /dashboard             → stay on home tab     (index 0)
+        final tab = uri.queryParameters['tab'] ?? '';
+        switch (tab) {
+          case 'profile':
+            return DeepLinkResolution.route(AppRoutes.home,
+                arguments: {'tab': 4});
+          case 'play':
+            return DeepLinkResolution.route(AppRoutes.home,
+                arguments: {'tab': 2});
+          default:
+            return DeepLinkResolution.route(AppRoutes.home);
+        }
 
       case 'account':
         if (segments.length >= 2) {
