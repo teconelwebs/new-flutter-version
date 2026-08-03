@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:video_player/video_player.dart';
 import 'package:v_video_compressor/v_video_compressor.dart';
-import 'package:ffmpeg_kit_flutter_new_min_gpl/ffmpeg_kit.dart';
+import "package:ffmpeg_kit_flutter_new_min_gpl/ffmpeg_kit.dart";
 import 'package:ffmpeg_kit_flutter_new_min_gpl/return_code.dart';
 
 import '../../models/music_track.dart';
@@ -30,8 +30,10 @@ const _kPurple = Color(0xFF7B4FFF);
 const _kPurple2 = Color(0xFF9B6FFF);
 const _kPurpleText = Color(0xFFB494FF);
 const _kWhite = Colors.white;
+
 /// Shared height for Trim / Music / Reset panels (max; shrinks on small screens).
 const _kEditPanelHeight = 152.0;
+
 /// Fixed chrome below video — keeps controls aligned on every screen size.
 const _kProgressBarHeight = 3.0;
 
@@ -61,7 +63,8 @@ class VideoEditStep extends StatefulWidget {
   State<VideoEditStep> createState() => _VideoEditStepState();
 }
 
-class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateMixin {
+class _VideoEditStepState extends State<VideoEditStep>
+    with TickerProviderStateMixin {
   late UploadDraft _draft;
 
   VideoPlayerController? _videoController;
@@ -87,7 +90,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
 
   // Volume state
   double _musicVolume = 1.0;
-  double _originalVolume = 1.0; // video/original audio; muted when music overlay is added
+  double _originalVolume =
+      1.0; // video/original audio; muted when music overlay is added
 
   // Playback progress for timeline scrubber
   int _playPositionMs = 0;
@@ -109,14 +113,17 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
     _originalVolume = _draft.originalVolume;
     _restoreMusicFromDraft();
 
-    _playFadeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
-    _playFadeAnim = CurvedAnimation(parent: _playFadeCtrl, curve: Curves.easeOut);
+    _playFadeCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 350));
+    _playFadeAnim =
+        CurvedAnimation(parent: _playFadeCtrl, curve: Curves.easeOut);
 
     // Audio context MUST be configured before any audio operation.
     // _initVideo is chained after so audio session is always ready first.
     // catchError ensures video always initialises even if setAudioContext()
     // fails (e.g. on some Android versions when launched from React Native).
-    _sync.configureAudioContext()
+    _sync
+        .configureAudioContext()
         .then((_) => _sync.bindPlayer())
         .then((_) => _initVideo())
         .catchError((_) => _initVideo());
@@ -146,7 +153,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
       if (!mounted) return;
       final durationMs = controller.value.duration.inMilliseconds;
       if (_draft.videoDurationMs <= 0 && durationMs > 0) {
-        _draft.videoEndMs = durationMs.clamp(UploadDraft.minVideoMs, UploadDraft.maxVideoMs);
+        _draft.videoEndMs =
+            durationMs.clamp(UploadDraft.minVideoMs, UploadDraft.maxVideoMs);
       }
       _coverScrubMs = _draft.videoStartMs;
       await controller.seekTo(Duration(milliseconds: _draft.videoStartMs));
@@ -205,7 +213,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
           if (!mounted || !_isMusicTrimming) return;
           final ph = audioPos == null
               ? 0
-              : (audioPos.inMilliseconds - _draft.musicStartMs).clamp(0, _videoClipMs);
+              : (audioPos.inMilliseconds - _draft.musicStartMs)
+                  .clamp(0, _videoClipMs);
           if (ph != _musicPlayheadMs || !_showMusicPlayhead) {
             setState(() {
               _musicPlayheadMs = ph;
@@ -213,7 +222,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
             });
           }
         });
-      } else if (c.value.isPlaying || _audioPlayer.state == PlayerState.playing) {
+      } else if (c.value.isPlaying ||
+          _audioPlayer.state == PlayerState.playing) {
         playhead = (pos - _draft.videoStartMs).clamp(0, _videoClipMs);
         showPlayhead = true;
       } else {
@@ -241,7 +251,12 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
   }
 
   void _onVideoTick() {
-    if (_isVideoTrimming || _isMusicTrimming || _isLooping || _isStartingPlayback) return;
+    if (_isVideoTrimming ||
+        _isMusicTrimming ||
+        _isLooping ||
+        _isStartingPlayback) {
+      return;
+    }
     final controller = _videoController;
     if (controller == null || !controller.value.isInitialized) return;
 
@@ -262,7 +277,9 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
             )
             .whenComplete(() => _isLooping = false);
       } else {
-        controller.seekTo(Duration(milliseconds: _draft.videoStartMs)).then((_) {
+        controller
+            .seekTo(Duration(milliseconds: _draft.videoStartMs))
+            .then((_) {
           controller.play();
           _isLooping = false;
         });
@@ -325,7 +342,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
                 color: Color(0xFFFFF4E5),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.help_outline_rounded, color: Color(0xFFfb5204), size: 32),
+              child: const Icon(Icons.help_outline_rounded,
+                  color: Color(0xFFfb5204), size: 32),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -340,7 +358,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
             const SizedBox(height: 10),
             const Text(
               'If you go back now, your trim, music, and cover changes will be lost.',
-              style: TextStyle(fontSize: 14, color: Color(0xFF6B7280), height: 1.45),
+              style: TextStyle(
+                  fontSize: 14, color: Color(0xFF6B7280), height: 1.45),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 22),
@@ -350,9 +369,12 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(ctx, false),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 8),
-                      side: const BorderSide(color: Color(0xFF111827), width: 1.5),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 11, horizontal: 8),
+                      side: const BorderSide(
+                          color: Color(0xFF111827), width: 1.5),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                     child: const Text(
                       'Continue Editing',
@@ -372,8 +394,10 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
                     onPressed: () => Navigator.pop(ctx, true),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFdc2626),
-                      padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 11, horizontal: 8),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                     child: const Text(
                       'Discard',
@@ -526,7 +550,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
   }
 
   // ── Cover ───────────────────────────────────
-  Future<void> _generateCoverAt(int timeMs, {bool resumePlayback = true}) async {
+  Future<void> _generateCoverAt(int timeMs,
+      {bool resumePlayback = true}) async {
     final controller = _videoController;
     if (controller == null || !controller.value.isInitialized) {
       // Fallback: Generate thumbnail natively from the video file directly
@@ -534,7 +559,10 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
       try {
         final extractTimeMs = timeMs.clamp(0, _draft.effectiveDurationMs);
         // Avoid initial black frames by shifting 0ms extracts to 1000ms if video is long enough
-        final targetTimeMs = (extractTimeMs == 0 && _draft.effectiveDurationMs > 1500) ? 1000 : extractTimeMs;
+        final targetTimeMs =
+            (extractTimeMs == 0 && _draft.effectiveDurationMs > 1500)
+                ? 1000
+                : extractTimeMs;
 
         VVideoThumbnailResult? result;
         try {
@@ -547,7 +575,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
             ),
           );
         } catch (e1) {
-          debugPrint("⚠️ Native getVideoThumbnail failed at $targetTimeMs ms: $e1. Retrying at 0 ms...");
+          debugPrint(
+              "⚠️ Native getVideoThumbnail failed at $targetTimeMs ms: $e1. Retrying at 0 ms...");
           try {
             result = await VVideoCompressor().getVideoThumbnail(
               _draft.videoFile.path,
@@ -558,7 +587,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
               ),
             );
           } catch (e2) {
-            debugPrint("❌ Native getVideoThumbnail fallback at 0 ms also failed: $e2");
+            debugPrint(
+                "❌ Native getVideoThumbnail fallback at 0 ms also failed: $e2");
           }
         }
 
@@ -567,28 +597,33 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
         // If native extraction failed, use FFmpeg software frame extraction
         if (path == null || path.isEmpty) {
           try {
-            debugPrint("🔄 FFmpeg Fallback: Extracting thumbnail using software decoder...");
+            debugPrint(
+                "🔄 FFmpeg Fallback: Extracting thumbnail using software decoder...");
             final dir = await getTemporaryDirectory();
-            final outPath = '${dir.path}/cover_ffmpeg_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            final outPath =
+                '${dir.path}/cover_ffmpeg_${DateTime.now().millisecondsSinceEpoch}.jpg';
             final timeSec = (targetTimeMs / 1000).toStringAsFixed(3);
 
             final session = await FFmpegKit.execute(
-              '-ss $timeSec -i "${_draft.videoFile.path}" -vframes 1 -q:v 3 -y "$outPath"'
-            );
+                '-ss $timeSec -i "${_draft.videoFile.path}" -vframes 1 -q:v 3 -y "$outPath"');
             final returnCode = await session.getReturnCode();
 
-            if (ReturnCode.isSuccess(returnCode) && await File(outPath).exists()) {
+            if (ReturnCode.isSuccess(returnCode) &&
+                await File(outPath).exists()) {
               debugPrint("✅ FFmpeg thumbnail extraction succeeded: $outPath");
               path = outPath;
             } else {
-              debugPrint("❌ FFmpeg extraction failed at $timeSec. Attempting at 0.0s...");
-              final outPathFallback = '${dir.path}/cover_ffmpeg_0_${DateTime.now().millisecondsSinceEpoch}.jpg';
+              debugPrint(
+                  "❌ FFmpeg extraction failed at $timeSec. Attempting at 0.0s...");
+              final outPathFallback =
+                  '${dir.path}/cover_ffmpeg_0_${DateTime.now().millisecondsSinceEpoch}.jpg';
               final sessionFallback = await FFmpegKit.execute(
-                '-ss 0.000 -i "${_draft.videoFile.path}" -vframes 1 -q:v 3 -y "$outPathFallback"'
-              );
+                  '-ss 0.000 -i "${_draft.videoFile.path}" -vframes 1 -q:v 3 -y "$outPathFallback"');
               final codeFallback = await sessionFallback.getReturnCode();
-              if (ReturnCode.isSuccess(codeFallback) && await File(outPathFallback).exists()) {
-                debugPrint("✅ FFmpeg thumbnail fallback at 0s succeeded: $outPathFallback");
+              if (ReturnCode.isSuccess(codeFallback) &&
+                  await File(outPathFallback).exists()) {
+                debugPrint(
+                    "✅ FFmpeg thumbnail fallback at 0s succeeded: $outPathFallback");
                 path = outPathFallback;
               }
             }
@@ -616,7 +651,10 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
     setState(() => _generatingCover = true);
     try {
       final extractTimeMs = timeMs.clamp(0, _draft.effectiveDurationMs);
-      final targetTimeMs = (extractTimeMs == 0 && _draft.effectiveDurationMs > 1500) ? 1000 : extractTimeMs;
+      final targetTimeMs =
+          (extractTimeMs == 0 && _draft.effectiveDurationMs > 1500)
+              ? 1000
+              : extractTimeMs;
 
       try {
         await controller.seekTo(Duration(milliseconds: targetTimeMs));
@@ -632,7 +670,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
         return;
       }
       final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/cover_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      final file = File(
+          '${dir.path}/cover_${DateTime.now().millisecondsSinceEpoch}.jpg');
       await file.writeAsBytes(bytes, flush: true);
       setState(() {
         _draft.coverPath = file.path;
@@ -713,7 +752,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
     await _applyMusicSelection(picked, audioPrimed: result.audioPrimed);
   }
 
-  Future<void> _applyMusicSelection(MusicTrack picked, {required bool audioPrimed}) async {
+  Future<void> _applyMusicSelection(MusicTrack picked,
+      {required bool audioPrimed}) async {
     setState(() {
       _draft.music = picked;
       _musicDurationMs = picked.durationMs > 0 ? picked.durationMs : 180000;
@@ -741,17 +781,20 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
   }
 
   // ── Music math ──────────────────────────────
-  int get _videoClipMs =>
-      (_draft.videoEndMs - _draft.videoStartMs).clamp(UploadDraft.minVideoMs, UploadDraft.maxVideoMs);
+  int get _videoClipMs => (_draft.videoEndMs - _draft.videoStartMs)
+      .clamp(UploadDraft.minVideoMs, UploadDraft.maxVideoMs);
 
-  int _fixedMusicWindowMs() => _videoClipMs.clamp(UploadDraft.minVideoMs, _musicDurationMs);
+  int _fixedMusicWindowMs() =>
+      _videoClipMs.clamp(UploadDraft.minVideoMs, _musicDurationMs);
 
   int _clipMusicEnd(int startMs) {
     final window = _fixedMusicWindowMs();
-    return (startMs + window).clamp(startMs + UploadDraft.minVideoMs, _musicDurationMs);
+    return (startMs + window)
+        .clamp(startMs + UploadDraft.minVideoMs, _musicDurationMs);
   }
 
-  int _maxMusicStartMs() => (_musicDurationMs - _fixedMusicWindowMs()).clamp(0, _musicDurationMs);
+  int _maxMusicStartMs() =>
+      (_musicDurationMs - _fixedMusicWindowMs()).clamp(0, _musicDurationMs);
 
   void _normalizeMusicTrim() {
     _draft.musicStartMs = _draft.musicStartMs.clamp(0, _maxMusicStartMs());
@@ -834,7 +877,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
     await _haltSyncedPlayback();
     setState(() {
       _draft.videoStartMs = 0;
-      _draft.videoEndMs = _draft.effectiveDurationMs.clamp(UploadDraft.minVideoMs, UploadDraft.maxVideoMs);
+      _draft.videoEndMs = _draft.effectiveDurationMs
+          .clamp(UploadDraft.minVideoMs, UploadDraft.maxVideoMs);
       _draft.music = null;
       _musicDurationMs = 0;
       _draft.musicStartMs = 0;
@@ -865,8 +909,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
     try {
       await _haltSyncedPlayback();
       _syncDraftVolumes();
-      
-      // Temporarily dispose the video controller to free up native hardware decoder resources 
+
+      // Temporarily dispose the video controller to free up native hardware decoder resources
       // before initializing the next preview controller in _goToPosting.
       final activeController = _videoController;
       if (activeController != null) {
@@ -874,7 +918,7 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
         await activeController.dispose();
         _videoController = null;
       }
-      
+
       await widget.onNext(_draft);
     } catch (_) {
       // Re-initialize controller if onNext fails so the user can continue editing
@@ -891,7 +935,7 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
         } catch (e) {
           debugPrint("⚠️ Failed to re-initialize video controller: $e");
         }
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -993,8 +1037,10 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
                       SliderTheme(
                         data: SliderTheme.of(context).copyWith(
                           trackHeight: 3,
-                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
-                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                          thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 9),
+                          overlayShape:
+                              const RoundSliderOverlayShape(overlayRadius: 16),
                           activeTrackColor: _kPurple,
                           inactiveTrackColor: Colors.white12,
                           thumbColor: _kPurple2,
@@ -1006,7 +1052,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
                           onChanged: (v) async {
                             scrub = v.round();
                             setModalState(() {});
-                            await sheetController.seekTo(Duration(milliseconds: scrub));
+                            await sheetController
+                                .seekTo(Duration(milliseconds: scrub));
                           },
                         ),
                       ),
@@ -1017,7 +1064,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
                           children: [
                             Text(
                               formatMillis(_draft.videoStartMs),
-                              style: const TextStyle(color: Colors.white38, fontSize: 12),
+                              style: const TextStyle(
+                                  color: Colors.white38, fontSize: 12),
                             ),
                             Text(
                               formatMillis(scrub),
@@ -1029,7 +1077,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
                             ),
                             Text(
                               formatMillis(_draft.videoEndMs),
-                              style: const TextStyle(color: Colors.white38, fontSize: 12),
+                              style: const TextStyle(
+                                  color: Colors.white38, fontSize: 12),
                             ),
                           ],
                         ),
@@ -1047,7 +1096,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
                                   await _generateCoverAt(scrub);
                                   if (ctx.mounted) Navigator.pop(ctx);
                                 },
-                          label: _generatingCover ? 'Saving…' : 'Use this frame',
+                          label:
+                              _generatingCover ? 'Saving…' : 'Use this frame',
                         ),
                       ),
                     ],
@@ -1148,7 +1198,8 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
       },
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final panelHeight = (constraints.maxHeight * 0.21).clamp(128.0, _kEditPanelHeight);
+          final panelHeight =
+              (constraints.maxHeight * 0.21).clamp(128.0, _kEditPanelHeight);
 
           return Stack(
             children: [
@@ -1213,162 +1264,179 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
     return Stack(
       fit: StackFit.expand,
       children: [
-          GestureDetector(
-            onTap: _togglePlayback,
-            child: ColoredBox(
-              color: Colors.black,
-              child: _playerInitFailed
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        if (_draft.coverPath != null && File(_draft.coverPath!).existsSync()) ...[
-                          Image.file(File(_draft.coverPath!), fit: BoxFit.cover),
-                          Positioned(
-                            bottom: 16,
-                            left: 16,
-                            right: 16,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.7),
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.visibility_off_outlined, size: 16, color: Colors.white70),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Preview Mode: Tap Next to Upload directly',
-                                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
-                              ),
+        GestureDetector(
+          onTap: _togglePlayback,
+          child: ColoredBox(
+            color: Colors.black,
+            child: _playerInitFailed
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (_draft.coverPath != null &&
+                          File(_draft.coverPath!).existsSync()) ...[
+                        Image.file(File(_draft.coverPath!), fit: BoxFit.cover),
+                        Positioned(
+                          bottom: 16,
+                          left: 16,
+                          right: 16,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(30),
                             ),
-                          ),
-                        ] else ...[
-                          Center(
-                            child: Column(
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
                               mainAxisAlignment: MainAxisAlignment.center,
-                              children: const [
-                                Icon(Icons.video_collection_outlined, size: 48, color: Colors.white54),
-                                SizedBox(height: 12),
+                              children: [
+                                Icon(Icons.visibility_off_outlined,
+                                    size: 16, color: Colors.white70),
+                                SizedBox(width: 8),
                                 Text(
-                                  'Preview not available for this format.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Tap Next to proceed and upload directly.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                                  'Preview Mode: Tap Next to Upload directly',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600),
                                 ),
                               ],
                             ),
                           ),
-                        ],
-                      ],
-                    )
-                  : (_videoReady && controller != null)
-                      ? Screenshot(
-                          controller: _screenshotController,
-                          child: FittedBox(
-                            fit: BoxFit.cover,
-                            alignment: Alignment.center,
-                            child: SizedBox(
-                              width: controller.value.size.width > 0
-                                  ? controller.value.size.width
-                                  : 1080,
-                              height: controller.value.size.height > 0
-                                  ? controller.value.size.height
-                                  : 1920,
-                              child: VideoPlayer(controller),
-                            ),
-                          ),
-                        )
-                      : const Center(
-                          child: CircularProgressIndicator(color: _kPurple, strokeWidth: 2),
                         ),
-            ),
+                      ] else ...[
+                        Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.video_collection_outlined,
+                                  size: 48, color: Colors.white54),
+                              SizedBox(height: 12),
+                              Text(
+                                'Preview not available for this format.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Tap Next to proceed and upload directly.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  )
+                : (_videoReady && controller != null)
+                    ? Screenshot(
+                        controller: _screenshotController,
+                        child: FittedBox(
+                          fit: BoxFit.cover,
+                          alignment: Alignment.center,
+                          child: SizedBox(
+                            width: controller.value.size.width > 0
+                                ? controller.value.size.width
+                                : 1080,
+                            height: controller.value.size.height > 0
+                                ? controller.value.size.height
+                                : 1920,
+                            child: VideoPlayer(controller),
+                          ),
+                        ),
+                      )
+                    : const Center(
+                        child: CircularProgressIndicator(
+                            color: _kPurple, strokeWidth: 2),
+                      ),
           ),
+        ),
 
-          // Top bar: back + time (left), mute (right)
-          Positioned(
-            top: 4,
-            left: 8,
-            right: 8,
-            child: Row(
-              children: [
-                _VideoOverlayIconButton(
-                  icon: Icons.arrow_back_ios_new_rounded,
-                  size: 18,
-                  onTap: _handleBackPress,
+        // Top bar: back + time (left), mute (right)
+        Positioned(
+          top: 4,
+          left: 8,
+          right: 8,
+          child: Row(
+            children: [
+              _VideoOverlayIconButton(
+                icon: Icons.arrow_back_ios_new_rounded,
+                size: 18,
+                onTap: _handleBackPress,
+              ),
+              const SizedBox(width: 8),
+              if (_videoReady && controller != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${formatMillis(_playPositionMs)} / ${formatMillis(_draft.videoEndMs)}',
+                    style: const TextStyle(
+                      color: _kWhite,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 8),
-                if (_videoReady && controller != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              const Spacer(),
+              if (_playerInitFailed) ...[
+                _VideoNextButton(
+                  onTap: _isProcessingNext ? null : _onApply,
+                ),
+              ] else if (_videoReady) ...[
+                _VideoOverlayIconButton(
+                  icon: _muted
+                      ? Icons.volume_off_rounded
+                      : Icons.volume_up_rounded,
+                  size: 18,
+                  onTap: _toggleMute,
+                ),
+                const SizedBox(width: 6),
+                _VideoNextButton(
+                  onTap: _isProcessingNext ? null : _onApply,
+                ),
+              ],
+            ],
+          ),
+        ),
+
+        // Play/Pause overlay
+        if (_showPlayOverlay)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: FadeTransition(
+                opacity: _playFadeAnim,
+                child: Center(
+                  child: Container(
+                    width: 64,
+                    height: 64,
                     decoration: BoxDecoration(
                       color: Colors.black54,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(32),
                     ),
-                    child: Text(
-                      '${formatMillis(_playPositionMs)} / ${formatMillis(_draft.videoEndMs)}',
-                      style: const TextStyle(
-                        color: _kWhite,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                const Spacer(),
-                if (_playerInitFailed) ...[
-                  _VideoNextButton(
-                    onTap: _isProcessingNext ? null : _onApply,
-                  ),
-                ] else if (_videoReady) ...[
-                  _VideoOverlayIconButton(
-                    icon: _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                    size: 18,
-                    onTap: _toggleMute,
-                  ),
-                  const SizedBox(width: 6),
-                  _VideoNextButton(
-                    onTap: _isProcessingNext ? null : _onApply,
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          // Play/Pause overlay
-          if (_showPlayOverlay)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: FadeTransition(
-                  opacity: _playFadeAnim,
-                  child: Center(
-                    child: Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(32),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                        color: _kWhite,
-                        size: 36,
-                      ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      isPlaying
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      color: _kWhite,
+                      size: 36,
                     ),
                   ),
                 ),
               ),
             ),
-        ],
+          ),
+      ],
     );
   }
 
@@ -1513,7 +1581,8 @@ class _VideoProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final clipMs = (endMs - startMs).clamp(1, 1 << 30);
-    final progress = visible ? ((positionMs - startMs) / clipMs).clamp(0.0, 1.0) : 0.0;
+    final progress =
+        visible ? ((positionMs - startMs) / clipMs).clamp(0.0, 1.0) : 0.0;
     return SizedBox(
       height: _kProgressBarHeight,
       width: double.infinity,
@@ -1756,7 +1825,8 @@ class _ResetCard extends StatelessWidget {
             const Text(
               'This will remove all trims and music.\nYour original video stays safe.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.45),
+              style:
+                  TextStyle(color: Colors.white38, fontSize: 12, height: 1.45),
             ),
             const SizedBox(height: 12),
             SizedBox(
@@ -1767,7 +1837,8 @@ class _ResetCard extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.redAccent,
                   side: const BorderSide(color: Colors.redAccent),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text(
                   'Reset',

@@ -78,7 +78,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final profile = _profile;
     if (profile == null || _uploadingPhoto) return;
 
-    final cropped = await pickAndCropProfileImage();
+    File? cropped;
+    try {
+      cropped = await pickAndCropProfileImage();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not pick or crop image. Please try again.')),
+        );
+      }
+      return;
+    }
     if (cropped == null || !mounted) return;
 
     setState(() {

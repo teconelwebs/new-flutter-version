@@ -76,6 +76,12 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Required by image_cropper (uCrop) - without this Android throws
+             ActivityNotFoundException when the crop screen is opened -->
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -228,6 +228,28 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  void _runAfterTransition(VoidCallback callback) {
+    if (!mounted) return;
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      final secondaryAnimation = route.secondaryAnimation;
+      if (secondaryAnimation != null && secondaryAnimation.isAnimating) {
+        void listener(AnimationStatus status) {
+          if (status == AnimationStatus.completed ||
+              status == AnimationStatus.dismissed) {
+            secondaryAnimation.removeStatusListener(listener);
+            if (mounted) {
+              callback();
+            }
+          }
+        }
+        secondaryAnimation.addStatusListener(listener);
+        return;
+      }
+    }
+    callback();
+  }
+
   @override
   void didPushNext() {
     if (mounted && !_routeCovered) {
@@ -238,7 +260,11 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void didPopNext() {
     if (mounted && _routeCovered) {
-      setState(() => _routeCovered = false);
+      _runAfterTransition(() {
+        if (mounted) {
+          setState(() => _routeCovered = false);
+        }
+      });
     }
   }
 
@@ -644,25 +670,29 @@ class _HomeScreenState extends State<HomeScreen>
                     onLocationTap: () {
                       if (_isGuest) {
                         Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
-                          _checkGuestStatus();
+                          _runAfterTransition(() {
+                            _checkGuestStatus();
+                          });
                         });
                         return;
                       }
                       Navigator.of(context).pushNamed(AppRoutes.address).then((
                         _,
                       ) async {
-                        await _loadActiveAddressFromPrefs();
-                        // Only refetch the whole home bundle when the pincode
-                        // actually changed — same guard used on tab-switch —
-                        // otherwise every back-from-address hits the API again.
-                        final prefs = await SharedPreferences.getInstance();
-                        final savedPincode =
-                            prefs.getString('postal_code') ?? '302001';
-                        if (savedPincode != _loadedPincode) {
-                          setState(() {
-                            _bundleFuture = _fetchBundleWithPincodeTracking();
-                          });
-                        }
+                        _runAfterTransition(() async {
+                          await _loadActiveAddressFromPrefs();
+                          // Only refetch the whole home bundle when the pincode
+                          // actually changed — same guard used on tab-switch —
+                          // otherwise every back-from-address hits the API again.
+                          final prefs = await SharedPreferences.getInstance();
+                          final savedPincode =
+                              prefs.getString('postal_code') ?? '302001';
+                          if (savedPincode != _loadedPincode) {
+                            setState(() {
+                              _bundleFuture = _fetchBundleWithPincodeTracking();
+                            });
+                          }
+                        });
                       });
                     },
                     onRefresh: () async {
@@ -678,7 +708,9 @@ class _HomeScreenState extends State<HomeScreen>
                     isGuest: _isGuest,
                     promptLogin: () {
                       Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
-                        _checkGuestStatus();
+                        _runAfterTransition(() {
+                          _checkGuestStatus();
+                        });
                       });
                     },
                     onTabChange: (index) async {
@@ -914,9 +946,11 @@ class _HomeScreenState extends State<HomeScreen>
                   },
                   isGuest: _isGuest,
                   cartCount: cartCount,
-                  promptLogin: () {
+                   promptLogin: () {
                     Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
-                      _checkGuestStatus(); // Check guest status again when returning from Login
+                      _runAfterTransition(() {
+                        _checkGuestStatus(); // Check guest status again when returning from Login
+                      });
                     });
                   },
                   clearGuestMode: () async {
@@ -1005,6 +1039,28 @@ class _HomeTabState extends State<_HomeTab> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _runAfterTransition(VoidCallback callback) {
+    if (!mounted) return;
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      final secondaryAnimation = route.secondaryAnimation;
+      if (secondaryAnimation != null && secondaryAnimation.isAnimating) {
+        void listener(AnimationStatus status) {
+          if (status == AnimationStatus.completed ||
+              status == AnimationStatus.dismissed) {
+            secondaryAnimation.removeStatusListener(listener);
+            if (mounted) {
+              callback();
+            }
+          }
+        }
+        secondaryAnimation.addStatusListener(listener);
+        return;
+      }
+    }
+    callback();
   }
 
   double _toDouble(dynamic val) {
@@ -1149,13 +1205,12 @@ class _HomeTabState extends State<_HomeTab> {
                       isActive: widget.isActive,
                     ),
                   ),
-                  // TEMP: banners commented out for lag testing
-                  // SliverToBoxAdapter(
-                  //   child: BannerWidget(
-                  //     slides: bundle.mobileSlider,
-                  //     isActive: widget.isActive,
-                  //   ),
-                  // ),
+                  SliverToBoxAdapter(
+                    child: BannerWidget(
+                      slides: bundle.mobileSlider,
+                      isActive: widget.isActive,
+                    ),
+                  ),
                   if (_recentProducts.isNotEmpty)
                     SliverToBoxAdapter(
                       child: Padding(
@@ -1172,34 +1227,33 @@ class _HomeTabState extends State<_HomeTab> {
                                     _recentProducts.indexOf(p),
                                   ),
                                 )
-                                .then((_) => _loadRecentlyViewed());
+                                .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
                           },
                           onRightIconTap: () {
                             Navigator.of(context)
                                 .pushNamed(AppRoutes.recentlyViewed)
-                                .then((_) => _loadRecentlyViewed());
+                                .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
                           },
                         ),
                       ),
                     ),
-                  // TEMP: banners commented out for lag testing
-                  // if (bundle.banner1.isNotEmpty)
-                  //   SliverToBoxAdapter(
-                  //     child: Padding(
-                  //       padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-                  //       child: Column(
-                  //         children: bundle.banner1
-                  //             .where((b) => b.image.trim().isNotEmpty)
-                  //             .map(
-                  //               (b) => Padding(
-                  //                 padding: const EdgeInsets.only(bottom: 10),
-                  //                 child: PromoBannerImage(imageUrl: b.image),
-                  //               ),
-                  //             )
-                  //             .toList(),
-                  //       ),
-                  //     ),
-                  //   ),
+                  if (bundle.banner1.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                        child: Column(
+                          children: bundle.banner1
+                              .where((b) => b.image.trim().isNotEmpty)
+                              .map(
+                                (b) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: PromoBannerImage(imageUrl: b.image),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
+                    ),
                   const SliverToBoxAdapter(child: TrustStrip()),
                   SliverToBoxAdapter(
                     child: Padding(
@@ -1219,35 +1273,34 @@ class _HomeTabState extends State<_HomeTab> {
                                   dealList.indexOf(p),
                                 ),
                               )
-                              .then((_) => _loadRecentlyViewed());
+                              .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
                         },
                         onRightIconTap: () {
                           Navigator.of(context)
                               .pushNamed(AppRoutes.todayDeals)
-                              .then((_) => _loadRecentlyViewed());
+                              .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
                         },
                       ),
                     ),
                   ),
-                  // TEMP: banners commented out for lag testing
-                  // if (bundle.banner2.isNotEmpty)
-                  //   SliverToBoxAdapter(
-                  //     child: Padding(
-                  //       padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-                  //       child: Column(
-                  //         children: bundle.banner2
-                  //             .where((b) => b.image.trim().isNotEmpty)
-                  //             .take(2)
-                  //             .map(
-                  //               (b) => Padding(
-                  //                 padding: const EdgeInsets.only(bottom: 10),
-                  //                 child: PromoBannerImage(imageUrl: b.image),
-                  //               ),
-                  //             )
-                  //             .toList(),
-                  //       ),
-                  //     ),
-                  //   ),
+                  if (bundle.banner2.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                        child: Column(
+                          children: bundle.banner2
+                              .where((b) => b.image.trim().isNotEmpty)
+                              .take(2)
+                              .map(
+                                (b) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: PromoBannerImage(imageUrl: b.image),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
+                    ),
                   // Lazy-built per section (was an eager .map spread) — with many
                   // categories, eagerly building every section meant every
                   // BannerCarousel's animation ran simultaneously even when
@@ -1274,7 +1327,7 @@ class _HomeTabState extends State<_HomeTab> {
                                           s.products.indexOf(p),
                                         ),
                                       )
-                                      .then((_) => _loadRecentlyViewed());
+                                      .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
                                 },
                                 onRightIconTap: () {
                                   Navigator.of(context).pushNamed(
@@ -1283,19 +1336,18 @@ class _HomeTabState extends State<_HomeTab> {
                                       'query': s.name,
                                       'categoryId': s.id,
                                     },
-                                  ).then((_) => _loadRecentlyViewed());
+                                  ).then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
                                 },
                               ),
                             ),
-                          // TEMP: banners commented out for lag testing
-                          // if (s.bannerData.isNotEmpty)
-                          //   Padding(
-                          //     padding: const EdgeInsets.only(top: 10),
-                          //     child: BannerCarousel(
-                          //       items: s.bannerData,
-                          //       isActive: widget.isActive,
-                          //     ),
-                          //   ),
+                          if (s.bannerData.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: BannerCarousel(
+                                items: s.bannerData,
+                                isActive: widget.isActive,
+                              ),
+                            ),
                           CategoryPromotionWidget(
                             categoryId: s.id,
                             isActive: widget.isActive,
