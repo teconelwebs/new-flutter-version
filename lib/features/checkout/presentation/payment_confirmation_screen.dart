@@ -61,6 +61,13 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
   String? _addressId;
   bool _showAllProducts = false;
 
+  // Guard: didChangeDependencies is re-invoked whenever ModalRoute notifies
+  // its dependents (e.g. when CashfreeWebViewPage is popped back onto this
+  // screen). Without this flag the cart/summary APIs are refetched on return,
+  // which can yield zeroed-out prices if the backend already marked the cart
+  // as order-in-progress.
+  bool _initialized = false;
+
   // Android-only: Cashfree's official native SDK is used instead of the
   // generic webview (see CashfreeWebViewPage) because Android's WebView +
   // Cashfree JS checkout combo doesn't reliably surface the UPI-app-intent
@@ -84,6 +91,9 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_initialized) return;
+    _initialized = true;
+
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is Map) {
       _buyNowProductId = args['buy_now']?.toString();
