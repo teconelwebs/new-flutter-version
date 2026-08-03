@@ -287,10 +287,8 @@ class _BannerCarouselState extends State<BannerCarousel> with TickerProviderStat
       );
       image.resolve(const ImageConfiguration()).addListener(
         ImageStreamListener((ImageInfo info, bool _) {
-          final w = info.image.width;
           final h = info.image.height;
-          debugPrint('[Home] Banner #$i actual size: ${w}×${h}px | url: $imgUrl');
-          final ratio = h > 0 ? w / h : 3.0;
+          final ratio = h > 0 ? info.image.width / h : 3.0;
           if (mounted) {
             setState(() => _aspectRatios[i] = _safeBannerAspectRatio(ratio));
           }
@@ -446,11 +444,9 @@ class _PromoBannerImageState extends State<PromoBannerImage> {
     );
     image.resolve(const ImageConfiguration()).addListener(
       ImageStreamListener((ImageInfo info, bool _) {
-        final w = info.image.width;
         final h = info.image.height;
-        debugPrint('[Home] PromoBanner actual size: ${w}×${h}px | url: ${widget.imageUrl}');
         if (h <= 0) return;
-        final ratio = w / h;
+        final ratio = info.image.width / h;
         if (mounted && ratio.isFinite && ratio > 0) {
           setState(() => _aspectRatio = ratio);
         }
@@ -764,12 +760,6 @@ class _HomeProductCardState extends State<HomeProductCard> {
     final discount = p.mrp > p.price && p.price > 0
         ? (((p.mrp - p.price) / p.mrp) * 100).round()
         : 0;
-
-    final displayPx = (widget.cardWidth ?? 0).toInt();
-    debugPrint('[Home] Product card "${p.name}" (id:${p.id})'
-        ' | display: ${displayPx}×${displayPx}px'
-        ' | memCacheWidth: 250px'
-        ' | url: ${p.image}');
 
     final contentSection = Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 9),

@@ -107,14 +107,10 @@ class _HeaderState extends State<Header> with TickerProviderStateMixin {
     super.didUpdateWidget(oldWidget);
     if (widget.isActive != oldWidget.isActive) {
       if (widget.isActive) {
-        // Resume only if not already running (avoid double timers).
         if (_placeholderTimer == null) {
-          debugPrint('▶️ [Header] resuming placeholder timer');
           _startPlaceholderRotation();
         }
       } else {
-        // Screen hidden behind another tab — stop ticking in the background.
-        debugPrint('⏸️ [Header] pausing placeholder timer');
         _placeholderTimer?.cancel();
         _placeholderTimer = null;
       }
