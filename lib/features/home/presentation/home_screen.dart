@@ -1149,12 +1149,13 @@ class _HomeTabState extends State<_HomeTab> {
                       isActive: widget.isActive,
                     ),
                   ),
-                  SliverToBoxAdapter(
-                    child: BannerWidget(
-                      slides: bundle.mobileSlider,
-                      isActive: widget.isActive,
-                    ),
-                  ),
+                  // TEMP: banners commented out for lag testing
+                  // SliverToBoxAdapter(
+                  //   child: BannerWidget(
+                  //     slides: bundle.mobileSlider,
+                  //     isActive: widget.isActive,
+                  //   ),
+                  // ),
                   if (_recentProducts.isNotEmpty)
                     SliverToBoxAdapter(
                       child: Padding(
@@ -1181,23 +1182,24 @@ class _HomeTabState extends State<_HomeTab> {
                         ),
                       ),
                     ),
-                  if (bundle.banner1.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-                        child: Column(
-                          children: bundle.banner1
-                              .where((b) => b.image.trim().isNotEmpty)
-                              .map(
-                                (b) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: PromoBannerImage(imageUrl: b.image),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ),
-                    ),
+                  // TEMP: banners commented out for lag testing
+                  // if (bundle.banner1.isNotEmpty)
+                  //   SliverToBoxAdapter(
+                  //     child: Padding(
+                  //       padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                  //       child: Column(
+                  //         children: bundle.banner1
+                  //             .where((b) => b.image.trim().isNotEmpty)
+                  //             .map(
+                  //               (b) => Padding(
+                  //                 padding: const EdgeInsets.only(bottom: 10),
+                  //                 child: PromoBannerImage(imageUrl: b.image),
+                  //               ),
+                  //             )
+                  //             .toList(),
+                  //       ),
+                  //     ),
+                  //   ),
                   const SliverToBoxAdapter(child: TrustStrip()),
                   SliverToBoxAdapter(
                     child: Padding(
@@ -1227,24 +1229,25 @@ class _HomeTabState extends State<_HomeTab> {
                       ),
                     ),
                   ),
-                  if (bundle.banner2.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-                        child: Column(
-                          children: bundle.banner2
-                              .where((b) => b.image.trim().isNotEmpty)
-                              .take(2)
-                              .map(
-                                (b) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: PromoBannerImage(imageUrl: b.image),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ),
-                    ),
+                  // TEMP: banners commented out for lag testing
+                  // if (bundle.banner2.isNotEmpty)
+                  //   SliverToBoxAdapter(
+                  //     child: Padding(
+                  //       padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                  //       child: Column(
+                  //         children: bundle.banner2
+                  //             .where((b) => b.image.trim().isNotEmpty)
+                  //             .take(2)
+                  //             .map(
+                  //               (b) => Padding(
+                  //                 padding: const EdgeInsets.only(bottom: 10),
+                  //                 child: PromoBannerImage(imageUrl: b.image),
+                  //               ),
+                  //             )
+                  //             .toList(),
+                  //       ),
+                  //     ),
+                  //   ),
                   // Lazy-built per section (was an eager .map spread) — with many
                   // categories, eagerly building every section meant every
                   // BannerCarousel's animation ran simultaneously even when
@@ -1284,14 +1287,15 @@ class _HomeTabState extends State<_HomeTab> {
                                 },
                               ),
                             ),
-                          if (s.bannerData.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 10),
-                              child: BannerCarousel(
-                                items: s.bannerData,
-                                isActive: widget.isActive,
-                              ),
-                            ),
+                          // TEMP: banners commented out for lag testing
+                          // if (s.bannerData.isNotEmpty)
+                          //   Padding(
+                          //     padding: const EdgeInsets.only(top: 10),
+                          //     child: BannerCarousel(
+                          //       items: s.bannerData,
+                          //       isActive: widget.isActive,
+                          //     ),
+                          //   ),
                           CategoryPromotionWidget(
                             categoryId: s.id,
                             isActive: widget.isActive,

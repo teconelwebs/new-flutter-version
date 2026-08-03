@@ -66,19 +66,28 @@ class _CreatePostFlowScreenState extends State<CreatePostFlowScreen> {
       if (picked == null || !mounted) return;
 
       if (!isMp4VideoPath(picked.path, mimeType: picked.mimeType)) {
-        _showSnack('Only MP4 videos are supported. Please select an MP4 file.');
+        _showSnack('Only MP4 and MOV videos are supported. Please select a supported file.');
         return;
       }
 
       final file = File(picked.path);
-      final probe = VideoPlayerController.file(file);
-      await probe.initialize();
-      final durationMs = probe.value.duration.inMilliseconds;
-      await probe.dispose();
+      bool needForceTranscode = false;
+      int durationMs = 0;
 
-      if (durationMs < UploadDraft.minVideoMs) {
-        _showSnack('Video must be at least 1 second long.');
-        return;
+      final probe = VideoPlayerController.file(file);
+      try {
+        await probe.initialize();
+        durationMs = probe.value.duration.inMilliseconds;
+        await probe.dispose();
+
+        if (durationMs < UploadDraft.minVideoMs) {
+          _showSnack('Video must be at least 1 second long.');
+          return;
+        }
+      } catch (e) {
+        // If the video is incompatible (e.g. MOV, HEVC/H.265, HDR), force transcoding to standard H.264 MP4
+        needForceTranscode = true;
+        await probe.dispose();
       }
 
       if (!mounted) return;
@@ -87,22 +96,58 @@ class _CreatePostFlowScreenState extends State<CreatePostFlowScreen> {
         _compressProgress = 0;
       });
 
-      final compressedFile = await VideoCompressService.compressForUpload(
-        file,
-        onProgress: (p) {
-          if (mounted) setState(() => _compressProgress = p);
-        },
-      );
+      File compressedFile = file;
+      try {
+        compressedFile = await VideoCompressService.compressForUpload(
+          file,
+          force: needForceTranscode,
+          onProgress: (p) {
+            if (mounted) setState(() => _compressProgress = p);
+          },
+        );
+      } catch (err) {
+        debugPrint("⚠️ Video compression service threw error: $err");
+        compressedFile = file;
+      }
 
       if (!mounted) return;
 
       final readyFile = compressedFile;
-      final readyProbe = VideoPlayerController.file(readyFile);
-      await readyProbe.initialize();
-      final readyDurationMs = readyProbe.value.duration.inMilliseconds;
-      final readyWidth = readyProbe.value.size.width.round();
-      final readyHeight = readyProbe.value.size.height.round();
-      await readyProbe.dispose();
+
+      int readyDurationMs = durationMs > 0 ? durationMs : 15000;
+      int readyWidth = 1080;
+      int readyHeight = 1920;
+
+      // Avoid double-initializing player on the exact same file right after disposal
+      if (readyFile.path != file.path) {
+        final readyProbe = VideoPlayerController.file(readyFile);
+        try {
+          await readyProbe.initialize();
+          readyDurationMs = readyProbe.value.duration.inMilliseconds;
+          readyWidth = readyProbe.value.size.width.round();
+          readyHeight = readyProbe.value.size.height.round();
+          await readyProbe.dispose();
+        } catch (e) {
+          debugPrint("⚠️ Ready probe player initialization failed: $e");
+          await readyProbe.dispose();
+        }
+      } else {
+        // If no compression occurred, we reuse the durationMs and only probe dimensions
+        // after a safe 250ms delay to allow MediaCodec to fully release
+        if (durationMs > 0) {
+          await Future<void>.delayed(const Duration(milliseconds: 250));
+          final readyProbe = VideoPlayerController.file(readyFile);
+          try {
+            await readyProbe.initialize();
+            readyWidth = readyProbe.value.size.width.round();
+            readyHeight = readyProbe.value.size.height.round();
+            await readyProbe.dispose();
+          } catch (e) {
+            debugPrint("⚠️ Original file dimension probe failed: $e");
+            await readyProbe.dispose();
+          }
+        }
+      }
 
       final endMs = readyDurationMs.clamp(UploadDraft.minVideoMs, UploadDraft.maxVideoMs);
       setState(() {
@@ -190,11 +235,16 @@ class _CreatePostFlowScreenState extends State<CreatePostFlowScreen> {
       videoPlayerOptions: createPostVideoOptions,
     );
     _previewController = controller;
-    await controller.initialize();
-    await controller.setLooping(false);
-    controller.addListener(_onPreviewVideoTick);
-
-    await _startPreviewPlayback(draft);
+    
+    try {
+      await controller.initialize();
+      await controller.setLooping(false);
+      controller.addListener(_onPreviewVideoTick);
+      await _startPreviewPlayback(draft);
+    } catch (e) {
+      debugPrint("⚠️ Preview video player initialization failed: $e");
+      // Proceed to posting screen even if preview player fails to load natively
+    }
 
     if (!mounted) return;
     setState(() {

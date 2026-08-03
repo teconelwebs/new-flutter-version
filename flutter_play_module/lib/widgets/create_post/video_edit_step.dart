@@ -7,6 +7,9 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:video_player/video_player.dart';
+import 'package:v_video_compressor/v_video_compressor.dart';
+import 'package:ffmpeg_kit_flutter_new_min_gpl/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new_min_gpl/return_code.dart';
 
 import '../../models/music_track.dart';
 import '../../models/upload_draft.dart';
@@ -75,6 +78,7 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
   bool _coverGenerated = false;
   bool _muted = false;
   bool _isProcessingNext = false;
+  bool _playerInitFailed = false;
 
   int _coverScrubMs = 0;
   int _musicDurationMs = 0;
@@ -129,6 +133,9 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
 
   // ── Video init ──────────────────────────────
   Future<void> _initVideo() async {
+    // Add a safe 300ms delay to allow any previous native decoder instances to be fully disposed by the OS
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+
     final controller = VideoPlayerController.file(
       _draft.videoFile,
       videoPlayerOptions: createPostVideoOptions,
@@ -162,7 +169,16 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
         await controller.play();
       }
     } catch (_) {
-      if (mounted) setState(() => _videoReady = false);
+      if (mounted) {
+        setState(() {
+          _videoReady = false;
+          _playerInitFailed = true;
+        });
+      }
+      if (!_coverGenerated) {
+        await _generateCoverAt(_coverScrubMs, resumePlayback: false);
+        _coverGenerated = true;
+      }
     }
   }
 
@@ -384,17 +400,56 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
   }
 
   // ── Playback helpers ────────────────────────
+  Future<void> _videoPlay() async {
+    final c = _videoController;
+    if (c != null && c.value.isInitialized) {
+      try {
+        await c.play();
+      } catch (e) {
+        debugPrint("⚠️ _videoPlay error: $e");
+      }
+    }
+  }
+
+  Future<void> _videoPause() async {
+    final c = _videoController;
+    if (c != null && c.value.isInitialized) {
+      try {
+        await c.pause();
+      } catch (e) {
+        debugPrint("⚠️ _videoPause error: $e");
+      }
+    }
+  }
+
+  Future<void> _videoSeekTo(Duration duration) async {
+    final c = _videoController;
+    if (c != null && c.value.isInitialized) {
+      try {
+        await c.seekTo(duration);
+      } catch (e) {
+        debugPrint("⚠️ _videoSeekTo error: $e");
+      }
+    }
+  }
+
   Future<void> _applyVideoVolume() async {
+    final controller = _videoController;
+    if (controller == null || !controller.value.isInitialized) return;
     final volume = _muted ? 0.0 : _originalVolume;
-    await _videoController?.setVolume(volume);
+    try {
+      await controller.setVolume(volume);
+    } catch (e) {
+      debugPrint("⚠️ _applyVideoVolume error: $e");
+    }
   }
 
   Future<void> _haltSyncedPlayback() async {
     final controller = _videoController;
-    if (controller == null) return;
+    if (controller == null || !controller.value.isInitialized) return;
     await _sync.haltPlayback();
-    await controller.pause();
-    await controller.seekTo(Duration(milliseconds: _draft.videoStartMs));
+    await _videoPause();
+    await _videoSeekTo(Duration(milliseconds: _draft.videoStartMs));
   }
 
   Future<void> _startSyncedPlayback() async {
@@ -473,12 +528,104 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
   // ── Cover ───────────────────────────────────
   Future<void> _generateCoverAt(int timeMs, {bool resumePlayback = true}) async {
     final controller = _videoController;
-    if (controller == null || !controller.value.isInitialized) return;
+    if (controller == null || !controller.value.isInitialized) {
+      // Fallback: Generate thumbnail natively from the video file directly
+      setState(() => _generatingCover = true);
+      try {
+        final extractTimeMs = timeMs.clamp(0, _draft.effectiveDurationMs);
+        // Avoid initial black frames by shifting 0ms extracts to 1000ms if video is long enough
+        final targetTimeMs = (extractTimeMs == 0 && _draft.effectiveDurationMs > 1500) ? 1000 : extractTimeMs;
+
+        VVideoThumbnailResult? result;
+        try {
+          result = await VVideoCompressor().getVideoThumbnail(
+            _draft.videoFile.path,
+            VVideoThumbnailConfig(
+              timeMs: targetTimeMs,
+              format: VThumbnailFormat.jpeg,
+              quality: 85,
+            ),
+          );
+        } catch (e1) {
+          debugPrint("⚠️ Native getVideoThumbnail failed at $targetTimeMs ms: $e1. Retrying at 0 ms...");
+          try {
+            result = await VVideoCompressor().getVideoThumbnail(
+              _draft.videoFile.path,
+              VVideoThumbnailConfig(
+                timeMs: 0,
+                format: VThumbnailFormat.jpeg,
+                quality: 85,
+              ),
+            );
+          } catch (e2) {
+            debugPrint("❌ Native getVideoThumbnail fallback at 0 ms also failed: $e2");
+          }
+        }
+
+        String? path = result?.thumbnailPath;
+
+        // If native extraction failed, use FFmpeg software frame extraction
+        if (path == null || path.isEmpty) {
+          try {
+            debugPrint("🔄 FFmpeg Fallback: Extracting thumbnail using software decoder...");
+            final dir = await getTemporaryDirectory();
+            final outPath = '${dir.path}/cover_ffmpeg_${DateTime.now().millisecondsSinceEpoch}.jpg';
+            final timeSec = (targetTimeMs / 1000).toStringAsFixed(3);
+
+            final session = await FFmpegKit.execute(
+              '-ss $timeSec -i "${_draft.videoFile.path}" -vframes 1 -q:v 3 -y "$outPath"'
+            );
+            final returnCode = await session.getReturnCode();
+
+            if (ReturnCode.isSuccess(returnCode) && await File(outPath).exists()) {
+              debugPrint("✅ FFmpeg thumbnail extraction succeeded: $outPath");
+              path = outPath;
+            } else {
+              debugPrint("❌ FFmpeg extraction failed at $timeSec. Attempting at 0.0s...");
+              final outPathFallback = '${dir.path}/cover_ffmpeg_0_${DateTime.now().millisecondsSinceEpoch}.jpg';
+              final sessionFallback = await FFmpegKit.execute(
+                '-ss 0.000 -i "${_draft.videoFile.path}" -vframes 1 -q:v 3 -y "$outPathFallback"'
+              );
+              final codeFallback = await sessionFallback.getReturnCode();
+              if (ReturnCode.isSuccess(codeFallback) && await File(outPathFallback).exists()) {
+                debugPrint("✅ FFmpeg thumbnail fallback at 0s succeeded: $outPathFallback");
+                path = outPathFallback;
+              }
+            }
+          } catch (ffmpegErr) {
+            debugPrint("❌ FFmpeg thumbnail extraction threw error: $ffmpegErr");
+          }
+        }
+
+        if (path != null && path.isNotEmpty) {
+          setState(() {
+            _draft.coverPath = path;
+            _generatingCover = false;
+          });
+        } else {
+          setState(() => _generatingCover = false);
+        }
+      } catch (e) {
+        debugPrint("⚠️ Native/FFmpeg getVideoThumbnail outer exception: $e");
+        if (mounted) setState(() => _generatingCover = false);
+      }
+      return;
+    }
+
     final wasPlaying = controller.value.isPlaying;
     setState(() => _generatingCover = true);
     try {
-      await controller.seekTo(Duration(milliseconds: timeMs.clamp(0, _draft.effectiveDurationMs)));
-      await Future<void>.delayed(const Duration(milliseconds: 120));
+      final extractTimeMs = timeMs.clamp(0, _draft.effectiveDurationMs);
+      final targetTimeMs = (extractTimeMs == 0 && _draft.effectiveDurationMs > 1500) ? 1000 : extractTimeMs;
+
+      try {
+        await controller.seekTo(Duration(milliseconds: targetTimeMs));
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+      } catch (_) {
+        await controller.seekTo(Duration(milliseconds: 0));
+        await Future<void>.delayed(const Duration(milliseconds: 120));
+      }
+
       final bytes = await _screenshotController.capture();
       if (!mounted || bytes == null) {
         setState(() => _generatingCover = false);
@@ -502,7 +649,7 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
 
   Future<void> _removeMusic() async {
     HapticFeedback.mediumImpact();
-    await _videoController?.pause();
+    await _videoPause();
     await _sync.haltPlayback();
     await _audioPlayer.stop();
     setState(() {
@@ -546,7 +693,7 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
       if (_draft.music != null) {
         await _startSyncedPlayback();
       } else {
-        await _videoController?.play();
+        await _videoPlay();
       }
       return;
     }
@@ -559,7 +706,7 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
       if (_draft.music != null) {
         await _startSyncedPlayback();
       } else {
-        await _videoController?.play();
+        await _videoPlay();
       }
       return;
     }
@@ -612,13 +759,13 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
   }
 
   // ── Trim callbacks ──────────────────────────
-  void _onVideoTrimDragStart() {
+  Future<void> _onVideoTrimDragStart() async {
     _isVideoTrimming = true;
     _sync.haltPlayback();
-    _videoController?.pause();
+    await _videoPause();
   }
 
-  void _onVideoTrimChanged(({int start, int end}) range) {
+  Future<void> _onVideoTrimChanged(({int start, int end}) range) async {
     setState(() {
       _draft.videoStartMs = range.start;
       _draft.videoEndMs = range.end;
@@ -626,7 +773,7 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
       _coverScrubMs = range.start;
     });
     // Only seek to show the frame — no play, no cover during drag
-    _videoController?.seekTo(Duration(milliseconds: range.start));
+    await _videoSeekTo(Duration(milliseconds: range.start));
   }
 
   Future<void> _onVideoTrimDragEnd() async {
@@ -637,9 +784,9 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
     await _startSyncedPlayback();
   }
 
-  void _onMusicTrimDragStart() {
+  Future<void> _onMusicTrimDragStart() async {
     _isMusicTrimming = true;
-    _videoController?.pause();
+    await _videoPause();
     _sync.beginMusicScrub();
     setState(() {
       _musicPlayheadMs = 0;
@@ -652,7 +799,7 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
     );
   }
 
-  void _onMusicTrimChanged(int startMs) {
+  Future<void> _onMusicTrimChanged(int startMs) async {
     final clamped = startMs.clamp(0, _maxMusicStartMs());
     setState(() {
       _draft.musicStartMs = clamped;
@@ -661,7 +808,7 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
       _showMusicPlayhead = true;
       _playPositionMs = _draft.videoStartMs;
     });
-    _videoController?.seekTo(Duration(milliseconds: _draft.videoStartMs));
+    await _videoSeekTo(Duration(milliseconds: _draft.videoStartMs));
     _sync.scrubMusicTo(
       clamped,
       volume: _muted ? 0 : _musicVolume,
@@ -673,7 +820,7 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
     _isMusicTrimming = false;
     _sync.endMusicScrub();
     await _sync.haltPlayback();
-    await _videoController?.seekTo(Duration(milliseconds: _draft.videoStartMs));
+    await _videoSeekTo(Duration(milliseconds: _draft.videoStartMs));
     setState(() {
       _musicPlayheadMs = 0;
       _playPositionMs = _draft.videoStartMs;
@@ -718,15 +865,41 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
     try {
       await _haltSyncedPlayback();
       _syncDraftVolumes();
+      
+      // Temporarily dispose the video controller to free up native hardware decoder resources 
+      // before initializing the next preview controller in _goToPosting.
+      final activeController = _videoController;
+      if (activeController != null) {
+        activeController.removeListener(_onVideoTick);
+        await activeController.dispose();
+        _videoController = null;
+      }
+      
       await widget.onNext(_draft);
     } catch (_) {
+      // Re-initialize controller if onNext fails so the user can continue editing
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not prepare preview. Please try again.'),
-            behavior: SnackBarBehavior.floating,
-          ),
+        _videoController = VideoPlayerController.file(
+          _draft.videoFile,
+          videoPlayerOptions: createPostVideoOptions,
         );
+        try {
+          await _videoController!.initialize();
+          _attachVideoLoop(_videoController!);
+          await _applyVideoVolume();
+          await _startSyncedPlayback();
+        } catch (e) {
+          debugPrint("⚠️ Failed to re-initialize video controller: $e");
+        }
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not prepare preview. Please try again.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isProcessingNext = false);
@@ -1044,26 +1217,80 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
             onTap: _togglePlayback,
             child: ColoredBox(
               color: Colors.black,
-              child: _videoReady && controller != null
-                  ? Screenshot(
-                      controller: _screenshotController,
-                      child: FittedBox(
-                        fit: BoxFit.cover,
-                        alignment: Alignment.center,
-                        child: SizedBox(
-                          width: controller.value.size.width > 0
-                              ? controller.value.size.width
-                              : 1080,
-                          height: controller.value.size.height > 0
-                              ? controller.value.size.height
-                              : 1920,
-                          child: VideoPlayer(controller),
-                        ),
-                      ),
+              child: _playerInitFailed
+                  ? Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (_draft.coverPath != null && File(_draft.coverPath!).existsSync()) ...[
+                          Image.file(File(_draft.coverPath!), fit: BoxFit.cover),
+                          Positioned(
+                            bottom: 16,
+                            left: 16,
+                            right: 16,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.7),
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.visibility_off_outlined, size: 16, color: Colors.white70),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Preview Mode: Tap Next to Upload directly',
+                                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ] else ...[
+                          Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: const [
+                                Icon(Icons.video_collection_outlined, size: 48, color: Colors.white54),
+                                SizedBox(height: 12),
+                                Text(
+                                  'Preview not available for this format.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Tap Next to proceed and upload directly.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     )
-                  : const Center(
-                      child: CircularProgressIndicator(color: _kPurple, strokeWidth: 2),
-                    ),
+                  : (_videoReady && controller != null)
+                      ? Screenshot(
+                          controller: _screenshotController,
+                          child: FittedBox(
+                            fit: BoxFit.cover,
+                            alignment: Alignment.center,
+                            child: SizedBox(
+                              width: controller.value.size.width > 0
+                                  ? controller.value.size.width
+                                  : 1080,
+                              height: controller.value.size.height > 0
+                                  ? controller.value.size.height
+                                  : 1920,
+                              child: VideoPlayer(controller),
+                            ),
+                          ),
+                        )
+                      : const Center(
+                          child: CircularProgressIndicator(color: _kPurple, strokeWidth: 2),
+                        ),
             ),
           ),
 
@@ -1097,7 +1324,11 @@ class _VideoEditStepState extends State<VideoEditStep> with TickerProviderStateM
                     ),
                   ),
                 const Spacer(),
-                if (_videoReady) ...[
+                if (_playerInitFailed) ...[
+                  _VideoNextButton(
+                    onTap: _isProcessingNext ? null : _onApply,
+                  ),
+                ] else if (_videoReady) ...[
                   _VideoOverlayIconButton(
                     icon: _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
                     size: 18,

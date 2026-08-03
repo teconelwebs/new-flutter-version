@@ -25,6 +25,7 @@ dependencies:
   flash_list: ^0.0.2
   url_launcher: ^6.3.2
   cached_network_image: ^3.4.1
+  ffmpeg_kit_flutter_new_min_gpl: ^2.5.5
 
 dev_dependencies:
   flutter_test:
