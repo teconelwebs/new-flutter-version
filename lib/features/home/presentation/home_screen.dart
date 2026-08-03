@@ -230,18 +230,14 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void didPushNext() {
-    // A new screen (e.g. product details) was pushed on top of Home.
     if (mounted && !_routeCovered) {
-      debugPrint('⏸️ [HomeScreen] covered by a pushed route — pausing background timers/animations');
       setState(() => _routeCovered = true);
     }
   }
 
   @override
   void didPopNext() {
-    // Back to Home — resume paused timers/animations.
     if (mounted && _routeCovered) {
-      debugPrint('▶️ [HomeScreen] back on top — resuming background timers/animations');
       setState(() => _routeCovered = false);
     }
   }
