@@ -67,29 +67,67 @@ class AppRouter {
         : (name.startsWith('/') ? name : '/$name');
     final uri = Uri.tryParse(normalizedName);
     if (uri != null) {
-      // Reuses the same product-slug resolution rules as the AppLinks
-      // listener in HomeScreen (see DeepLinkService), so this special-case
-      // parsing for raw-URL route names (e.g. nav.pushNamed('/products/x'))
-      // doesn't duplicate the pattern-matching logic in two places. The
-      // dedupe checks below are unchanged from before this refactor.
       final resolution = DeepLinkService.resolve(uri);
-      if (resolution.action == DeepLinkAction.pushRoute &&
-          resolution.routeName == AppRoutes.product) {
-        final trimmed = resolution.arguments as String? ?? '';
-        if (trimmed.isNotEmpty) {
-          if (trimmed == ProductScreen.currentlyVisibleSlug) {
-            debugPrint('DeepLink Router: Slug $trimmed is already visible, ignoring push.');
-            return null;
+      
+      // If it's an external deep link URL (starts with http, welfog:// or is the dashboard path)
+      final isExternalLink = name.startsWith('http') ||
+          name.startsWith('welfog://') ||
+          name == '/dashboard' ||
+          name.startsWith('/dashboard?') ||
+          name.startsWith('/dashboard/');
+      if (isExternalLink) {
+        if (resolution.action != DeepLinkAction.none) {
+          if (resolution.routeName == AppRoutes.product) {
+            final trimmed = resolution.arguments as String? ?? '';
+            if (trimmed.isNotEmpty) {
+              if (trimmed == ProductScreen.currentlyVisibleSlug) {
+                debugPrint('DeepLink Router: Slug $trimmed is already visible, ignoring push.');
+                return null;
+              }
+              if (shouldIgnoreSlug(trimmed)) {
+                debugPrint('DeepLink Router: Skip duplicate push for slug: $trimmed');
+                return null;
+              }
+              lastResolvedSlug = trimmed;
+              return MaterialPageRoute(
+                settings: settings,
+                builder: (_) => ProductScreen(slug: trimmed),
+              );
+            }
+          } else {
+            // For other web links (home, dashboard, cart, shop, etc.) on cold start,
+            // we boot to HomeScreen first. HomeScreen's initial link handler
+            // will push the specific screen once mounted.
+            final args = resolution.arguments;
+            final tabIndex = (args is Map && args['tab'] is int)
+                ? args['tab'] as int
+                : 0;
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => HomeScreen(initialTab: tabIndex),
+            );
           }
-          if (shouldIgnoreSlug(trimmed)) {
-            debugPrint('DeepLink Router: Skip duplicate push for slug: $trimmed');
-            return null;
+        }
+      } else {
+        // Original logic for internal/relative routes (like '/products/some-slug')
+        if (resolution.action == DeepLinkAction.pushRoute &&
+            resolution.routeName == AppRoutes.product) {
+          final trimmed = resolution.arguments as String? ?? '';
+          if (trimmed.isNotEmpty) {
+            if (trimmed == ProductScreen.currentlyVisibleSlug) {
+              debugPrint('DeepLink Router: Slug $trimmed is already visible, ignoring push.');
+              return null;
+            }
+            if (shouldIgnoreSlug(trimmed)) {
+              debugPrint('DeepLink Router: Skip duplicate push for slug: $trimmed');
+              return null;
+            }
+            lastResolvedSlug = trimmed;
+            return MaterialPageRoute(
+              settings: settings,
+              builder: (_) => ProductScreen(slug: trimmed),
+            );
           }
-          lastResolvedSlug = trimmed;
-          return MaterialPageRoute(
-            settings: settings,
-            builder: (_) => ProductScreen(slug: trimmed),
-          );
         }
       }
     }

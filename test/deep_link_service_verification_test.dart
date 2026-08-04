@@ -41,6 +41,7 @@ void main() {
       'https://www.welfog.com/dashboard': {
         'action': DeepLinkAction.pushRoute,
         'route': AppRoutes.home,
+        'arguments': {'tab': 4},
       },
       'https://www.welfog.com/account/orders': {
         'action': DeepLinkAction.pushRoute,

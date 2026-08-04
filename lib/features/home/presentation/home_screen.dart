@@ -382,12 +382,54 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  void _handleUriRouting(Uri uri) {
-    if (uri.pathSegments.isEmpty) return;
+  Uri? _pendingDeepLinkUri;
 
+  void _checkPendingDeepLinkAfterLogin() async {
+    final loggedIn = await SessionStore.isLoggedIn();
+    if (loggedIn && _pendingDeepLinkUri != null) {
+      final uri = _pendingDeepLinkUri!;
+      _pendingDeepLinkUri = null;
+      debugPrint('DeepLink: User successfully logged in, executing pending link: $uri');
+      await _checkGuestStatus(); // Ensure _isGuest and status are updated
+      _handleUriRouting(uri);
+    } else {
+      _pendingDeepLinkUri = null;
+    }
+  }
+
+  void _handleUriRouting(Uri uri) async {
     debugPrint('DeepLink: Received $uri, segments: ${uri.pathSegments}');
 
     final resolution = DeepLinkService.resolve(uri);
+
+    // Auth Guard check: if user is logged out, redirect to LoginScreen
+    // unless the link is Home page (tab != 4), Product details, or Shop.
+    final loggedIn = await SessionStore.isLoggedIn();
+    if (!loggedIn) {
+      bool isWhitelisted = false;
+      if (resolution.routeName == AppRoutes.product) {
+        isWhitelisted = true;
+      } else if (resolution.routeName == AppRoutes.shop) {
+        isWhitelisted = true;
+      } else if (resolution.routeName == AppRoutes.home) {
+        final args = resolution.arguments;
+        final tabIndex = (args is Map && args['tab'] is int) ? args['tab'] as int : 0;
+        if (tabIndex != 4) {
+          isWhitelisted = true;
+        }
+      }
+
+      if (!isWhitelisted) {
+        debugPrint('DeepLink: User is logged out, saving pending link and redirecting to login page: $uri');
+        _pendingDeepLinkUri = uri;
+        if (mounted) {
+          Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
+            _checkPendingDeepLinkAfterLogin();
+          });
+        }
+        return;
+      }
+    }
 
     switch (resolution.action) {
       case DeepLinkAction.none:

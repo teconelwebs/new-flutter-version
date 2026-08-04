@@ -110,7 +110,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
   Future<void> _continue() async {
     if (!mounted) return;
-    Navigator.of(context).pushReplacementNamed(HomeScreen.routeName);
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(true);
+    } else {
+      Navigator.of(context).pushReplacementNamed(HomeScreen.routeName);
+    }
   }
 
   // Guest Mode Transition

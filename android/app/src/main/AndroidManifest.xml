@@ -47,14 +47,30 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Intent filter for website URLs (matches all paths on main website domains and development ngrok domain) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="welfog.com" />
-                <data android:scheme="https" android:host="www.welfog.com" />
-                <data android:scheme="https" android:host="api.welfog.com" android:pathPrefix="/products" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="welfog.com" />
+                <data android:host="www.welfog.com" />
+                <data android:host="unnecessitous-domitila-unbudging.ngrok-free.dev" />
             </intent-filter>
+
+            <!-- Intent filter for API product share links (matches only paths starting with /products) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="api.welfog.com" />
+                <data android:pathPrefix="/products" />
+            </intent-filter>
+
+            <!-- Intent filter for custom URI scheme (welfog://) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
