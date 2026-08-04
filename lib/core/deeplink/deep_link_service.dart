@@ -170,9 +170,11 @@ class DeepLinkService {
         switch (tab) {
           case 'profile':
             return DeepLinkResolution.route(AppRoutes.home,
+                // ignore: prefer_const_literals_to_create_immutables
                 arguments: {'tab': 4});
           case 'play':
             return DeepLinkResolution.route(AppRoutes.home,
+                // ignore: prefer_const_literals_to_create_immutables
                 arguments: {'tab': 2});
           default:
             return DeepLinkResolution.route(AppRoutes.home);
