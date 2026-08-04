@@ -730,7 +730,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return RepaintBoundary(
+      child: Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         titleSpacing: 0,
@@ -993,6 +994,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           ),
         ],
       ),
-    );
+    ));
   }
 }

@@ -1269,25 +1269,27 @@ class _HomeTabState extends State<_HomeTab> {
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.only(top: 10),
-                        child: ProductStrip(
-                          title: 'Recently Viewed',
-                          products: _recentProducts,
-                          onProductTap: (p) {
-                            Navigator.of(context)
-                                .pushNamed(
-                                  AppRoutes.product,
-                                  arguments: _toProductItem(
-                                    p,
-                                    _recentProducts.indexOf(p),
-                                  ),
-                                )
-                                .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
-                          },
-                          onRightIconTap: () {
-                            Navigator.of(context)
-                                .pushNamed(AppRoutes.recentlyViewed)
-                                .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
-                          },
+                        child: RepaintBoundary(
+                          child: ProductStrip(
+                            title: 'Recently Viewed',
+                            products: _recentProducts,
+                            onProductTap: (p) {
+                              Navigator.of(context)
+                                  .pushNamed(
+                                    AppRoutes.product,
+                                    arguments: _toProductItem(
+                                      p,
+                                      _recentProducts.indexOf(p),
+                                    ),
+                                  )
+                                  .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
+                            },
+                            onRightIconTap: () {
+                              Navigator.of(context)
+                                  .pushNamed(AppRoutes.recentlyViewed)
+                                  .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
+                            },
+                          ),
                         ),
                       ),
                     ),
@@ -1312,28 +1314,30 @@ class _HomeTabState extends State<_HomeTab> {
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.only(top: 10),
-                      child: ProductStrip(
-                        title: 'Today Deals',
-                        titleIcon: SvgPicture.string(
-                          '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FB5404" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>''',
+                      child: RepaintBoundary(
+                        child: ProductStrip(
+                          title: 'Today Deals',
+                          titleIcon: SvgPicture.string(
+                            '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FB5404" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>''',
+                          ),
+                          products: dealList,
+                          onProductTap: (p) {
+                            Navigator.of(context)
+                                .pushNamed(
+                                  AppRoutes.product,
+                                  arguments: _toProductItem(
+                                    p,
+                                    dealList.indexOf(p),
+                                  ),
+                                )
+                                .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
+                          },
+                          onRightIconTap: () {
+                            Navigator.of(context)
+                                .pushNamed(AppRoutes.todayDeals)
+                                .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
+                          },
                         ),
-                        products: dealList,
-                        onProductTap: (p) {
-                          Navigator.of(context)
-                              .pushNamed(
-                                AppRoutes.product,
-                                arguments: _toProductItem(
-                                  p,
-                                  dealList.indexOf(p),
-                                ),
-                              )
-                              .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
-                        },
-                        onRightIconTap: () {
-                          Navigator.of(context)
-                              .pushNamed(AppRoutes.todayDeals)
-                              .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
-                        },
                       ),
                     ),
                   ),
@@ -1364,49 +1368,51 @@ class _HomeTabState extends State<_HomeTab> {
                     itemCount: sections.length,
                     itemBuilder: (context, index) {
                       final s = sections[index];
-                      return Column(
-                        children: [
-                          if (s.products.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: ProductStrip(
-                                title: s.name,
-                                products: s.products.take(10).toList(),
-                                onProductTap: (p) {
-                                  Navigator.of(context)
-                                      .pushNamed(
-                                        AppRoutes.product,
-                                        arguments: _toProductItem(
-                                          p,
-                                          s.products.indexOf(p),
-                                        ),
-                                      )
-                                      .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
-                                },
-                                onRightIconTap: () {
-                                  Navigator.of(context).pushNamed(
-                                    AppRoutes.searchResults,
-                                    arguments: {
-                                      'query': s.name,
-                                      'categoryId': s.id,
-                                    },
-                                  ).then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
-                                },
+                      return RepaintBoundary(
+                        child: Column(
+                          children: [
+                            if (s.products.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: ProductStrip(
+                                  title: s.name,
+                                  products: s.products.take(10).toList(),
+                                  onProductTap: (p) {
+                                    Navigator.of(context)
+                                        .pushNamed(
+                                          AppRoutes.product,
+                                          arguments: _toProductItem(
+                                            p,
+                                            s.products.indexOf(p),
+                                          ),
+                                        )
+                                        .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
+                                  },
+                                  onRightIconTap: () {
+                                    Navigator.of(context).pushNamed(
+                                      AppRoutes.searchResults,
+                                      arguments: {
+                                        'query': s.name,
+                                        'categoryId': s.id,
+                                      },
+                                    ).then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
+                                  },
+                                ),
                               ),
-                            ),
-                          if (s.bannerData.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 10),
-                              child: BannerCarousel(
-                                items: s.bannerData,
-                                isActive: widget.isActive,
+                            if (s.bannerData.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 10),
+                                child: BannerCarousel(
+                                  items: s.bannerData,
+                                  isActive: widget.isActive,
+                                ),
                               ),
+                            CategoryPromotionWidget(
+                              categoryId: s.id,
+                              isActive: widget.isActive,
                             ),
-                          CategoryPromotionWidget(
-                            categoryId: s.id,
-                            isActive: widget.isActive,
-                          ),
-                        ],
+                          ],
+                        ),
                       );
                     },
                   ),

@@ -834,7 +834,8 @@ class _HomeProductCardState extends State<HomeProductCard> {
       ),
     );
 
-    return GestureDetector(
+    return RepaintBoundary(
+      child: GestureDetector(
       onTap: widget.onTap,
       child: Align(
         alignment: Alignment.topCenter,
@@ -940,6 +941,6 @@ class _HomeProductCardState extends State<HomeProductCard> {
           ],
         ),
       ),
-    ));
+    )));
   }
 }

@@ -197,7 +197,8 @@ class _ShopScreenState extends State<ShopScreen> {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final cardWidth = (screenWidth - 36) / 2;
 
-    return Scaffold(
+    return RepaintBoundary(
+      child: Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
@@ -334,7 +335,7 @@ class _ShopScreenState extends State<ShopScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildHeader() {

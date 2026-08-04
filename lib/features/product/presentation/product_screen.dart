@@ -53,8 +53,6 @@ class _ProductScreenState extends State<ProductScreen> {
   final GlobalKey _quantitySelectorKey = GlobalKey();
   bool _showStickyQuantity = false;
 
-  // Guards to avoid redundant work inside _onScroll (called ~60x/sec).
-  bool _statusBarDark = false;
   double _lastScrollOffset = 0;
 
   bool _isNetworkError(dynamic error) {
@@ -77,8 +75,8 @@ class _ProductScreenState extends State<ProductScreen> {
       ProductScreen.currentlyVisibleSlug = slug.trim();
     }
     _scrollController.addListener(_onScroll);
-    // Set initial status bar icons to light (white) for unscrolled state
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+    // Set initial status bar icons to dark (black) for white header background
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
     _load();
     CartState.loadCartCount();
   }
@@ -102,14 +100,7 @@ class _ProductScreenState extends State<ProductScreen> {
     if (!_scrollController.hasClients) return;
     final offset = _scrollController.offset;
 
-    // Only call platform channel when crossing the threshold, not every frame.
-    final shouldBeDark = offset > 100;
-    if (shouldBeDark != _statusBarDark) {
-      _statusBarDark = shouldBeDark;
-      SystemChrome.setSystemUIOverlayStyle(
-        shouldBeDark ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
-      );
-    }
+    // Status bar remains dark at all times for the white header background.
 
     // findRenderObject + localToGlobal walks the render tree — skip it when a
     // state change is impossible:
@@ -568,7 +559,8 @@ class _ProductScreenState extends State<ProductScreen> {
     }
 
     final detail = _detail!;
-    return Scaffold(
+    return RepaintBoundary(
+      child: Scaffold(
       backgroundColor: Colors.white,
       body: Column(
         children: [
@@ -678,7 +670,7 @@ class _ProductScreenState extends State<ProductScreen> {
           });
         },
       ),
-    );
+    ));
   }
 
   Widget _buildSuggestedProducts() {
