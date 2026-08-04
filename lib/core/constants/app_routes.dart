@@ -29,6 +29,7 @@ class AppRoutes {
   static const faq = '/profile/help/faq';
   static const contactSupport = '/profile/help/contact';
   static const becomeSupplier = '/profile/help/become-supplier';
+  static const about = '/profile/help/about';
   static const policy = '/profile/help/policy';
   static const recentlyViewed = '/recently-viewed';
   static const shop = '/shop';

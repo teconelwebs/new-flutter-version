@@ -19,6 +19,9 @@ class _AccountScreenState extends State<AccountScreen> {
   bool _loading = true;
   AccountUser? _user;
   bool _playRouteOpening = false;
+  // Pre-warmed authenticated Play route — built eagerly when tab becomes
+  // active so the first tap navigates instantly without an async wait.
+  String? _prewarmedPlayRoute;
 
   final List<_MenuItem> _menu = const [
     _MenuItem(
@@ -91,6 +94,7 @@ class _AccountScreenState extends State<AccountScreen> {
   void initState() {
     super.initState();
     _load();
+    _prewarmPlayRoute();
   }
 
   @override
@@ -98,6 +102,18 @@ class _AccountScreenState extends State<AccountScreen> {
     super.didUpdateWidget(oldWidget);
     if (widget.active && !oldWidget.active) {
       _load(silent: true);
+      _prewarmPlayRoute(); // refresh on every tab activation
+    }
+  }
+
+  /// Eagerly builds the authenticated Play route string while the user is
+  /// reading the Account screen, so the first tap on "Play Profile" is instant.
+  Future<void> _prewarmPlayRoute() async {
+    try {
+      _prewarmedPlayRoute =
+          await _buildPlayRouteWithSession(play.AppRoutes.myProfile);
+    } catch (_) {
+      _prewarmedPlayRoute = null;
     }
   }
 
@@ -160,9 +176,18 @@ class _AccountScreenState extends State<AccountScreen> {
 
   Future<void> _openPlayRoute(String routeName) async {
     if (_playRouteOpening) return;
-    _playRouteOpening = true;
+    // setState immediately so the UI shows a loading state on the tapped item
+    // before any async work begins — prevents the "first tap feels dropped" UX.
+    setState(() => _playRouteOpening = true);
     try {
-      final routeWithSession = await _buildPlayRouteWithSession(routeName);
+      // Use pre-warmed route if available (built when tab became active),
+      // otherwise fall back to async build. The pre-warm eliminates the
+      // SharedPreferences + API call delay on the tap path.
+      final routeWithSession = (_prewarmedPlayRoute != null && routeName == play.AppRoutes.myProfile)
+          ? _prewarmedPlayRoute!
+          : await _buildPlayRouteWithSession(routeName);
+      _prewarmedPlayRoute = null; // consume — re-warm on next activation
+
       final route = play.AppRoutes.onGenerateRoute(
         RouteSettings(name: routeWithSession),
       );
@@ -176,7 +201,7 @@ class _AccountScreenState extends State<AccountScreen> {
       if (!mounted) return;
       await Navigator.of(context).push(route);
     } finally {
-      _playRouteOpening = false;
+      if (mounted) setState(() => _playRouteOpening = false);
     }
   }
 
@@ -283,6 +308,8 @@ class _AccountScreenState extends State<AccountScreen> {
               ),
               itemBuilder: (_, i) {
                 final m = _menu[i];
+                final bool isPlayItem = m.keyName == 'playProfile';
+                final bool showSpinner = isPlayItem && _playRouteOpening;
                 return InkWell(
                   borderRadius: BorderRadius.circular(8),
                   onTap: () => _onMenuTap(m),
@@ -303,7 +330,19 @@ class _AccountScreenState extends State<AccountScreen> {
                             color: m.bg,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(m.icon, size: 16, color: m.tint),
+                          child: showSpinner
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Color(0xFFFB5404)),
+                                    ),
+                                  ),
+                                )
+                              : Icon(m.icon, size: 16, color: m.tint),
                         ),
                         const SizedBox(width: 6),
                         Expanded(

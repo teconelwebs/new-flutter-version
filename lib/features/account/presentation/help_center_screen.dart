@@ -165,6 +165,12 @@ class HelpCenterScreen extends StatelessWidget {
                     subtitle: 'Register as a Supplier on Welfog',
                     onTap: () => Navigator.of(context).pushNamed(AppRoutes.becomeSupplier),
                   ),
+                  _buildHelpCard(
+                    context: context,
+                    title: 'About Us',
+                    subtitle: 'Learn more about Welfog\'s journey and story',
+                    onTap: () => Navigator.of(context).pushNamed(AppRoutes.about),
+                  ),
                 ],
               ),
             ),

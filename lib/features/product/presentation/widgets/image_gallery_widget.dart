@@ -1,12 +1,11 @@
-// lib/features/product/presentation/widgets/image_gallery_widget.dart
-// Converted from: component/ImageGallery.tsx
-
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:share_plus/share_plus.dart';
 import 'inline_product_video_player.dart';
 import '../../../../core/state/wishlist_state.dart';
+import '../../../../core/utils/persistent_image_cache_manager.dart';
 
 class ImageGalleryWidget extends StatefulWidget {
   final List<String> images;
@@ -263,13 +262,21 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
                   return GestureDetector(
                     onTap: () => _openFullscreenGallery(actualImageIndex),
                     child: Container(
-                      margin: EdgeInsets.zero,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.zero,
-                        color: Colors.white,
-                        image: DecorationImage(
-                          image: NetworkImage(fullUrl),
-                          fit: BoxFit.cover,
+                      color: Colors.white,
+                      child: CachedNetworkImage(
+                        imageUrl: fullUrl,
+                        cacheManager: PersistentImageCacheManager.instance,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        placeholder: (_, __) => const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFFB5404),
+                            strokeWidth: 2,
+                          ),
+                        ),
+                        errorWidget: (_, __, ___) => const Center(
+                          child: Icon(Icons.image_not_supported, color: Colors.grey),
                         ),
                       ),
                     ),

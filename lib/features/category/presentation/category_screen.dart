@@ -1,7 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_routes.dart';
+import '../../../core/utils/persistent_image_cache_manager.dart';
 import '../../../core/widgets/no_internet_widget.dart';
 import '../../search/presentation/search_screen.dart';
 import '../data/category_api_service.dart';
@@ -15,7 +17,15 @@ class CategoryScreen extends StatefulWidget {
   State<CategoryScreen> createState() => _CategoryScreenState();
 }
 
-class _CategoryScreenState extends State<CategoryScreen> {
+class _CategoryScreenState extends State<CategoryScreen>
+    with AutomaticKeepAliveClientMixin {
+  // Keeps this tab's state alive even if Flutter tries to discard it.
+  // With IndexedStack the state is always kept, but this acts as an explicit
+  // contract so a future refactor (e.g. switching to TabBarView) never breaks
+  // the no-refetch guarantee.
+  @override
+  bool get wantKeepAlive => true;
+
   final _api = CategoryApiService();
   bool _loading = true;
   String? _error;
@@ -237,12 +247,18 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
   Widget _buildBanner() {
     if (_bannerImage.isEmpty) return const SizedBox.shrink();
+    // fitWidth shows the full image at screen width with its natural aspect
+    // ratio — no cropping. A grey placeholder reserves space on first load to
+    // avoid a layout jump; after that CachedNetworkImage serves from
+    // PersistentImageCacheManager disk cache so the image appears instantly.
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      child: Image.network(
-        _bannerImage,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      child: CachedNetworkImage(
+        imageUrl: _bannerImage,
+        cacheManager: PersistentImageCacheManager.instance,
+        width: double.infinity,
+        fit: BoxFit.fitWidth,
+        errorWidget: (_, __, ___) => const SizedBox.shrink(),
       ),
     );
   }
@@ -303,10 +319,11 @@ class _CategoryScreenState extends State<CategoryScreen> {
                               shape: BoxShape.circle,
                             ),
                             clipBehavior: Clip.antiAlias,
-                            child: Image.network(
-                              child.imageUrl,
+                            child: CachedNetworkImage(
+                              imageUrl: child.imageUrl,
+                              cacheManager: PersistentImageCacheManager.instance,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
+                              errorWidget: (_, __, ___) =>
                                   const Icon(Icons.image_outlined),
                             ),
                           ),
@@ -337,6 +354,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     if (_categories.isEmpty) {
       if (_error != null) {
         return Scaffold(
@@ -485,10 +503,11 @@ class _CategoryScreenState extends State<CategoryScreen> {
                                     shape: BoxShape.circle,
                                   ),
                                   clipBehavior: Clip.antiAlias,
-                                  child: Image.network(
-                                    c.iconUrl,
+                                  child: CachedNetworkImage(
+                                    imageUrl: c.iconUrl,
+                                    cacheManager: PersistentImageCacheManager.instance,
                                     fit: BoxFit.contain,
-                                    errorBuilder: (_, __, ___) =>
+                                    errorWidget: (_, __, ___) =>
                                         const Icon(Icons.category_outlined),
                                   ),
                                 ),

@@ -230,22 +230,26 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _runAfterTransition(VoidCallback callback) {
     if (!mounted) return;
-    final route = ModalRoute.of(context);
-    if (route != null) {
-      final secondaryAnimation = route.secondaryAnimation;
-      if (secondaryAnimation != null && secondaryAnimation.isAnimating) {
-        void listener(AnimationStatus status) {
-          if (status == AnimationStatus.completed ||
-              status == AnimationStatus.dismissed) {
-            secondaryAnimation.removeStatusListener(listener);
-            if (mounted) {
-              callback();
-            }
-          }
+    final animation = ModalRoute.of(context)?.secondaryAnimation;
+
+    // Guard: wait if animation is actively running OR if value > 0 (home is
+    // still "receded" behind a child route). The isAnimating-only check has a
+    // timing window — on fast devices didPopNext can fire before isAnimating
+    // flips to true, causing carousels to restart mid-transition.
+    if (animation != null && (animation.isAnimating || animation.value > 0.0)) {
+      late AnimationStatusListener listener;
+      listener = (AnimationStatus status) {
+        if (status == AnimationStatus.dismissed) {
+          // Pop complete — home fully visible again.
+          animation.removeStatusListener(listener);
+          if (mounted) callback();
+        } else if (status == AnimationStatus.completed) {
+          // User cancelled gesture — clean up; didPopNext re-registers on next pop.
+          animation.removeStatusListener(listener);
         }
-        secondaryAnimation.addStatusListener(listener);
-        return;
-      }
+      };
+      animation.addStatusListener(listener);
+      return;
     }
     callback();
   }
@@ -704,7 +708,8 @@ class _HomeScreenState extends State<HomeScreen>
               IndexedStack(
                 index: _currentIndex,
                 children: [
-                  _HomeTab(
+                  RepaintBoundary(
+                    child: _HomeTab(
                     bundleFuture: _bundleFuture,
                     displayCity: _displayCity,
                     displayPincode: _displayPincode,
@@ -781,15 +786,20 @@ class _HomeScreenState extends State<HomeScreen>
                       }
                     },
                   ),
-                  const CategoryScreen(embedded: true),
-                  play.EmbeddedReelsWrapper(
-                    key: ValueKey('play_session_${_userId}_$_shareReelId'),
-                    viewerId: _userId,
-                    isActive: _currentIndex == 2,
-                    initialReelId: _shareReelId,
                   ),
-                  const CartScreen(embedded: true),
-                  AccountScreen(embedded: true, active: _currentIndex == 4),
+                  const RepaintBoundary(child: CategoryScreen(embedded: true)),
+                  RepaintBoundary(
+                    child: play.EmbeddedReelsWrapper(
+                      key: ValueKey('play_session_${_userId}_$_shareReelId'),
+                      viewerId: _userId,
+                      isActive: _currentIndex == 2,
+                      initialReelId: _shareReelId,
+                    ),
+                  ),
+                  const RepaintBoundary(child: CartScreen(embedded: true)),
+                  RepaintBoundary(
+                    child: AccountScreen(embedded: true, active: _currentIndex == 4),
+                  ),
                 ],
               ),
 
@@ -1085,22 +1095,20 @@ class _HomeTabState extends State<_HomeTab> {
 
   void _runAfterTransition(VoidCallback callback) {
     if (!mounted) return;
-    final route = ModalRoute.of(context);
-    if (route != null) {
-      final secondaryAnimation = route.secondaryAnimation;
-      if (secondaryAnimation != null && secondaryAnimation.isAnimating) {
-        void listener(AnimationStatus status) {
-          if (status == AnimationStatus.completed ||
-              status == AnimationStatus.dismissed) {
-            secondaryAnimation.removeStatusListener(listener);
-            if (mounted) {
-              callback();
-            }
-          }
+    final animation = ModalRoute.of(context)?.secondaryAnimation;
+
+    if (animation != null && (animation.isAnimating || animation.value > 0.0)) {
+      late AnimationStatusListener listener;
+      listener = (AnimationStatus status) {
+        if (status == AnimationStatus.dismissed) {
+          animation.removeStatusListener(listener);
+          if (mounted) callback();
+        } else if (status == AnimationStatus.completed) {
+          animation.removeStatusListener(listener);
         }
-        secondaryAnimation.addStatusListener(listener);
-        return;
-      }
+      };
+      animation.addStatusListener(listener);
+      return;
     }
     callback();
   }
@@ -1241,16 +1249,20 @@ class _HomeTabState extends State<_HomeTab> {
                     ),
                   ),
                   SliverToBoxAdapter(
-                    child: CategoryWidget(
-                      pullRefreshKey: _pullRefreshKey,
-                      onTabChange: widget.onTabChange,
-                      isActive: widget.isActive,
+                    child: RepaintBoundary(
+                      child: CategoryWidget(
+                        pullRefreshKey: _pullRefreshKey,
+                        onTabChange: widget.onTabChange,
+                        isActive: widget.isActive,
+                      ),
                     ),
                   ),
                   SliverToBoxAdapter(
-                    child: BannerWidget(
-                      slides: bundle.mobileSlider,
-                      isActive: widget.isActive,
+                    child: RepaintBoundary(
+                      child: BannerWidget(
+                        slides: bundle.mobileSlider,
+                        isActive: widget.isActive,
+                      ),
                     ),
                   ),
                   if (_recentProducts.isNotEmpty)

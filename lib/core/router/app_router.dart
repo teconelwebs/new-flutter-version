@@ -32,6 +32,7 @@ import '../../features/account/presentation/help_center_screen.dart';
 import '../../features/account/presentation/faq_screen.dart';
 import '../../features/account/presentation/contact_support_screen.dart';
 import '../../features/account/presentation/become_supplier_screen.dart';
+import '../../features/account/presentation/about_screen.dart';
 import '../../features/account/presentation/policy_screen.dart';
 import '../../features/account/presentation/supplier_info_screen.dart';
 import '../../features/account/presentation/connect_supplier_screen.dart';
@@ -352,6 +353,11 @@ class AppRouter {
         return MaterialPageRoute(
           settings: settings,
           builder: (_) => const BecomeSupplierScreen(),
+        );
+      case AppRoutes.about:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const AboutScreen(),
         );
       case AppRoutes.supplierInfo:
         return MaterialPageRoute(

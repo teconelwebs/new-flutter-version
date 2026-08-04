@@ -125,7 +125,9 @@ class _VoiceSearchSheetState extends State<VoiceSearchSheet>
 
     await _speech.listen(
       onResult: _onSpeechResult,
+      // ignore: deprecated_member_use
       listenFor: const Duration(seconds: 20),
+      // ignore: deprecated_member_use
       pauseFor: const Duration(seconds: 4),
       listenOptions: stt.SpeechListenOptions(
         partialResults: true,

@@ -570,121 +570,102 @@ class _ProductScreenState extends State<ProductScreen> {
     final detail = _detail!;
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
+      body: Column(
         children: [
-          // Scrollable Content
-          RefreshIndicator(
-            onRefresh: _load,
-            child: ListView(
-              controller: _scrollController,
-              padding: const EdgeInsets.only(top: 0, bottom: 48),
-              children: [
-                ImageGalleryWidget(
-                  images: detail.images,
-                  videoUrl: detail.videoUrl,
-                  isWishlisted: _isWishlisted,
-                  onWishlistPress: _toggleWishlist,
-                  name: detail.name,
-                  slug: detail.slug,
-                  productId: detail.id,
-                  userId: _userId,
-                  showFloatingActions: false,
-                ),
-                Transform.translate(
-                  offset: const Offset(0, -24),
-                  child: Column(
-                    children: [
-                      // Main details container with rounded top corners
-                      Container(
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 16),
-                            ProductDetailsWidget(
-                              data: detail.rawJson,
-                              pincode: _pincode,
-                              onRatingTap: _scrollToReviews,
-                              onVariantSelected: _selectVariant,
-                            ),
-                            const SizedBox(height: 12),
-                            BuyProductWidget(
-                              key: _quantitySelectorKey,
-                              data: detail.rawJson,
-                              quantity: _qty,
-                              onQuantityChanged: (newQty) {
-                                setState(() {
-                                  _qty = newQty;
-                                });
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            ProductOtherDetailsWidget(
-                              data: detail.rawJson,
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      CustomerReviewsWidget(
-                        key: _reviewsKey,
-                        data: detail.rawJson,
-                      ),
-                      const SizedBox(height: 6),
-                      _buildSuggestedProducts(),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Static white header with all action icons — no animation/scroll rebuild
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: _StaticProductHeader(
-              onBack: () => Navigator.of(context).maybePop(),
-              onSearch: () => Navigator.of(context).pushNamed(AppRoutes.search),
-              onShare: () => _onShare(context),
-              onWishlist: _toggleWishlist,
-              onCartTap: () async {
-                final prefs = await SharedPreferences.getInstance();
-                final token = prefs.getString('access_token') ?? '';
-                if (token.isEmpty) {
-                  if (context.mounted) {
-                    Navigator.of(context).pushNamed(AppRoutes.login);
-                  }
-                  return;
-                }
+          // Header sits at the top and takes its natural height —
+          // no Stack overlap, no gap on any device.
+          _StaticProductHeader(
+            onBack: () => Navigator.of(context).maybePop(),
+            onSearch: () => Navigator.of(context).pushNamed(AppRoutes.search),
+            onShare: () => _onShare(context),
+            onWishlist: _toggleWishlist,
+            onCartTap: () async {
+              final prefs = await SharedPreferences.getInstance();
+              final token = prefs.getString('access_token') ?? '';
+              if (token.isEmpty) {
                 if (context.mounted) {
-                  Navigator.of(context).pushNamed(AppRoutes.cart);
+                  Navigator.of(context).pushNamed(AppRoutes.login);
                 }
-              },
-              isWishlisted: _isWishlisted,
+                return;
+              }
+              if (context.mounted) {
+                Navigator.of(context).pushNamed(AppRoutes.cart);
+              }
+            },
+            isWishlisted: _isWishlisted,
+          ),
+          // Scrollable content fills the rest of the screen
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.only(bottom: 48),
+                children: [
+                  ImageGalleryWidget(
+                    images: detail.images,
+                    videoUrl: detail.videoUrl,
+                    isWishlisted: _isWishlisted,
+                    onWishlistPress: _toggleWishlist,
+                    name: detail.name,
+                    slug: detail.slug,
+                    productId: detail.id,
+                    userId: _userId,
+                    showFloatingActions: false,
+                  ),
+                  Transform.translate(
+                    offset: const Offset(0, -24),
+                    child: Column(
+                      children: [
+                        // Main details container with rounded top corners
+                        Container(
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 16),
+                              ProductDetailsWidget(
+                                data: detail.rawJson,
+                                pincode: _pincode,
+                                onRatingTap: _scrollToReviews,
+                                onVariantSelected: _selectVariant,
+                              ),
+                              const SizedBox(height: 12),
+                              BuyProductWidget(
+                                key: _quantitySelectorKey,
+                                data: detail.rawJson,
+                                quantity: _qty,
+                                onQuantityChanged: (newQty) {
+                                  setState(() {
+                                    _qty = newQty;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              ProductOtherDetailsWidget(
+                                data: detail.rawJson,
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        CustomerReviewsWidget(
+                          key: _reviewsKey,
+                          data: detail.rawJson,
+                        ),
+                        const SizedBox(height: 6),
+                        _buildSuggestedProducts(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          // View Cart Banner (Commented out per user request)
-          // ValueListenableBuilder<int>(
-          //   valueListenable: CartState.cartCountNotifier,
-          //   builder: (context, cartCount, _) {
-          //     if (cartCount <= 0) return const SizedBox.shrink();
-          //     return Positioned(
-          //       left: 0,
-          //       right: 0,
-          //       bottom: 8.0,
-          //       child: ViewCartBanner(
-          //         onTap: () {
-          //           Navigator.of(context).pushNamed(AppRoutes.cart);
-          //         },
-          //       ),
-          //     );
-          //   },
-          // ),
         ],
       ),
       bottomNavigationBar: BuyProductBtnWidget(
