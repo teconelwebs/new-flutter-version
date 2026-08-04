@@ -179,10 +179,11 @@ class DeepLinkService {
                 arguments: {'tab': 2});
           case 'home':
             return DeepLinkResolution.route(AppRoutes.home,
+                // ignore: prefer_const_literals_to_create_immutables
                 arguments: {'tab': 0});
-          case 'profile':
           default:
             return DeepLinkResolution.route(AppRoutes.home,
+                // ignore: prefer_const_literals_to_create_immutables
                 arguments: {'tab': 4});
         }
 

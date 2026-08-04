@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:http/http.dart' as http;
 
 /// Prefetches profile grid thumbnails with a small concurrency cap so scroll
 /// stays smooth without opening dozens of parallel downloads.
@@ -17,42 +16,6 @@ class ProfileThumbnailCache {
   static ImageProvider thumbnailProvider(String url, double logicalWidth, double devicePixelRatio) {
     final cacheWidth = (logicalWidth * devicePixelRatio).round().clamp(64, 150);
     
-    // Fetch and log file size asynchronously
-    unawaited(() async {
-      try {
-        final response = await http.head(Uri.parse(url));
-        final sizeHeader = response.headers['content-length'];
-        if (sizeHeader != null) {
-          final sizeInBytes = int.tryParse(sizeHeader) ?? 0;
-          final sizeInMb = sizeInBytes / (1024 * 1024);
-          
-          const originalRamMb = (1080 * 1920 * 4) / (1024 * 1024); // ~7.91 MB
-          final targetHeight = (cacheWidth * 1.33).round();
-          final compressedRamMb = (cacheWidth * targetHeight * 4) / (1024 * 1024);
-          final savingsPercent = ((originalRamMb - compressedRamMb) / originalRamMb * 100).toStringAsFixed(1);
-          
-          // ignore: avoid_print
-          print('--------------------------------------------------');
-          // ignore: avoid_print
-          print('🖼️ [ProfileThumbnailCache] THUMBNAIL OPTIMIZATION REPORT');
-          // ignore: avoid_print
-          print('   • Original Network File Size: ${sizeInMb.toStringAsFixed(3)} MB');
-          // ignore: avoid_print
-          print('   • Original Decoded RAM Size (1080x1920): ${originalRamMb.toStringAsFixed(2)} MB');
-          // ignore: avoid_print
-          print('   • Compressed Decoded RAM Size ($cacheWidth x $targetHeight): ${compressedRamMb.toStringAsFixed(2)} MB');
-          // ignore: avoid_print
-          print('   • Memory Footprint Saved: $savingsPercent% (~${(originalRamMb - compressedRamMb).toStringAsFixed(2)} MB)');
-          // ignore: avoid_print
-          print('   • URL: $url');
-          // ignore: avoid_print
-          print('--------------------------------------------------');
-        }
-      } catch (e) {
-        debugPrint('⚠️ [ProfileThumbnailCache] failed to fetch thumbnail size: $e');
-      }
-    }());
-
     return ResizeImage(CachedNetworkImageProvider(url), width: cacheWidth);
   }
 

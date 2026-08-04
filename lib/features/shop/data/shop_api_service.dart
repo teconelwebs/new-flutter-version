@@ -26,16 +26,16 @@ class ShopApiService {
       final uri = Uri.parse('$_baseUrl/shops/details/$shopId')
           .replace(queryParameters: {'slug': slug, 'id': shopId});
 
-      debugPrint('🟢 [API REQ DETAILS] URL: $uri');
-      debugPrint('🟢 [API REQ DETAILS] TOKEN EXIST: ${token.isNotEmpty}');
+      // debugPrint('🟢 [API REQ DETAILS] URL: $uri');
+      // debugPrint('🟢 [API REQ DETAILS] TOKEN EXIST: ${token.isNotEmpty}');
 
       final response = await http.get(uri, headers: {
         if (token.isNotEmpty) 'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       });
 
-      debugPrint('🔵 [API RES DETAILS] STATUS CODE: ${response.statusCode}');
-      debugPrint('🔵 [API RES DETAILS] BODY: ${response.body}');
+      // debugPrint('🔵 [API RES DETAILS] STATUS CODE: ${response.statusCode}');
+      // debugPrint('🔵 [API RES DETAILS] BODY: ${response.body}');
 
       if (response.statusCode < 200 || response.statusCode >= 300) return null;
 
@@ -118,8 +118,8 @@ class ShopApiService {
               .toList()
           : <ShopProduct>[];
 
-      debugPrint(
-          '🎯 [PARSED] PRODUCTS COUNT: ${products.length}, TOTAL PAGES: $totalPages');
+      // debugPrint(
+      //     '🎯 [PARSED] PRODUCTS COUNT: ${products.length}, TOTAL PAGES: $totalPages');
 
       return ShopProductsResult(products: products, totalPages: totalPages);
     } catch (e) {

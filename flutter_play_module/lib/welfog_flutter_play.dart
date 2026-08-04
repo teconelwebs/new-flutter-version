@@ -64,11 +64,11 @@ class _EmbeddedReelsWrapperState extends State<EmbeddedReelsWrapper> {
     // Ready only when a real username exists — not merely a mongo doc.
     final usernameReady = await PlayProfileHelper.isPlayUsernameReady();
 
-    debugPrint(
-      '🎮 [PlayTab] resolve viewerId=$id usernameReady=$usernameReady '
-      'mainUserId=${data?.mainUserId} mobile=${data?.mobile} '
-      'name=${data?.name}',
-    );
+    // debugPrint(
+    //   '🎮 [PlayTab] resolve viewerId=$id usernameReady=$usernameReady '
+    //   'mainUserId=${data?.mainUserId} mobile=${data?.mobile} '
+    //   'name=${data?.name}',
+    // );
 
     if (usernameReady && widget.isActive) {
       await PlayProfileHelper.ensureMainUserIdOnPlayProfile();

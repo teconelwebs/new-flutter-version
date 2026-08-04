@@ -2,7 +2,6 @@
 
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'play_api_config.dart';
@@ -20,8 +19,7 @@ class PlayProfileService {
         if (deviceId.isNotEmpty) 'x-android-id': deviceId,
       };
 
-  void _log(String msg) =>
-      debugPrint('🎮 [PlayProfile] baseUrl=$_fourthBaseUrl | $msg');
+  void _log(String msg) {}
 
   /// Shop login ids are numeric (e.g. "1773"). Server often ignores string-only
   /// `{userid}` PUTs, so send numeric when possible.
