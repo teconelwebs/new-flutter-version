@@ -169,13 +169,10 @@ class DeepLinkService {
         // /dashboard             → switch to account tab (index 4)
         final tab = uri.queryParameters['tab'] ?? 'profile';
         switch (tab) {
-<<<<<<< HEAD
-=======
           case 'profile':
             return DeepLinkResolution.route(AppRoutes.home,
                 // ignore: prefer_const_literals_to_create_immutables
                 arguments: {'tab': 4});
->>>>>>> 762c3f4704ed435d03b1415eeefcfa52aba7d3f3
           case 'play':
             return DeepLinkResolution.route(AppRoutes.home,
                 // ignore: prefer_const_literals_to_create_immutables
