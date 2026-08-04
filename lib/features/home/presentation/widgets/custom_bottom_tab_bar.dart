@@ -54,8 +54,6 @@ class CustomBottomTabBar extends StatefulWidget {
 }
 
 class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
-
-
   void _tabPressHaptic() => HapticFeedback.lightImpact();
   void _tabBlockedHaptic() => HapticFeedback.heavyImpact();
   void _tabRefreshHaptic() => HapticFeedback.mediumImpact();
@@ -152,9 +150,8 @@ class _CustomBottomTabBarState extends State<CustomBottomTabBar> {
                           color: isFocused
                               ? const Color(0xFFFB5404)
                               : const Color(0xFF666666),
-                          fontWeight: isFocused
-                              ? FontWeight.bold
-                              : FontWeight.normal,
+                          fontWeight:
+                              isFocused ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
                     ],

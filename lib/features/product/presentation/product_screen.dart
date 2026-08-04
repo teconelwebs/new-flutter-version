@@ -52,7 +52,10 @@ class _ProductScreenState extends State<ProductScreen> {
   final GlobalKey _reviewsKey = GlobalKey();
   final GlobalKey _quantitySelectorKey = GlobalKey();
   bool _showStickyQuantity = false;
-  final ValueNotifier<double> _scrollOffsetNotifier = ValueNotifier<double>(0.0);
+
+  // Guards to avoid redundant work inside _onScroll (called ~60x/sec).
+  bool _statusBarDark = false;
+  double _lastScrollOffset = 0;
 
   bool _isNetworkError(dynamic error) {
     if (error == null) return false;
@@ -90,27 +93,39 @@ class _ProductScreenState extends State<ProductScreen> {
     }
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
-    _scrollOffsetNotifier.dispose();
     // Restore default dark status bar icons when leaving product details
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
     super.dispose();
   }
 
   void _onScroll() {
-    if (_scrollController.hasClients) {
-      final offset = _scrollController.offset;
-      _scrollOffsetNotifier.value = offset;
-      // Update status bar icons color dynamically (light when unscrolled/on image, dark when scrolled)
-      SystemChrome.setSystemUIOverlayStyle(
-        offset > 100 ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
-      );
+    if (!_scrollController.hasClients) return;
+    final offset = _scrollController.offset;
 
-      // Check if body quantity selector has scrolled off screen
-      final RenderObject? renderObject = _quantitySelectorKey.currentContext?.findRenderObject();
+    // Only call platform channel when crossing the threshold, not every frame.
+    final shouldBeDark = offset > 100;
+    if (shouldBeDark != _statusBarDark) {
+      _statusBarDark = shouldBeDark;
+      SystemChrome.setSystemUIOverlayStyle(
+        shouldBeDark ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
+      );
+    }
+
+    // findRenderObject + localToGlobal walks the render tree — skip it when a
+    // state change is impossible:
+    //   • sticky hidden  → only relevant while scrolling DOWN
+    //   • sticky visible → only relevant while scrolling UP
+    final scrollingDown = offset > _lastScrollOffset;
+    _lastScrollOffset = offset;
+
+    if ((!_showStickyQuantity && scrollingDown) ||
+        (_showStickyQuantity && !scrollingDown)) {
+      final RenderObject? renderObject =
+          _quantitySelectorKey.currentContext?.findRenderObject();
       if (renderObject is RenderBox && mounted) {
         final position = renderObject.localToGlobal(Offset.zero);
-        // If bottom of widget is above the top portion of the screen (e.g. 100px from top)
-        final bool shouldShow = (position.dy + renderObject.size.height) < 100;
+        final bool shouldShow =
+            (position.dy + renderObject.size.height) < 100;
         if (shouldShow != _showStickyQuantity) {
           setState(() {
             _showStickyQuantity = shouldShow;
@@ -627,37 +642,30 @@ class _ProductScreenState extends State<ProductScreen> {
               ],
             ),
           ),
-          // Dynamic Header Overlay
+          // Static white header with all action icons — no animation/scroll rebuild
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            child: ValueListenableBuilder<double>(
-              valueListenable: _scrollOffsetNotifier,
-              builder: (context, offset, _) {
-                final double t = (offset / 180.0).clamp(0.0, 1.0);
-                return _ProductHeader(
-                  onBack: () => Navigator.of(context).maybePop(),
-                  onSearch: () => Navigator.of(context).pushNamed(AppRoutes.search),
-                  onShare: () => _onShare(context),
-                  onWishlist: _toggleWishlist,
-                  onCartTap: () async {
-                    final prefs = await SharedPreferences.getInstance();
-                    final token = prefs.getString('access_token') ?? '';
-                    if (token.isEmpty) {
-                      if (context.mounted) {
-                        Navigator.of(context).pushNamed(AppRoutes.login);
-                      }
-                      return;
-                    }
-                    if (context.mounted) {
-                      Navigator.of(context).pushNamed(AppRoutes.cart);
-                    }
-                  },
-                  isWishlisted: _isWishlisted,
-                  t: t,
-                );
+            child: _StaticProductHeader(
+              onBack: () => Navigator.of(context).maybePop(),
+              onSearch: () => Navigator.of(context).pushNamed(AppRoutes.search),
+              onShare: () => _onShare(context),
+              onWishlist: _toggleWishlist,
+              onCartTap: () async {
+                final prefs = await SharedPreferences.getInstance();
+                final token = prefs.getString('access_token') ?? '';
+                if (token.isEmpty) {
+                  if (context.mounted) {
+                    Navigator.of(context).pushNamed(AppRoutes.login);
+                  }
+                  return;
+                }
+                if (context.mounted) {
+                  Navigator.of(context).pushNamed(AppRoutes.cart);
+                }
               },
+              isWishlisted: _isWishlisted,
             ),
           ),
           // View Cart Banner (Commented out per user request)
@@ -805,6 +813,137 @@ class _ProductScreenState extends State<ProductScreen> {
   }
 }
 
+class _StaticProductHeader extends StatelessWidget {
+  const _StaticProductHeader({
+    required this.onBack,
+    required this.onSearch,
+    required this.onShare,
+    required this.onWishlist,
+    required this.onCartTap,
+    required this.isWishlisted,
+  });
+
+  final VoidCallback onBack;
+  final VoidCallback onSearch;
+  final VoidCallback onShare;
+  final VoidCallback onWishlist;
+  final VoidCallback onCartTap;
+  final bool isWishlisted;
+
+  Widget _iconBtn({
+    required VoidCallback onTap,
+    required IconData icon,
+    required double size,
+    Color color = const Color(0xFF111827),
+  }) {
+    return SizedBox(
+      width: 36,
+      height: 36,
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        onPressed: onTap,
+        icon: Icon(icon, size: size, color: color),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double topPad = MediaQuery.paddingOf(context).top;
+    return Container(
+      height: topPad + 52,
+      padding: EdgeInsets.only(top: topPad, left: 8, right: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            // ignore: deprecated_member_use
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          _iconBtn(
+            onTap: onBack,
+            icon: Icons.chevron_left_rounded,
+            size: 28,
+          ),
+          const Spacer(),
+          _iconBtn(
+            onTap: onSearch,
+            icon: Icons.search_rounded,
+            size: 22,
+            color: const Color(0xFFDC2626),
+          ),
+          const SizedBox(width: 2),
+          _iconBtn(
+            onTap: onShare,
+            icon: Icons.share_outlined,
+            size: 20,
+            color: const Color(0xFFDC2626),
+          ),
+          const SizedBox(width: 2),
+          _iconBtn(
+            onTap: onWishlist,
+            icon: isWishlisted
+                ? Icons.favorite
+                : Icons.favorite_border_rounded,
+            size: 20,
+            color: const Color(0xFFDC2626),
+          ),
+          const SizedBox(width: 2),
+          // Cart icon with live badge
+          ValueListenableBuilder<int>(
+            valueListenable: CartState.cartCountNotifier,
+            builder: (context, cartCount, _) {
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  _iconBtn(
+                    onTap: onCartTap,
+                    icon: Icons.shopping_cart_outlined,
+                    size: 20,
+                    color: const Color(0xFFDC2626),
+                  ),
+                  if (cartCount > 0)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFDC2626),
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 14,
+                          minHeight: 14,
+                        ),
+                        child: Text(
+                          '$cartCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
 class _ProductHeader extends StatelessWidget {
   const _ProductHeader({
     required this.onBack,

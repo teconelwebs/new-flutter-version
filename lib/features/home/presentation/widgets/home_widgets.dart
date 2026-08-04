@@ -339,6 +339,7 @@ class _BannerCarouselState extends State<BannerCarousel> with TickerProviderStat
                       child: CachedNetworkImage(
                         imageUrl: banner.image,
                         fit: BoxFit.cover,
+                        memCacheWidth: 1000,
                         fadeInDuration: Duration.zero,
                         fadeOutDuration: Duration.zero,
                         // Application-Support-backed cache — avoids iOS purging
@@ -472,6 +473,7 @@ class _PromoBannerImageState extends State<PromoBannerImage> {
             imageUrl: widget.imageUrl,
             width: double.infinity,
             fit: BoxFit.cover,
+            memCacheWidth: 1000,
             fadeInDuration: Duration.zero,
             fadeOutDuration: Duration.zero,
             cacheManager: PersistentImageCacheManager.instance,
