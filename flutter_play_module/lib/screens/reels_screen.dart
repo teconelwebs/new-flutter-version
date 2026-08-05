@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 
 import '../models/reel.dart';
 import '../services/adaptive_prefetch_engine.dart';
@@ -43,7 +44,7 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
   bool _routeSubscribed = false;
   int _bootstrapGen = 0;
   bool _setupOffered = false;
-  String? _lastListenedReelId;
+  Timer? _prefetchTimer;
 
   ReelsApi get _api => PlaySession.apiOf(context);
 
@@ -125,6 +126,7 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
   @override
   void dispose() {
     _bootstrapGen++;
+    _prefetchTimer?.cancel();
     appRouteObserver.unsubscribe(this);
     _preloadPool?.pauseAll();
     _preloadPool?.disposeAll();
@@ -360,17 +362,7 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
     }
   }
 
-  bool _canScrollForward() {
-    final nextIndex = _currentIndex + 1;
-    if (nextIndex >= _reels.length) {
-      return true; // No next page to block
-    }
-    final nextReel = _reels[nextIndex];
-    final pool = _preloadPool;
-    if (pool == null) return true;
-    final state = pool.stateFor(nextReel.id);
-    return state == PreloadState.ready;
-  }
+
 
   void _onPageChanged(int index) {
     _scrollPredictor.onPageChanged(index);
@@ -378,9 +370,16 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
 
     setState(() => _currentIndex = index);
 
+    _prefetchTimer?.cancel();
+    _prefetchTimer = Timer(const Duration(milliseconds: 500), () {
+      final pool = _preloadPool;
+      if (pool != null && _reels.isNotEmpty && mounted) {
+        pool.prefetchWindowBackground(_reels, index, extraAhead: extra);
+      }
+    });
+
     final pool = _preloadPool;
     if (pool != null && _reels.isNotEmpty) {
-      pool.prefetchWindowBackground(_reels, index, extraAhead: extra);
       pool.trimOutside(_reels, index, extraAhead: extra);
     }
     _prefetchReelAvatars(index);
@@ -471,125 +470,31 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
 
     final pool = _preloadPool!;
 
-    // Set up reactive listener for the next reel preloading completion
-    final nextIndex = _currentIndex + 1;
-    if (nextIndex < _reels.length) {
-      final nextReel = _reels[nextIndex];
-      if (nextReel.id != _lastListenedReelId && pool.stateFor(nextReel.id) != PreloadState.ready) {
-        _lastListenedReelId = nextReel.id;
-        pool.initFutureOf(nextReel.id)?.then((_) {
-          if (mounted && _currentIndex + 1 < _reels.length && _reels[_currentIndex + 1].id == nextReel.id) {
-            setState(() {});
-          }
-        });
-      }
-    }
-
-    final scrollAllowed = _canScrollForward();
-
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          PageView.builder(
-            controller: _pageController,
-            scrollDirection: Axis.vertical,
-            physics: DirectionalScrollPhysics(
-              allowForward: scrollAllowed,
-              allowBackward: true,
-              parent: const PageScrollPhysics(),
-            ),
-            itemCount: _reels.length,
-            onPageChanged: _onPageChanged,
-            itemBuilder: (context, index) {
-              final reel = _reels[index];
-              return ReelItemWidget(
-                key: ValueKey(reel.id),
-                reel: reel,
-                pool: pool,
-                api: _api,
-                isActive: index == _currentIndex && _routeVisible && widget.isActive,
-                openCommentsOnStart: widget.openCommentsOnStart &&
-                    index == _currentIndex &&
-                    reel.id == widget.initialReelId.trim(),
-                onClose: _handleClose,
-                onRefresh: _bootstrap,
-                onRemoveReel: _removeReel,
-              );
-            },
-          ),
-          if (!scrollAllowed)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 80,
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    // ignore: deprecated_member_use
-                    color: Colors.black.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white24, width: 0.5),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Color(0xFFFB5404),
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Preparing next video...',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        ],
+      body: PageView.builder(
+        controller: _pageController,
+        scrollDirection: Axis.vertical,
+        physics: const BouncingScrollPhysics(),
+        itemCount: _reels.length,
+        onPageChanged: _onPageChanged,
+        itemBuilder: (context, index) {
+          final reel = _reels[index];
+          return ReelItemWidget(
+            key: ValueKey(reel.id),
+            reel: reel,
+            pool: pool,
+            api: _api,
+            isActive: index == _currentIndex && _routeVisible && widget.isActive,
+            openCommentsOnStart: widget.openCommentsOnStart &&
+                index == _currentIndex &&
+                reel.id == widget.initialReelId.trim(),
+            onClose: _handleClose,
+            onRefresh: _bootstrap,
+            onRemoveReel: _removeReel,
+          );
+        },
       ),
     );
-  }
-}
-
-class DirectionalScrollPhysics extends ScrollPhysics {
-  final bool allowForward;
-  final bool allowBackward;
-
-  const DirectionalScrollPhysics({
-    super.parent,
-    this.allowForward = true,
-    this.allowBackward = true,
-  });
-
-  @override
-  DirectionalScrollPhysics applyTo(ScrollPhysics? ancestor) {
-    return DirectionalScrollPhysics(
-      parent: buildParent(ancestor),
-      allowForward: allowForward,
-      allowBackward: allowBackward,
-    );
-  }
-
-  @override
-  double applyBoundaryConditions(ScrollMetrics position, double value) {
-    if (value < position.pixels && !allowBackward) {
-      return value - position.pixels;
-    }
-    if (value > position.pixels && !allowForward) {
-      return value - position.pixels;
-    }
-    return super.applyBoundaryConditions(position, value);
   }
 }

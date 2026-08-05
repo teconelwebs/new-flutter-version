@@ -80,36 +80,36 @@ class AdaptivePrefetchEngine {
 
     if (score >= 75) {
       return const AdaptivePrefetchConfig(
-        preloadAhead: 5,
-        preloadBehind: 1,
-        maxConcurrentInits: 3,
-        fastScrollBonus: 2,
+        preloadAhead: 2,
+        preloadBehind: 0,
+        maxConcurrentInits: 1,
+        fastScrollBonus: 0,
         tierLabel: 'ultra',
         initTimeoutSec: 15,
       );
     }
     if (score >= 50) {
       return const AdaptivePrefetchConfig(
-        preloadAhead: 4,
-        preloadBehind: 1,
-        maxConcurrentInits: 2,
-        fastScrollBonus: 1,
+        preloadAhead: 2,
+        preloadBehind: 0,
+        maxConcurrentInits: 1,
+        fastScrollBonus: 0,
         tierLabel: 'high',
         initTimeoutSec: 12,
       );
     }
     if (score >= 30) {
       return const AdaptivePrefetchConfig(
-        preloadAhead: 3,
-        preloadBehind: 1,
-        maxConcurrentInits: 2,
-        fastScrollBonus: 1,
+        preloadAhead: 1,
+        preloadBehind: 0,
+        maxConcurrentInits: 1,
+        fastScrollBonus: 0,
         tierLabel: 'balanced',
         initTimeoutSec: 10,
       );
     }
     return const AdaptivePrefetchConfig(
-      preloadAhead: 2,
+      preloadAhead: 1,
       preloadBehind: 0,
       maxConcurrentInits: 1,
       fastScrollBonus: 0,
