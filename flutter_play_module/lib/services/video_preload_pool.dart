@@ -30,16 +30,7 @@ class VideoPreloadPool {
     }
 
     if (!_controllers.containsKey(reelId)) {
-      await warm(reelId, url, priority: true);
-    } else {
-      final future = _initFutures[reelId];
-      if (future != null) {
-        try {
-          await future.timeout(
-            Duration(milliseconds: (config.initTimeoutSec * 1000).round()),
-          );
-        } catch (_) {}
-      }
+      unawaited(warm(reelId, url, priority: true));
     }
 
     return _controllers[reelId];

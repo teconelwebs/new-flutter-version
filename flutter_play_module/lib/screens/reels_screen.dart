@@ -224,7 +224,7 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
       _preloadPool = VideoPreloadPool(config);
 
       if (loaded.reels.isNotEmpty) {
-        await _preloadPool!.prefetchWindow(loaded.reels, 0, waitForFirst: true);
+        _preloadPool!.prefetchWindowBackground(loaded.reels, 0);
       }
 
       setState(() {
