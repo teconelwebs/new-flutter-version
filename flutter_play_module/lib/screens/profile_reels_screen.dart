@@ -6,6 +6,7 @@ import '../services/reels_api.dart';
 import '../services/video_preload_pool.dart';
 import '../utils/flutter_nav.dart';
 import '../utils/play_session.dart';
+import '../utils/my_profile_cache.dart';
 import '../widgets/reel_item.dart';
 
 class ProfileReelsScreen extends StatefulWidget {
@@ -247,7 +248,7 @@ class _ProfileReelsScreenState extends State<ProfileReelsScreen> with RouteAware
       final startIndex = loaded.startIndex.clamp(0, reels.isEmpty ? 0 : reels.length - 1);
 
       if (reels.isNotEmpty) {
-        await _preloadPool!.prefetchWindow(reels, startIndex, waitForFirst: true);
+        _preloadPool!.prefetchWindowBackground(reels, startIndex);
       }
       if (!mounted) return;
 
@@ -351,6 +352,7 @@ class _ProfileReelsScreenState extends State<ProfileReelsScreen> with RouteAware
   }
 
   void _onReelDeleted(String reelId) {
+    MyProfileCache.clear();
     final idx = _reels.indexWhere((r) => r.id == reelId);
     if (idx < 0) return;
 

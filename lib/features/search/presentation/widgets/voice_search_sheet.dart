@@ -71,12 +71,12 @@ class _VoiceSearchSheetState extends State<VoiceSearchSheet>
           _startListening();
         }
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() {
           _isInitialized = false;
           _text = 'Initialization error';
-          _statusMessage = e.toString();
+          _statusMessage = 'Could not start voice search. Please try again.';
         });
       }
     }
@@ -104,13 +104,17 @@ class _VoiceSearchSheetState extends State<VoiceSearchSheet>
     setState(() {
       _isListening = false;
       _pulseController.stop();
-      if (error.errorMsg.contains('error_speech_timeout')) {
-        _statusMessage = 'No sound detected. Tap the mic to try again.';
-      } else if (error.errorMsg.contains('error_permission')) {
+      
+      final msg = error.errorMsg.toLowerCase();
+      if (msg.contains('error_speech_timeout') || msg.contains('error_no_match')) {
+        _statusMessage = 'Please try again. Tap the mic and speak clearly.';
+      } else if (msg.contains('error_permission')) {
         _text = 'Permission denied';
         _statusMessage = 'Microphone permission is required for voice search.';
+      } else if (msg.contains('error_busy')) {
+        _statusMessage = 'Voice search is busy. Please try again.';
       } else {
-        _statusMessage = 'Error: ${error.errorMsg}';
+        _statusMessage = 'Please try again. Tap the mic to restart.';
       }
     });
   }

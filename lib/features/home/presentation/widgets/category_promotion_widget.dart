@@ -352,6 +352,7 @@ class _CategoryPromotionWidgetState extends State<CategoryPromotionWidget> {
                 children: [
                   CachedNetworkImage(
                     imageUrl: imageUrl,
+                    memCacheWidth: 800,
                     fit: BoxFit.fill,
                     width: double.infinity,
                     height: double.infinity,
@@ -634,6 +635,7 @@ class _PromoSectionSliderState extends State<_PromoSectionSlider> with TickerPro
                           children: [
                             CachedNetworkImage(
                               imageUrl: imageUrl,
+                              memCacheWidth: 800,
                               fit: BoxFit.fill,
                               width: double.infinity,
                               height: double.infinity,

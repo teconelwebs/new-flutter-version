@@ -88,7 +88,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> with RouteAware {
 
   @override
   void didPopNext() {
-    _load(refresh: true);
+    _load();
   }
 
   void _restoreFromCache(MyProfileCacheEntry cached) {
@@ -714,8 +714,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> with RouteAware {
                 )
               : NotificationListener<ScrollNotification>(
                   onNotification: (notification) {
-                    if (notification is ScrollEndNotification &&
-                        notification.metrics.extentAfter < 300 &&
+                    if (notification.metrics.extentAfter < 500 &&
                         _hasMore &&
                         !_loadingMore &&
                         !_loadingPosts) {
@@ -743,13 +742,29 @@ class _MyProfileScreenState extends State<MyProfileScreen> with RouteAware {
                               onRetryStale: _retryStalePost,
                             ),
                           ),
-                        ProfilePostsSliverGrid(
+                         ProfilePostsSliverGrid(
                           posts: _posts,
                           loadingMore: _loadingMore,
                           loadingInitial: _loadingPosts && _posts.isEmpty && _pendingPosts.isEmpty,
                           onPostTap: _openPost,
                           showOwnerActions: false,
                         ),
+                        if (_loadingMore)
+                          const SliverToBoxAdapter(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Color(0xFFfb5404),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         const SliverToBoxAdapter(child: SizedBox(height: 24)),
                       ],
                     ),

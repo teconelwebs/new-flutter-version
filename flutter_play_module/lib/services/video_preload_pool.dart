@@ -19,6 +19,8 @@ class VideoPreloadPool {
 
   PreloadState stateFor(String reelId) => _states[reelId] ?? PreloadState.idle;
 
+  Future<void>? initFutureOf(String reelId) => _initFutures[reelId];
+
   Future<VideoPlayerController?> obtain(String reelId, String url) async {
     if (url.isEmpty) return null;
 

@@ -21,8 +21,10 @@ class HomeApiService {
     // Fetch all four endpoints in parallel, adding the categories list
     final results = await Future.wait([
       _getJson('$_mainApi/bannerdata/'),
-      _getJson('https://welfogapi.welfog.com/api/cat_wise_product_show?latitude=$lat&longitude=$lng&page=1&limit=20'),
-      _getJson('$_secondApi/today_deal?latitude=$lat&longitude=$lng&page=1&limit=10'),
+      _getJson(
+          'https://welfogapi.welfog.com/api/cat_wise_product_show?latitude=$lat&longitude=$lng&page=1&limit=20'),
+      _getJson(
+          '$_secondApi/today_deal?latitude=$lat&longitude=$lng&page=1&limit=10'),
       _getJson('https://welfogapi.welfog.com/api/nav_cat_data/'),
     ]);
 
@@ -66,7 +68,8 @@ class HomeApiService {
     );
 
     try {
-      await prefs.setString('cached_home_bundle_v4', jsonEncode(bundle.toJson()));
+      await prefs.setString(
+          'cached_home_bundle_v4', jsonEncode(bundle.toJson()));
     } catch (e) {
       debugPrint("Failed to cache home bundle: $e");
     }
@@ -79,7 +82,8 @@ class HomeApiService {
     final lat = prefs.getString('latitude') ?? '0';
     final lng = prefs.getString('longitude') ?? '0';
 
-    final response = await _getJson('$_secondApi/today_deal?latitude=$lat&longitude=$lng&page=$page&limit=10');
+    final response = await _getJson(
+        '$_secondApi/today_deal?latitude=$lat&longitude=$lng&page=$page&limit=10');
     return _mapDealProducts(response['products']);
   }
 
@@ -145,67 +149,89 @@ class HomeApiService {
 
   List<HomeCategorySection> _mapSections(dynamic rawRows) {
     if (rawRows is! List) return const [];
-    return rawRows.whereType<Map>().map((row) {
-      final category = row['category'];
-      final id = category is Map ? (category['id'] ?? '').toString() : '';
-      final name =
-          category is Map ? (category['name'] ?? 'Category').toString() : 'Category';
-      final products = _mapCategoryProducts(row['products']);
-      // Parse banner_data from category
-      final rawBannerData = category is Map ? category['banner_data'] : null;
-      final bannerData = _mapCategoryBanners(rawBannerData);
-      return HomeCategorySection(id: id, name: name, products: products, bannerData: bannerData);
-    }).where((s) => s.products.isNotEmpty).toList();
+    return rawRows
+        .whereType<Map>()
+        .map((row) {
+          final category = row['category'];
+          final id = category is Map ? (category['id'] ?? '').toString() : '';
+          final name = category is Map
+              ? (category['name'] ?? 'Category').toString()
+              : 'Category';
+          final products = _mapCategoryProducts(row['products']);
+          // Parse banner_data from category
+          final rawBannerData =
+              category is Map ? category['banner_data'] : null;
+          final bannerData = _mapCategoryBanners(rawBannerData);
+          return HomeCategorySection(
+              id: id, name: name, products: products, bannerData: bannerData);
+        })
+        .where((s) => s.products.isNotEmpty)
+        .toList();
   }
 
   List<HomeProduct> _mapCategoryProducts(dynamic rawList) {
     if (rawList is! List) return const [];
-    return rawList.whereType<Map>().map((p) {
-      final id = int.tryParse((p['id'] ?? '0').toString()) ?? 0;
-      final name = (p['name'] ?? '').toString();
-      final slug = (p['link'] ?? p['slug'] ?? '').toString();
-      final image = _asAbsoluteImage((p['image'] ?? p['thumbnail_img'] ?? '').toString());
-      final price = _toDouble(p['price'] ?? p['main_price'] ?? p['sell_price'] ?? p['unit_price'] ?? p['discount_price']);
-      final mrp = _toDouble(p['orignalprice'] ?? p['stroked_price'] ?? p['mrp'] ?? price);
-      final duration = int.tryParse((p['duration'] ?? '0').toString()) ?? 0;
-      final brand = (p['brand'] ?? '').toString();
-      return HomeProduct(
-        id: id,
-        name: name,
-        price: price,
-        mrp: mrp,
-        image: image,
-        slug: slug,
-        duration: duration,
-        brand: brand,
-      );
-    }).where((p) => p.id > 0 && p.name.isNotEmpty).toList();
+    return rawList
+        .whereType<Map>()
+        .map((p) {
+          final id = int.tryParse((p['id'] ?? '0').toString()) ?? 0;
+          final name = (p['name'] ?? '').toString();
+          final slug = (p['link'] ?? p['slug'] ?? '').toString();
+          final image = _asAbsoluteImage(
+              (p['image'] ?? p['thumbnail_img'] ?? '').toString());
+          final price = _toDouble(p['price'] ??
+              p['main_price'] ??
+              p['sell_price'] ??
+              p['unit_price'] ??
+              p['discount_price']);
+          final mrp = _toDouble(
+              p['orignalprice'] ?? p['stroked_price'] ?? p['mrp'] ?? price);
+          final duration = int.tryParse((p['duration'] ?? '0').toString()) ?? 0;
+          final brand = (p['brand'] ?? '').toString();
+          return HomeProduct(
+            id: id,
+            name: name,
+            price: price,
+            mrp: mrp,
+            image: image,
+            slug: slug,
+            duration: duration,
+            brand: brand,
+          );
+        })
+        .where((p) => p.id > 0 && p.name.isNotEmpty)
+        .toList();
   }
 
   List<HomeProduct> _mapDealProducts(dynamic rawList) {
     if (rawList is! List) return const [];
-    return rawList.whereType<Map>().map((p) {
-      final id = int.tryParse((p['id'] ?? '0').toString()) ?? 0;
-      final name = (p['name'] ?? p['productname'] ?? '').toString();
-      final slug = (p['slug'] ?? '').toString();
-      final image = _asAbsoluteImage(
-        (p['thumbnail_image'] ?? p['thumbnail_img'] ?? p['image'] ?? '').toString(),
-      );
-      final price = _toDouble(p['new_price'] ?? p['price']);
-      final mrp = _toDouble(p['old_price'] ?? p['mrp'] ?? price);
-      final duration = int.tryParse((p['duration'] ?? '0').toString()) ?? 0;
-      final brand = (p['brand'] ?? '').toString();
-      return HomeProduct(
-        id: id,
-        name: name,
-        price: price,
-        mrp: mrp,
-        image: image,
-        slug: slug,
-        duration: duration,
-        brand: brand,
-      );
-    }).where((p) => p.id > 0 && p.name.isNotEmpty).toList();
+    return rawList
+        .whereType<Map>()
+        .map((p) {
+          final id = int.tryParse((p['id'] ?? '0').toString()) ?? 0;
+          final name = (p['name'] ?? p['productname'] ?? '').toString();
+          final slug = (p['slug'] ?? '').toString();
+          final image = _asAbsoluteImage(
+            (p['thumbnail_image'] ?? p['thumbnail_img'] ?? p['image'] ?? '')
+                .toString(),
+          );
+          final price = _toDouble(p['new_price'] ?? p['price']);
+          final mrp = _toDouble(p['old_price'] ?? p['mrp'] ?? price);
+          final duration = int.tryParse((p['duration'] ?? '0').toString()) ?? 0;
+          final brand = (p['brand'] ?? '').toString();
+          return HomeProduct(
+            id: id,
+            name: name,
+            price: price,
+            mrp: mrp,
+            image: image,
+            slug: slug,
+            duration: duration,
+            brand: brand,
+          );
+        })
+        .where((p) => p.id > 0 && p.name.isNotEmpty)
+        .toList();
   }
 
   String _asAbsoluteImage(String path) {

@@ -37,6 +37,7 @@ class _ProductScreenState extends State<ProductScreen> {
 
   ProductDetailData? _detail;
   List<ProductItem> _related = const [];
+  bool _shareInProgress = false;
 
   // ignore: unused_field
   bool _loading = true;
@@ -448,7 +449,8 @@ class _ProductScreenState extends State<ProductScreen> {
   }
 
   Future<void> _onShare(BuildContext context) async {
-    if (_detail == null) return;
+    if (_detail == null || _shareInProgress) return;
+    _shareInProgress = true;
     try {
       final url = 'https://www.welfog.com/products/${_detail!.slug}';
       final price = _detail!.sellPrice;
@@ -460,6 +462,10 @@ class _ProductScreenState extends State<ProductScreen> {
       );
     } catch (e) {
       debugPrint('Share Error: $e');
+    } finally {
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        _shareInProgress = false;
+      });
     }
   }
 
@@ -688,16 +694,22 @@ class _ProductScreenState extends State<ProductScreen> {
                 onPressed: () {
                   final rawCat = _detail?.rawJson['category'];
                   String? categoryName;
+                  String? categoryId;
                   if (rawCat is Map) {
                     categoryName = rawCat['name']?.toString();
+                    categoryId = rawCat['id']?.toString();
                   } else {
                     categoryName = _detail?.rawJson['category_name']?.toString();
+                    categoryId = _detail?.rawJson['category_id']?.toString();
                   }
 
                   if (categoryName != null && categoryName.trim().isNotEmpty) {
                     Navigator.of(context).pushNamed(
                       AppRoutes.searchResults,
-                      arguments: categoryName.trim(),
+                      arguments: <String, dynamic>{
+                        'query': categoryName.trim(),
+                        'categoryId': categoryId,
+                      },
                     );
                   } else {
                     Navigator.of(context).pushNamedAndRemoveUntil(

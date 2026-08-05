@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 
 import '../models/user_profile.dart';
 import '../utils/play_session.dart';
@@ -46,10 +48,103 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (!mounted) return;
       _applyProfile(profile);
       setState(() => _loading = false);
+      await _checkLostData();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
       Navigator.maybePop(context);
+    }
+  }
+
+  Future<void> _checkLostData() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final picker = ImagePicker();
+      final response = await picker.retrieveLostData();
+      if (response.isEmpty || response.file == null || !mounted) return;
+
+      // Resolve variables needing BuildContext or State references before async gaps
+      final api = PlaySession.apiOf(context);
+      final profile = _profile;
+      if (profile == null) return;
+      final profileId = profile.id.isNotEmpty ? profile.id : (profile.userid ?? '');
+      if (profileId.isEmpty) return;
+
+      final file = File(response.file!.path);
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: file.path,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        compressFormat: ImageCompressFormat.jpg,
+        compressQuality: 85,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Photo',
+            toolbarColor: ProfileColors.primary,
+            toolbarWidgetColor: Colors.white,
+            activeControlsWidgetColor: ProfileColors.primary,
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: true,
+            hideBottomControls: false,
+          ),
+          IOSUiSettings(
+            title: 'Crop Photo',
+            aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
+          ),
+        ],
+      );
+
+      if (cropped == null || !mounted) return;
+      final croppedFile = File(cropped.path);
+      if (!await croppedFile.exists()) return;
+
+      setState(() {
+        _localImage = croppedFile;
+        _uploadingPhoto = true;
+      });
+
+      final picUrl = await api.uploadProfilePicture(profileId, croppedFile);
+      await api.updateUserProfile(profileId, _buildPayload(profilePicture: picUrl));
+      if (!mounted) return;
+
+      setState(() {
+        _localImage = null;
+        _uploadingPhoto = false;
+        final updatedProfile = UserProfile(
+          id: profile.id,
+          userid: profile.userid,
+          name: _name,
+          username: _username,
+          email: _email,
+          mobile: _mobile,
+          bio: _bio,
+          profilePicture: picUrl,
+          followersCount: profile.followersCount,
+          followingCount: profile.followingCount,
+          postCount: profile.postCount,
+          isDeleted: profile.isDeleted,
+          isConnected: profile.isConnected,
+          sellerId: profile.sellerId,
+          followers: profile.followers,
+          following: profile.following,
+        );
+        _applyProfile(updatedProfile);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile picture recovered and updated successfully!')),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _localImage = null;
+          _uploadingPhoto = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error recovering profile picture: $e')),
+        );
+      }
     }
   }
 

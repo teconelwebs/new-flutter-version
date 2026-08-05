@@ -1077,7 +1077,7 @@ class _HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<_HomeTab> {
   late ScrollController _scrollController;
-  int _pullRefreshKey = 0;
+  final int _pullRefreshKey = 0;
   List<HomeProduct> _recentProducts = [];
 
   @override
@@ -1232,17 +1232,9 @@ class _HomeTabState extends State<_HomeTab> {
 
         return Stack(
           children: [
-            RefreshIndicator(
-              onRefresh: () async {
-                setState(() {
-                  _pullRefreshKey++;
-                });
-                await _loadRecentlyViewed();
-                await widget.onRefresh();
-              },
-              child: CustomScrollView(
-                controller: _scrollController,
-                slivers: [
+            CustomScrollView(
+              controller: _scrollController,
+              slivers: [
                   SliverToBoxAdapter(
                     child: SizedBox(
                       height: MediaQuery.of(context).padding.top + 140,
@@ -1419,7 +1411,6 @@ class _HomeTabState extends State<_HomeTab> {
                   const SliverToBoxAdapter(child: SizedBox(height: 20)),
                 ],
               ),
-            ),
             Header(
               isHome: true,
               scrollController: _scrollController,

@@ -256,6 +256,7 @@ class _CategoryScreenState extends State<CategoryScreen>
       child: CachedNetworkImage(
         imageUrl: _bannerImage,
         cacheManager: PersistentImageCacheManager.instance,
+        memCacheWidth: 800,
         width: double.infinity,
         fit: BoxFit.fitWidth,
         errorWidget: (_, __, ___) => const SizedBox.shrink(),
@@ -322,6 +323,7 @@ class _CategoryScreenState extends State<CategoryScreen>
                             child: CachedNetworkImage(
                               imageUrl: child.imageUrl,
                               cacheManager: PersistentImageCacheManager.instance,
+                              memCacheWidth: 150,
                               fit: BoxFit.cover,
                               errorWidget: (_, __, ___) =>
                                   const Icon(Icons.image_outlined),
@@ -506,6 +508,7 @@ class _CategoryScreenState extends State<CategoryScreen>
                                   child: CachedNetworkImage(
                                     imageUrl: c.iconUrl,
                                     cacheManager: PersistentImageCacheManager.instance,
+                                    memCacheWidth: 120,
                                     fit: BoxFit.contain,
                                     errorWidget: (_, __, ___) =>
                                         const Icon(Icons.category_outlined),

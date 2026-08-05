@@ -24,6 +24,7 @@ class OtherProfileScreen extends StatefulWidget {
 
 class _OtherProfileScreenState extends State<OtherProfileScreen>
     with RouteAware {
+  final _scrollController = ScrollController();
   UserProfile? _profile;
   List<ProfilePost> _posts = [];
   bool _loading = true;
@@ -64,6 +65,7 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
 
   @override
   void dispose() {
+    _scrollController.dispose();
     if (_routeSubscribed) {
       appRouteObserver.unsubscribe(this);
     }
@@ -72,7 +74,21 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
 
   @override
   void didPopNext() {
-    _load(refresh: true);
+    _syncFollowFromRegistry();
+  }
+
+  void _syncFollowFromRegistry() {
+    final profile = _profile;
+    if (profile == null) return;
+    final api = PlaySession.apiOf(context);
+    final next = PlaySessionRegistry.resolveFollowState(
+      userId: profile.id,
+      alternateId: profile.userid,
+      fallback: profile.isFollowedBy(api.viewerId),
+    );
+    if (next != _isFollowing && mounted) {
+      setState(() => _isFollowing = next);
+    }
   }
 
   Future<void> _checkProfile() async {
@@ -422,8 +438,7 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
                     ? _errorView()
                     : NotificationListener<ScrollNotification>(
                         onNotification: (notification) {
-                          if (notification is ScrollEndNotification &&
-                              notification.metrics.extentAfter < 300 &&
+                          if (notification.metrics.extentAfter < 500 &&
                               _hasMore &&
                               !_loadingMore) {
                             setState(() => _loadingMore = true);
@@ -435,6 +450,7 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
                           color: const Color(0xFFfb5404),
                           onRefresh: () => _load(refresh: true),
                           child: CustomScrollView(
+                            controller: _scrollController,
                             physics: const AlwaysScrollableScrollPhysics(),
                             slivers: [
                               if (_profile != null)
@@ -494,6 +510,22 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
                                   loadingInitial:
                                       _loadingPosts && _posts.isEmpty,
                                   onPostTap: _openPost,
+                                ),
+                              if (_loadingMore)
+                                const SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 16),
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          color: Color(0xFFfb5404),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               const SliverToBoxAdapter(
                                   child: SizedBox(height: 24)),

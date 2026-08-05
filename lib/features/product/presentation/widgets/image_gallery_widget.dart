@@ -46,6 +46,7 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
   int _currentIndex = 0;
   bool _localWishlisted = false;
   bool _isToggling = false;
+  bool _shareInProgress = false;
 
   @override
   void initState() {
@@ -143,6 +144,8 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
   }
 
   Future<void> _onShare(BuildContext context) async {
+    if (_shareInProgress) return;
+    _shareInProgress = true;
     try {
       final url = 'https://www.welfog.com/products/${widget.slug}';
       final price = widget.newPrice ?? widget.oldPrice ?? 0.0;
@@ -154,6 +157,10 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
       );
     } catch (e) {
       debugPrint('Share Error: $e');
+    } finally {
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        _shareInProgress = false;
+      });
     }
   }
 
@@ -266,6 +273,7 @@ class _ImageGalleryWidgetState extends State<ImageGalleryWidget> {
                       child: CachedNetworkImage(
                         imageUrl: fullUrl,
                         cacheManager: PersistentImageCacheManager.instance,
+                        memCacheWidth: 800,
                         fit: BoxFit.cover,
                         width: double.infinity,
                         height: double.infinity,
