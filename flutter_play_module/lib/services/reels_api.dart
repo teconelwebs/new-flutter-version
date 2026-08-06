@@ -146,7 +146,7 @@ class ReelsApi {
       };
 
   Future<({List<Reel> reels, bool hasMore})> fetchReelsPage(
-      {String exclude = ''}) async {
+      {String exclude = '', int? limit}) async {
     final trimmedExclude = _trimExcludeIds(exclude);
     Object? lastError;
 
@@ -155,6 +155,7 @@ class ReelsApi {
         return await _fetchReelsOnce(
           exclude:
               attempt == 2 && trimmedExclude.isNotEmpty ? '' : trimmedExclude,
+          limit: limit,
         );
       } catch (e) {
         lastError = e;
@@ -172,8 +173,8 @@ class ReelsApi {
     throw lastError ?? Exception('Failed to load play');
   }
 
-  Future<List<Reel>> fetchReels({String exclude = ''}) async {
-    final page = await fetchReelsPage(exclude: exclude);
+  Future<List<Reel>> fetchReels({String exclude = '', int? limit}) async {
+    final page = await fetchReelsPage(exclude: exclude, limit: limit);
     return page.reels;
   }
 
@@ -185,10 +186,12 @@ class ReelsApi {
   }
 
   Future<({List<Reel> reels, bool hasMore})> _fetchReelsOnce(
-      {required String exclude}) async {
+      {required String exclude, int? limit}) async {
+    final speed = NetworkSpeedTracker.speedMbps;
+    final resolvedLimit = limit ?? (speed < 2.0 ? 10 : _prefetchLimit);
     final uri = Uri.parse('$_baseUrl/reels/shownew').replace(
       queryParameters: {
-        'limit': '$_prefetchLimit',
+        'limit': resolvedLimit.toString(),
         if (exclude.isNotEmpty) 'exclude': exclude,
         'userId': viewerId,
         'direction': 'next',
@@ -218,7 +221,7 @@ class ReelsApi {
         .map(Reel.fromJson)
         .where((r) => r.id.isNotEmpty && r.playbackUrl.isNotEmpty)
         .toList();
-    return (reels: reels, hasMore: rawCount >= _prefetchLimit);
+    return (reels: reels, hasMore: rawCount >= resolvedLimit);
   }
 
   /// Play mongo `_id` for like/comment/follow — never shop id or guest hash.

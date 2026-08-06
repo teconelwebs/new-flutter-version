@@ -219,12 +219,18 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
 
     try {
       final api = PlaySession.apiOf(context);
-      await PlaySessionRegistry.ensureBlockedListLoaded(api);
       
-      final config = await AdaptivePrefetchEngine.load();
-      final loaded = await _fetchInitialReels();
+      // Load config, blocked list, and initial reels in parallel to speed up loading on slow networks
+      final results = await Future.wait([
+        AdaptivePrefetchEngine.load(),
+        PlaySessionRegistry.ensureBlockedListLoaded(api),
+        _fetchInitialReels(),
+      ]);
 
       if (!mounted || gen != _bootstrapGen) return;
+
+      final config = results[0] as AdaptivePrefetchConfig;
+      final loaded = results[2] as ({List<Reel> reels, bool hasMore});
 
       _prefetchConfig = config;
       _preloadPool = VideoPreloadPool(config);
@@ -429,12 +435,16 @@ class _ReelsScreenState extends State<ReelsScreen> with RouteAware {
               children: [
                 const Icon(Icons.error_outline, color: Colors.red, size: 40),
                 const SizedBox(height: 12),
-                Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+                const Text(
+                  'network connection failed',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70),
+                ),
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: _bootstrap,
                   style: FilledButton.styleFrom(backgroundColor: const Color(0xFFfb5404)),
-                  child: const Text('Retry'),
+                  child: const Text('Try Again'),
                 ),
                 const SizedBox(height: 10),
                 TextButton(
