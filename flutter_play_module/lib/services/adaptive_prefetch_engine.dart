@@ -155,3 +155,37 @@ class ScrollPredictor {
 
   bool get isFastScrolling => _pagesPerSecond >= 1.2;
 }
+
+class NetworkSpeedTracker {
+  static double _currentSpeedMbps = 10.0; // Default to 10 Mbps (good speed)
+
+  static double get speedMbps => _currentSpeedMbps;
+
+  static void reportDownload(int bytes, int milliseconds) {
+    if (milliseconds <= 0 || bytes <= 0) return;
+    final seconds = milliseconds / 1000.0;
+    final bytesPerSecond = bytes / seconds;
+    final bitsPerSecond = bytesPerSecond * 8;
+    final mbps = bitsPerSecond / (1024 * 1024);
+
+    // Apply EMA smoothing to prevent jitter
+    _currentSpeedMbps = (_currentSpeedMbps * 0.7) + (mbps * 0.3);
+  }
+
+  static void reportInitTime(int milliseconds) {
+    if (milliseconds <= 0) return;
+    // Estimate Mbps based on video player initialization duration
+    double estimatedMbps;
+    if (milliseconds >= 4000) {
+      estimatedMbps = 0.8;
+    } else if (milliseconds >= 2200) {
+      estimatedMbps = 1.5;
+    } else if (milliseconds >= 1200) {
+      estimatedMbps = 5.0;
+    } else {
+      estimatedMbps = 12.0;
+    }
+
+    _currentSpeedMbps = (_currentSpeedMbps * 0.7) + (estimatedMbps * 0.3);
+  }
+}

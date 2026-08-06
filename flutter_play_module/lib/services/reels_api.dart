@@ -17,6 +17,7 @@ import '../models/user_profile.dart';
 import '../utils/share_links.dart';
 import '../utils/play_profile_helper.dart';
 import '../utils/my_profile_cache.dart';
+import 'adaptive_prefetch_engine.dart';
 import 'device_id_store.dart';
 import 'play_api_config.dart';
 
@@ -194,10 +195,18 @@ class ReelsApi {
       },
     );
 
+    final stopwatch = Stopwatch()..start();
     final response = await http.get(uri, headers: _headers);
+    stopwatch.stop();
+
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Failed to load play (${response.statusCode})');
     }
+
+    NetworkSpeedTracker.reportDownload(
+      response.bodyBytes.length,
+      stopwatch.elapsedMilliseconds,
+    );
 
     final body = jsonDecode(response.body);
     final reelsRaw = body is Map ? body['reels'] : null;

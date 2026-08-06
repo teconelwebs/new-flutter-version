@@ -119,7 +119,12 @@ class VideoPreloadPool {
     );
     _controllers[reelId] = controller;
 
+    final stopwatch = Stopwatch()..start();
     final init = controller.initialize().then((_) async {
+      stopwatch.stop();
+      if (priority) {
+        NetworkSpeedTracker.reportInitTime(stopwatch.elapsedMilliseconds);
+      }
       if (controller.value.hasError) {
         _states[reelId] = PreloadState.failed;
         return;
@@ -154,8 +159,9 @@ class VideoPreloadPool {
   }) async {
     if (reels.isEmpty) return;
 
-    final ahead = config.preloadAhead + extraAhead;
-    final behind = config.preloadBehind;
+    final isSlow = NetworkSpeedTracker.speedMbps < 2.0;
+    final ahead = isSlow ? 0 : (config.preloadAhead + extraAhead);
+    final behind = isSlow ? 0 : config.preloadBehind;
     final indices = <int>[];
 
     for (var i = centerIndex - behind; i <= centerIndex + ahead; i++) {
