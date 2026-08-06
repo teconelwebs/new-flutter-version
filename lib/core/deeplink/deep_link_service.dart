@@ -120,6 +120,9 @@ class DeepLinkService {
     // ---- New website link patterns ----------------------------------------
 
     switch (segments.first) {
+      case 'get_app':
+        return DeepLinkResolution.route(AppRoutes.home);
+
       case 'product_details':
         // /product_details/{id}/{slug}
         if (segments.length >= 3) {
@@ -219,9 +222,7 @@ class DeepLinkService {
         return DeepLinkResolution.route(AppRoutes.contactSupport);
 
       case 'about':
-        // No matching in-app screen exists for this one — intentionally
-        // resolve to none instead of forcing it into an unrelated screen.
-        return DeepLinkResolution.none;
+        return DeepLinkResolution.route(AppRoutes.about);
 
       case 'page':
         // /page/{slug} — terms-and-conditions, privacy-policy,

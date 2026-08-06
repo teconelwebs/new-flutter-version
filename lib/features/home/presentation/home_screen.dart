@@ -427,6 +427,7 @@ class _HomeScreenState extends State<HomeScreen>
         debugPrint('DeepLink: User is logged out, saving pending link and redirecting to login page: $uri');
         _pendingDeepLinkUri = uri;
         if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
           Navigator.of(context).pushNamed(AppRoutes.login).then((_) {
             _checkPendingDeepLinkAfterLogin();
           });
@@ -447,6 +448,7 @@ class _HomeScreenState extends State<HomeScreen>
         // untouched from before this refactor.
         debugPrint('DeepLink: Parsed play reel ID: $reelId');
         if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
           setState(() {
             _shareReelId = reelId;
             _currentIndex = 2; // Switch to Play tab
@@ -475,6 +477,7 @@ class _HomeScreenState extends State<HomeScreen>
             return;
           }
           if (!mounted) return;
+          Navigator.of(context).popUntil((route) => route.isFirst);
           Navigator.of(context).pushNamed(routeName, arguments: slug);
           return;
         }
@@ -490,6 +493,7 @@ class _HomeScreenState extends State<HomeScreen>
               : 0; // default: Home tab
           debugPrint('DeepLink: Switching to tab $tabIndex from home/dashboard link.');
           if (mounted) {
+            Navigator.of(context).popUntil((route) => route.isFirst);
             setState(() {
               if (_currentIndex != 2) _previousIndex = _currentIndex;
               _currentIndex = tabIndex;
@@ -506,6 +510,7 @@ class _HomeScreenState extends State<HomeScreen>
           return;
         }
         if (!mounted) return;
+        Navigator.of(context).popUntil((route) => route.isFirst);
         Navigator.of(context)
             .pushNamed(routeName, arguments: resolution.arguments);
         return;

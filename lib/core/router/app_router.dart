@@ -78,36 +78,17 @@ class AppRouter {
           name.startsWith('/dashboard/');
       if (isExternalLink) {
         if (resolution.action != DeepLinkAction.none) {
-          if (resolution.routeName == AppRoutes.product) {
-            final trimmed = resolution.arguments as String? ?? '';
-            if (trimmed.isNotEmpty) {
-              if (trimmed == ProductScreen.currentlyVisibleSlug) {
-                debugPrint('DeepLink Router: Slug $trimmed is already visible, ignoring push.');
-                return null;
-              }
-              if (shouldIgnoreSlug(trimmed)) {
-                debugPrint('DeepLink Router: Skip duplicate push for slug: $trimmed');
-                return null;
-              }
-              lastResolvedSlug = trimmed;
-              return MaterialPageRoute(
-                settings: settings,
-                builder: (_) => ProductScreen(slug: trimmed),
-              );
-            }
-          } else {
-            // For other web links (home, dashboard, cart, shop, etc.) on cold start,
-            // we boot to HomeScreen first. HomeScreen's initial link handler
-            // will push the specific screen once mounted.
-            final args = resolution.arguments;
-            final tabIndex = (args is Map && args['tab'] is int)
-                ? args['tab'] as int
-                : 0;
-            return MaterialPageRoute(
-              settings: settings,
-              builder: (_) => HomeScreen(initialTab: tabIndex),
-            );
-          }
+          // For all web links (home, product, dashboard, cart, shop, etc.) on cold start,
+          // we boot to HomeScreen first. HomeScreen's initial link handler
+          // will push the specific screen once mounted.
+          final args = resolution.arguments;
+          final tabIndex = (args is Map && args['tab'] is int)
+              ? args['tab'] as int
+              : 0;
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => HomeScreen(initialTab: tabIndex),
+          );
         }
       } else {
         // Original logic for internal/relative routes (like '/products/some-slug')
