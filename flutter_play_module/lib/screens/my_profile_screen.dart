@@ -660,6 +660,13 @@ class _MyProfileScreenState extends State<MyProfileScreen> with RouteAware {
           onPressed: _handleBack,
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 22, color: Color(0xFF1A1A1A)),
+            tooltip: 'Chats',
+            onPressed: () {
+              Navigator.pushNamed(context, '/conversations');
+            },
+          ),
           if (_profile?.isConnected == true)
             Padding(
               padding: const EdgeInsets.only(right: 12),

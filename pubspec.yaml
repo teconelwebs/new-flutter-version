@@ -35,8 +35,10 @@ dependencies:
   shimmer: ^3.0.0
   path_provider: ^2.1.6
   file: ^7.0.1
-  path: ^1.9.1
   flutter_cashfree_pg_sdk: ^2.4.0+52
+  socket_io_client: ^2.0.3+1
+  image_picker: ^1.1.2
+  file_picker: ^8.1.7
 
 
 
