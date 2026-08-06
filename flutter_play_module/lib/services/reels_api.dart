@@ -1205,12 +1205,14 @@ class ReelsApi {
     void Function(double progress, String phase)? onProgress,
   }) async {
     if (!await videoFile.exists()) {
-      debugPrint('❌ [uploadReelFull] Video file not found at path: ${videoFile.path}');
+      debugPrint(
+          '❌ [uploadReelFull] Video file not found at path: ${videoFile.path}');
       throw Exception('Video file not found');
     }
 
     onProgress?.call(0.02, 'initializing');
-    debugPrint('🚀 [uploadReelFull] Started upload process for user: $playUserId');
+    debugPrint(
+        '🚀 [uploadReelFull] Started upload process for user: $playUserId');
 
     String rawVideoUrl = '';
     String? rawThumbnailUrl;
@@ -1218,8 +1220,11 @@ class ReelsApi {
     // STEP 1: Generate S3 Presigned URL & Upload Video
     try {
       debugPrint('📹 [uploadReelFull] Requesting presigned URL for video...');
-      final videoExt = p.extension(videoFile.path).isNotEmpty ? p.extension(videoFile.path) : '.mp4';
-      final videoName = 'video-${DateTime.now().millisecondsSinceEpoch}$videoExt';
+      final videoExt = p.extension(videoFile.path).isNotEmpty
+          ? p.extension(videoFile.path)
+          : '.mp4';
+      final videoName =
+          'video-${DateTime.now().millisecondsSinceEpoch}$videoExt';
 
       final urlRes = await http.post(
         Uri.parse('$_baseUrl/reels/generate-upload-url'),
@@ -1232,13 +1237,15 @@ class ReelsApi {
       );
 
       if (urlRes.statusCode < 200 || urlRes.statusCode >= 300) {
-        debugPrint('❌ [uploadReelFull] Failed to get video upload URL: HTTP ${urlRes.statusCode} - ${urlRes.body}');
+        debugPrint(
+            '❌ [uploadReelFull] Failed to get video upload URL: HTTP ${urlRes.statusCode} - ${urlRes.body}');
         throw Exception('Failed to generate video upload URL');
       }
 
       final urlData = jsonDecode(urlRes.body);
       if (urlData['success'] != true) {
-        debugPrint('❌ [uploadReelFull] Generate URL API returned false: ${urlRes.body}');
+        debugPrint(
+            '❌ [uploadReelFull] Generate URL API returned false: ${urlRes.body}');
         throw Exception('API failed to generate video upload URL');
       }
 
@@ -1255,8 +1262,8 @@ class ReelsApi {
         endProgress: 0.85, // Allocate 80% progress to video upload
         onProgress: onProgress,
       );
-      debugPrint('✅ [uploadReelFull] Video successfully uploaded to S3: $rawVideoUrl');
-
+      debugPrint(
+          '✅ [uploadReelFull] Video successfully uploaded to S3: $rawVideoUrl');
     } catch (e) {
       debugPrint('❌ [uploadReelFull] Error during video S3 upload phase: $e');
       rethrow;
@@ -1265,7 +1272,8 @@ class ReelsApi {
     // STEP 2: Generate S3 Presigned URL & Upload Thumbnail (If exists)
     if (thumbnailFile != null && await thumbnailFile.exists()) {
       try {
-        debugPrint('🖼️ [uploadReelFull] Requesting presigned URL for thumbnail...');
+        debugPrint(
+            '🖼️ [uploadReelFull] Requesting presigned URL for thumbnail...');
         final thumbName = 'thumb-${DateTime.now().millisecondsSinceEpoch}.jpg';
 
         final thumbUrlRes = await http.post(
@@ -1293,19 +1301,23 @@ class ReelsApi {
               endProgress: 0.95, // Allocate 10% progress to thumb upload
               onProgress: onProgress,
             );
-            debugPrint('✅ [uploadReelFull] Thumbnail uploaded to S3: $rawThumbnailUrl');
+            debugPrint(
+                '✅ [uploadReelFull] Thumbnail uploaded to S3: $rawThumbnailUrl');
           } else {
-            debugPrint('⚠️ [uploadReelFull] Thumbnail generate URL failed, proceeding without it.');
+            debugPrint(
+                '⚠️ [uploadReelFull] Thumbnail generate URL failed, proceeding without it.');
           }
         }
       } catch (e) {
-        debugPrint('⚠️ [uploadReelFull] Error uploading thumbnail (non-fatal, continuing): $e');
+        debugPrint(
+            '⚠️ [uploadReelFull] Error uploading thumbnail (non-fatal, continuing): $e');
       }
     }
 
     // STEP 3: Send Final Metadata to /full-upload (JSON instead of Multipart)
     try {
-      debugPrint('📝 [uploadReelFull] Preparing final JSON payload for backend Queue Worker...');
+      debugPrint(
+          '📝 [uploadReelFull] Preparing final JSON payload for backend Queue Worker...');
       final track = music;
       final resolvedMusicId = (musicId ?? track?.id ?? '').trim();
       final hasMongoMusicId = MusicTrack.isMongoId(resolvedMusicId);
@@ -1346,7 +1358,8 @@ class ReelsApi {
         payload['musicEndTime'] = (musicEndMs ?? 0).round();
       }
 
-      debugPrint('🚀 [uploadReelFull] Sending final request to /reels/full-upload...');
+      debugPrint(
+          '🚀 [uploadReelFull] Sending final request to /reels/full-upload...');
       final response = await http.post(
         Uri.parse('$_baseUrl/reels/full-upload'),
         headers: _jsonHeaders, // Sending as application/json
@@ -1354,7 +1367,8 @@ class ReelsApi {
       );
 
       if (response.statusCode != 200 && response.statusCode != 202) {
-        debugPrint('❌ [uploadReelFull] /full-upload API failed: HTTP ${response.statusCode} - ${response.body}');
+        debugPrint(
+            '❌ [uploadReelFull] /full-upload API failed: HTTP ${response.statusCode} - ${response.body}');
         String msg = 'Upload failed';
         if (response.body.isNotEmpty) {
           try {
@@ -1367,7 +1381,8 @@ class ReelsApi {
         throw Exception('$msg (${response.statusCode})');
       }
 
-      debugPrint('✅ [uploadReelFull] /full-upload API succeeded! Queue job initiated.');
+      debugPrint(
+          '✅ [uploadReelFull] /full-upload API succeeded! Queue job initiated.');
       var result = const UploadReelResult(
         message: 'Post shared. Preparing on your profile.',
       );
@@ -1391,7 +1406,6 @@ class ReelsApi {
         thumbnailUrl: result.thumbnailUrl,
         qualityVariants: result.qualityVariants,
       );
-
     } catch (e) {
       debugPrint('❌ [uploadReelFull] Final step error: $e');
       rethrow;
@@ -1435,7 +1449,8 @@ class ReelsApi {
           sent += chunk.length;
           if (total > 0) {
             final fraction = (sent / total).clamp(0.0, 1.0);
-            final currentProgress = startProgress + (fraction * (endProgress - startProgress));
+            final currentProgress =
+                startProgress + (fraction * (endProgress - startProgress));
             onProgress?.call(currentProgress, 'uploading');
           }
           sink.add(chunk);
@@ -1451,7 +1466,8 @@ class ReelsApi {
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final errBody = await response.stream.bytesToString();
-        throw Exception('S3 Upload failed with status ${response.statusCode}: $errBody');
+        throw Exception(
+            'S3 Upload failed with status ${response.statusCode}: $errBody');
       }
     } finally {
       client.close();
