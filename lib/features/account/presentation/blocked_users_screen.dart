@@ -249,7 +249,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen>
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          icon: const Icon(Icons.chevron_left),
           onPressed: () => Navigator.of(context).pop(),
         ),
         bottom: PreferredSize(

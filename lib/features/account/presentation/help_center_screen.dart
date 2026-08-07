@@ -19,6 +19,9 @@ class HelpCenterScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double screenHeight = MediaQuery.sizeOf(context).height;
+    final double spacing = screenHeight < 680 ? 10.0 : 12.0;
+    final double headerVerticalPadding = screenHeight < 680 ? 16.0 : 24.0;
     final socialMedia = [
       {
         'name': 'Facebook',
@@ -89,7 +92,7 @@ class HelpCenterScreen extends StatelessWidget {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1A1A1A), size: 20),
+          icon: const Icon(Icons.chevron_left, color: Color(0xFF1A1A1A)),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
@@ -115,9 +118,9 @@ class HelpCenterScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Header Section
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              child: Column(
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: headerVerticalPadding),
+              child: const Column(
                 children: [
                   Text(
                     'Help & Support',
@@ -152,34 +155,36 @@ class HelpCenterScreen extends StatelessWidget {
                     title: 'FAQs',
                     subtitle: 'Frequently Asked Questions',
                     onTap: () => Navigator.of(context).pushNamed(AppRoutes.faq),
+                    bottomMargin: spacing,
                   ),
                   _buildHelpCard(
                     context: context,
                     title: 'Contact Support',
                     subtitle: 'Reach out to us',
                     onTap: () => Navigator.of(context).pushNamed(AppRoutes.contactSupport),
+                    bottomMargin: spacing,
                   ),
                   _buildHelpCard(
                     context: context,
                     title: 'Become Supplier',
                     subtitle: 'Register as a Supplier on Welfog',
                     onTap: () => Navigator.of(context).pushNamed(AppRoutes.becomeSupplier),
+                    bottomMargin: spacing,
                   ),
                   _buildHelpCard(
                     context: context,
                     title: 'About Us',
                     subtitle: 'Learn more about Welfog\'s journey and story',
                     onTap: () => Navigator.of(context).pushNamed(AppRoutes.about),
+                    bottomMargin: spacing,
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 12),
-
             // Follow Us
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              margin: EdgeInsets.only(left: 16, right: 16, bottom: spacing),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -233,7 +238,7 @@ class HelpCenterScreen extends StatelessWidget {
 
             // Contact Info
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              margin: EdgeInsets.only(left: 16, right: 16, bottom: spacing),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -296,7 +301,7 @@ class HelpCenterScreen extends StatelessWidget {
 
             // Customer Service
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              margin: EdgeInsets.only(left: 16, right: 16, bottom: spacing),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -379,9 +384,10 @@ class HelpCenterScreen extends StatelessWidget {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    required double bottomMargin,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: bottomMargin),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(4),

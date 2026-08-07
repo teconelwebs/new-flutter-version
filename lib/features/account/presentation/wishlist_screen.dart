@@ -693,8 +693,7 @@ class _WishlistScreenState extends State<WishlistScreen>
         ),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              size: 20, color: Color(0xFF333333)),
+          icon: const Icon(Icons.chevron_left, color: Color(0xFF333333)),
           onPressed: () => Navigator.of(context).pop(),
         ),
         bottom: PreferredSize(

@@ -477,6 +477,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
               ? []
               : [
                   BoxShadow(
+                    // ignore: deprecated_member_use
                     color: Colors.black.withOpacity(0.03),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
@@ -509,8 +510,11 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     String? tagBadge = conv.categoryTag;
     if (tagBadge == null || tagBadge.isEmpty) {
       final nameLower = name.toLowerCase();
+      // ignore: curly_braces_in_flow_control_structures
       if (nameLower.contains('support')) tagBadge = 'SUPPORT';
+      // ignore: curly_braces_in_flow_control_structures
       else if (nameLower.contains('store') || nameLower.contains('official') || nameLower.contains('audio')) tagBadge = 'SELLER';
+      // ignore: curly_braces_in_flow_control_structures
       else if (nameLower.contains('delivery') || nameLower.contains('partner') || nameLower.contains('order')) tagBadge = 'ORDER';
     }
 

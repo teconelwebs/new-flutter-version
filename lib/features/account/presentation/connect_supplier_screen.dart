@@ -421,7 +421,7 @@ class _ConnectSupplierScreenState extends State<ConnectSupplierScreen> with Sing
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+            icon: const Icon(Icons.chevron_left, color: Colors.white),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ),
@@ -504,7 +504,7 @@ class _ConnectSupplierScreenState extends State<ConnectSupplierScreen> with Sing
                   Positioned(
                     left: 0,
                     child: IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+                      icon: const Icon(Icons.chevron_left, color: Colors.white),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ),

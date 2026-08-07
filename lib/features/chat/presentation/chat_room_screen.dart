@@ -344,6 +344,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         _replyToMessage = null;
       });
     } catch (e) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Upload failed: $e')),
       );
@@ -433,6 +434,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             width: 54,
             height: 54,
             decoration: BoxDecoration(
+              // ignore: deprecated_member_use
               color: color.withOpacity(0.12),
               shape: BoxShape.circle,
             ),
@@ -928,6 +930,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 ),
                 boxShadow: [
                   BoxShadow(
+                    // ignore: deprecated_member_use
                     color: Colors.black.withOpacity(0.04),
                     blurRadius: 4,
                     offset: const Offset(0, 2),

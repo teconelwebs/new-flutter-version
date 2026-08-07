@@ -30,7 +30,8 @@ class PersistentImageCacheManager {
 }
 
 class _AppSupportFileSystem implements FileSystem {
-  _AppSupportFileSystem(this._cacheKey) : _fileDir = _createDirectory(_cacheKey);
+  _AppSupportFileSystem(this._cacheKey)
+      : _fileDir = _createDirectory(_cacheKey);
 
   final Future<Directory> _fileDir;
   final String _cacheKey;

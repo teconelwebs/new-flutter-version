@@ -63,7 +63,7 @@ class _FaqScreenState extends State<FaqScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1A1A1A), size: 20),
+          icon: const Icon(Icons.chevron_left, color: Color(0xFF1A1A1A)),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
@@ -93,7 +93,6 @@ class _FaqScreenState extends State<FaqScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: const Color(0xFFE5E7EB), width: 0.5),
                 boxShadow: const [
                   BoxShadow(
                     color: Color(0x05000000),

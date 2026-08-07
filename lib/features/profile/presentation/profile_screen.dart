@@ -216,7 +216,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('Profile'),
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF111827),
-        elevation: 0.5,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.chevron_left, color: Color(0xFF111827)),
+          onPressed: () => Navigator.pop(context),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Container(
+            color: const Color(0xFFE5E7EB),
+            height: 0.5,
+          ),
+        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

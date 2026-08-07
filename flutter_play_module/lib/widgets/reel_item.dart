@@ -383,7 +383,8 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
     _playbackStarted = false;
     _updateProgress(0);
 
-    await Future<void>.delayed(Duration(milliseconds: fallback != null ? 300 : 800));
+    await Future<void>.delayed(
+        Duration(milliseconds: fallback != null ? 300 : 800));
     if (!mounted) {
       _recoveringVideo = false;
       return;
@@ -528,7 +529,8 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
       final msg = await widget.api.getShareMessage(widget.reel.id);
       if (!mounted) return;
       final RenderBox? box = context.findRenderObject() as RenderBox?;
-      final rect = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+      final rect =
+          box != null ? box.localToGlobal(Offset.zero) & box.size : null;
       await Share.share(msg, sharePositionOrigin: rect);
     } finally {
       _shareInProgress = false;
@@ -544,7 +546,9 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
       reelId: widget.reel.id,
       onChanged: () async {
         final list = await widget.api.fetchComments(widget.reel.id);
-        if (mounted) setState(() => _commentCount = countCommentsRecursive(list));
+        if (mounted)
+          // ignore: curly_braces_in_flow_control_structures
+          setState(() => _commentCount = countCommentsRecursive(list));
       },
       onNavigateToProfile: () {
         if (!_paused) {
@@ -579,8 +583,10 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
               children: [
                 if (!isOwnReel) ...[
                   ListTile(
-                    leading: const Icon(Icons.visibility_outlined, color: Colors.black87),
-                    title: const Text('Interested', style: TextStyle(color: Colors.black87)),
+                    leading: const Icon(Icons.visibility_outlined,
+                        color: Colors.black87),
+                    title: const Text('Interested',
+                        style: TextStyle(color: Colors.black87)),
                     onTap: () async {
                       Navigator.pop(ctx);
                       await _markInterest('interested', 'Marked as Interested');
@@ -588,22 +594,28 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
                   ),
                   const Divider(height: 1),
                   ListTile(
-                    leading: const Icon(Icons.visibility_off_outlined, color: Colors.red),
-                    title: const Text('Not Interested', style: TextStyle(color: Colors.red)),
+                    leading: const Icon(Icons.visibility_off_outlined,
+                        color: Colors.red),
+                    title: const Text('Not Interested',
+                        style: TextStyle(color: Colors.red)),
                     onTap: () async {
                       Navigator.pop(ctx);
                       await _stopPlaybackBeforeRemoval();
                       widget.onRemoveReel?.call(widget.reel.id);
-                      await _markInterest('not_interested', 'Marked as Not Interested');
+                      await _markInterest(
+                          'not_interested', 'Marked as Not Interested');
                     },
                   ),
                 ],
                 if (isOwnReel) ...[
                   ListTile(
-                    leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFdc2626)),
+                    leading: const Icon(Icons.delete_outline_rounded,
+                        color: Color(0xFFdc2626)),
                     title: const Text(
                       'Delete Play',
-                      style: TextStyle(color: Color(0xFFdc2626), fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                          color: Color(0xFFdc2626),
+                          fontWeight: FontWeight.w600),
                     ),
                     onTap: () async {
                       Navigator.pop(ctx);
@@ -638,18 +650,23 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
                 color: Color(0xFFfef2f2),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.delete_rounded, color: Color(0xFFdc2626), size: 32),
+              child: const Icon(Icons.delete_rounded,
+                  color: Color(0xFFdc2626), size: 32),
             ),
             const SizedBox(height: 16),
             const Text(
               'Delete this play?',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF111827)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 10),
             const Text(
               'This action is permanent. Your video, likes, and comments will be removed and cannot be recovered.',
-              style: TextStyle(fontSize: 14, color: Color(0xFF6B7280), height: 1.45),
+              style: TextStyle(
+                  fontSize: 14, color: Color(0xFF6B7280), height: 1.45),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -661,9 +678,12 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 13),
                       side: const BorderSide(color: Colors.black, width: 1.5),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Cancel', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600)),
+                    child: const Text('Cancel',
+                        style: TextStyle(
+                            color: Colors.black, fontWeight: FontWeight.w600)),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -673,9 +693,12 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFdc2626),
                       padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
+                    child: const Text('Delete',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, color: Colors.white)),
                   ),
                 ),
               ],
@@ -698,7 +721,9 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
       await _stopPlaybackBeforeRemoval();
       widget.onRemoveReel?.call(widget.reel.id);
     } else {
-      setState(() => _toast = result.message.isNotEmpty ? result.message : 'Could not delete. Try again.');
+      setState(() => _toast = result.message.isNotEmpty
+          ? result.message
+          : 'Could not delete. Try again.');
       Future.delayed(const Duration(milliseconds: 2200), () {
         if (mounted) setState(() => _toast = null);
       });
@@ -717,7 +742,9 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
         ? fallbackMsg
         : (result.success
             ? (result.message.isNotEmpty ? result.message : fallbackMsg)
-            : (result.message.isNotEmpty ? result.message : 'Could not update preference'));
+            : (result.message.isNotEmpty
+                ? result.message
+                : 'Could not update preference'));
 
     if (result.success || optimistic) {
       setState(() => _toast = message);
@@ -733,10 +760,13 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
   @override
   Widget build(BuildContext context) {
     final user = widget.reel.user;
-    final layout = ReelLayoutMetrics.of(context, productStripOpen: _productStripOpen && _hasProducts);
-    final hasThumb = widget.reel.thumbnailUrl != null && widget.reel.thumbnailUrl!.isNotEmpty;
+    final layout = ReelLayoutMetrics.of(context,
+        productStripOpen: _productStripOpen && _hasProducts);
+    final hasThumb = widget.reel.thumbnailUrl != null &&
+        widget.reel.thumbnailUrl!.isNotEmpty;
     // ignore: unused_local_variable
-    final hasMusic = widget.reel.musicId != null && widget.reel.musicId!.isNotEmpty;
+    final hasMusic =
+        widget.reel.musicId != null && widget.reel.musicId!.isNotEmpty;
     final musicLabel = widget.reel.music;
     final showMusicLabel = musicLabel != null &&
         musicLabel.isNotEmpty &&
@@ -775,7 +805,8 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
                               fadeInDuration: Duration.zero,
                               fadeOutDuration: Duration.zero,
                               memCacheWidth: 600,
-                              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                              errorWidget: (_, __, ___) =>
+                                  const SizedBox.shrink(),
                             ),
                           ),
                         )
@@ -824,8 +855,12 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
                             return Transform.scale(
                               scale: scale,
                               child: ShaderMask(
-                                shaderCallback: (bounds) => const LinearGradient(
-                                  colors: [Color(0xFFFF2D55), Color(0xFFFF0055)],
+                                shaderCallback: (bounds) =>
+                                    const LinearGradient(
+                                  colors: [
+                                    Color(0xFFFF2D55),
+                                    Color(0xFFFF0055)
+                                  ],
                                 ).createShader(bounds),
                                 child: const Icon(
                                   Icons.favorite,
@@ -840,7 +875,9 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
                   ),
                 ),
                 if (!_initialized && !hasThumb)
-                  const Center(child: CircularProgressIndicator(color: Color(0xFFfb5404))),
+                  const Center(
+                      child:
+                          CircularProgressIndicator(color: Color(0xFFfb5404))),
               ],
             ),
           ),
@@ -875,11 +912,18 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
                 count: _likeCount,
                 onTap: _handleLike,
               ),
-              _ActionBtn(icon: Icons.chat_bubble_outline, label: _formatCount(_commentCount), onTap: _openComments),
-              _ActionBtn(icon: Icons.share_outlined, label: 'Share', onTap: _handleShare),
+              _ActionBtn(
+                  icon: Icons.chat_bubble_outline,
+                  label: _formatCount(_commentCount),
+                  onTap: _openComments),
+              _ActionBtn(
+                  icon: Icons.share_outlined,
+                  label: 'Share',
+                  onTap: _handleShare),
               // if (hasMusic)
               //   _ActionBtn(icon: Icons.music_note, label: 'Music', onTap: () {}),
-              _ActionBtn(icon: Icons.more_vert, label: '', onTap: _showInterestSheet),
+              _ActionBtn(
+                  icon: Icons.more_vert, label: '', onTap: _showInterestSheet),
               // Show shop bag when products exist but strip is hidden
               if (_hasProducts && !_productStripOpen)
                 _ActionBtn(
@@ -919,7 +963,8 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
                         user.displayName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: reelOverlayText(15).copyWith(fontWeight: FontWeight.w700),
+                        style: reelOverlayText(15)
+                            .copyWith(fontWeight: FontWeight.w700),
                       ),
                     ),
                   ),
@@ -933,21 +978,26 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
                       child: TextButton(
                         onPressed: _handleFollow,
                         style: TextButton.styleFrom(
-                          backgroundColor: Colors.white.withValues(alpha: _following ? 0.12 : 0.22),
+                          backgroundColor: Colors.white
+                              .withValues(alpha: _following ? 0.12 : 0.22),
                           foregroundColor: Colors.white,
                           side: BorderSide(
-                            color: Colors.white.withValues(alpha: _following ? 0.45 : 0.65),
+                            color: Colors.white
+                                .withValues(alpha: _following ? 0.45 : 0.65),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6)),
                         ),
                         child: Text(
                           _following ? 'Following' : 'Follow',
                           style: reelOverlayText(12).copyWith(
                             fontWeight: FontWeight.w600,
-                            color: Colors.white.withValues(alpha: _following ? 0.85 : 1),
+                            color: Colors.white
+                                .withValues(alpha: _following ? 0.85 : 1),
                           ),
                         ),
                       ),
@@ -976,7 +1026,8 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    reelOverlayIcon(Icons.music_note, color: Colors.white.withValues(alpha: 0.8), size: 14),
+                    reelOverlayIcon(Icons.music_note,
+                        color: Colors.white.withValues(alpha: 0.8), size: 14),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
@@ -1031,12 +1082,15 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
             bottom: layout.safeBottom + 72,
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.92),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Text(_toast!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)),
+                child: Text(_toast!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white)),
               ),
             ),
           ),

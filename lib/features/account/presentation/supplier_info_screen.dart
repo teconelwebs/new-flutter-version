@@ -265,7 +265,7 @@ class _SupplierInfoScreenState extends State<SupplierInfoScreen> {
                 padding: const EdgeInsets.only(left: 8.0, top: 8.0),
                 child: IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black, size: 24),
+                  icon: const Icon(Icons.chevron_left, color: Colors.black),
                 ),
               ),
 
