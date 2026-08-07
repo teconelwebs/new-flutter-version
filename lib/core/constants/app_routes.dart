@@ -38,5 +38,8 @@ class AppRoutes {
   static const notifications = '/profile/notifications';
   static const dynamicPromotion = '/home/dynamic-promotion';
   static const chatAi = '/chat-ai';
+  static const conversations = '/conversations';
+  static const chatRoom = '/chat-room';
+  static const createGroup = '/create-group';
 }
 

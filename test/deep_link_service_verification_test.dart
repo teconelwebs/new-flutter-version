@@ -77,7 +77,8 @@ void main() {
         'route': AppRoutes.contactSupport,
       },
       'https://www.welfog.com/about': {
-        'action': DeepLinkAction.none,
+        'action': DeepLinkAction.pushRoute,
+        'route': AppRoutes.about,
       },
       'https://www.welfog.com/page/terms-and-conditions': {
         'action': DeepLinkAction.pushRoute,

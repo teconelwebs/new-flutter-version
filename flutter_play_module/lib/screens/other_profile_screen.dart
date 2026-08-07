@@ -426,6 +426,12 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
           actions: [
             if (!isSelf && _profile != null)
               IconButton(
+                icon: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF1A1A1A)),
+                tooltip: 'Chat',
+                onPressed: () => _openChatWithUser(context),
+              ),
+            if (!isSelf && _profile != null)
+              IconButton(
                   icon: const Icon(Icons.more_vert),
                   onPressed: _showBlockSheet),
           ],
@@ -455,39 +461,20 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
                             slivers: [
                               if (_profile != null)
                                 SliverToBoxAdapter(
-                                    child: _buildHeader(_profile!, isSelf)),
-                              const SliverToBoxAdapter(
-                                child: Divider(
-                                    height: 1, color: Color(0xFFEEEEEE)),
-                              ),
+                                  child: _buildHeader(_profile!, isSelf),
+                                ),
                               if (_isBlocked)
                                 SliverToBoxAdapter(
                                   child: Padding(
-                                    padding: const EdgeInsets.all(32),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 40),
                                     child: Column(
+                                      // ignore: prefer_const_literals_to_create_immutables
                                       children: [
-                                        Container(
-                                          width: 80,
-                                          height: 80,
-                                          decoration: const BoxDecoration(
-                                            color: Color(0xFFF3F4F6),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Stack(
-                                            alignment: Alignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.shield_outlined,
-                                                size: 46,
-                                                color: Color(0xFF9CA3AF),
-                                              ),
-                                              Icon(
-                                                Icons.block_rounded,
-                                                size: 22,
-                                                color: Color(0xFFEF4444),
-                                              ),
-                                            ],
-                                          ),
+                                        const Icon(
+                                          Icons.block_rounded,
+                                          size: 44,
+                                          color: _textMuted,
                                         ),
                                         const SizedBox(height: 14),
                                         const Text('You blocked this user',
@@ -538,6 +525,11 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
         ),
       ),
     );
+  }
+
+  void _openChatWithUser(BuildContext context) {
+    final targetId = _profile?.id ?? widget.userId;
+    Navigator.pushNamed(context, '/chat-room', arguments: {'targetUserId': targetId});
   }
 
   Widget _errorView() {

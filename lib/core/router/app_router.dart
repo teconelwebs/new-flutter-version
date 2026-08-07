@@ -42,6 +42,12 @@ import '../deeplink/deep_link_service.dart';
 import '../../features/shop/presentation/shop_screen.dart';
 // TEMP: Chat AI route disabled — uncomment with AppRoutes.chatAi case.
 // import '../../features/chat_ai/presentation/chat_ai_screen.dart';
+import '../../features/chat/presentation/conversations_screen.dart';
+import '../../features/chat/presentation/chat_room_screen.dart';
+import '../../features/chat/presentation/create_group_screen.dart';
+import '../../features/chat/data/models/conversation_model.dart';
+import '../../features/chat/services/chat_api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 
 class AppRouter {
@@ -78,36 +84,17 @@ class AppRouter {
           name.startsWith('/dashboard/');
       if (isExternalLink) {
         if (resolution.action != DeepLinkAction.none) {
-          if (resolution.routeName == AppRoutes.product) {
-            final trimmed = resolution.arguments as String? ?? '';
-            if (trimmed.isNotEmpty) {
-              if (trimmed == ProductScreen.currentlyVisibleSlug) {
-                debugPrint('DeepLink Router: Slug $trimmed is already visible, ignoring push.');
-                return null;
-              }
-              if (shouldIgnoreSlug(trimmed)) {
-                debugPrint('DeepLink Router: Skip duplicate push for slug: $trimmed');
-                return null;
-              }
-              lastResolvedSlug = trimmed;
-              return MaterialPageRoute(
-                settings: settings,
-                builder: (_) => ProductScreen(slug: trimmed),
-              );
-            }
-          } else {
-            // For other web links (home, dashboard, cart, shop, etc.) on cold start,
-            // we boot to HomeScreen first. HomeScreen's initial link handler
-            // will push the specific screen once mounted.
-            final args = resolution.arguments;
-            final tabIndex = (args is Map && args['tab'] is int)
-                ? args['tab'] as int
-                : 0;
-            return MaterialPageRoute(
-              settings: settings,
-              builder: (_) => HomeScreen(initialTab: tabIndex),
-            );
-          }
+          // For all web links (home, product, dashboard, cart, shop, etc.) on cold start,
+          // we boot to HomeScreen first. HomeScreen's initial link handler
+          // will push the specific screen once mounted.
+          final args = resolution.arguments;
+          final tabIndex = (args is Map && args['tab'] is int)
+              ? args['tab'] as int
+              : 0;
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => HomeScreen(initialTab: tabIndex),
+          );
         }
       } else {
         // Original logic for internal/relative routes (like '/products/some-slug')
@@ -401,6 +388,78 @@ class AppRouter {
       //     settings: settings,
       //     builder: (_) => ChatAiScreen(userId: userId),
       //   );
+      case AppRoutes.conversations:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const ConversationsScreen(),
+        );
+      case AppRoutes.chatRoom:
+        if (settings.arguments is ConversationModel) {
+          final conv = settings.arguments as ConversationModel;
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => ChatRoomScreen(conversation: conv),
+          );
+        } else if (settings.arguments is Map) {
+          final map = settings.arguments as Map;
+          final targetUserId = map['targetUserId']?.toString() ?? '';
+          return MaterialPageRoute(
+            settings: settings,
+            builder: (_) => FutureBuilder<ConversationModel>(
+              future: () async {
+                final prefs = await SharedPreferences.getInstance();
+                final cachedUserId = prefs.getString('cached_user_id') ?? '';
+                final savedUserId = prefs.getString('user_id') ?? '';
+                final savedPlayId = prefs.getString('play_user_id') ?? '';
+
+                String currentUserId = 'guest';
+                if (cachedUserId.isNotEmpty) {
+                  currentUserId = cachedUserId;
+                } else if (savedUserId.isNotEmpty) {
+                  currentUserId = savedUserId;
+                } else if (savedPlayId.isNotEmpty) {
+                  currentUserId = savedPlayId;
+                }
+
+                return ChatApiService.instance.getOrCreateOneToOneConversation(
+                  userId: currentUserId,
+                  targetUserId: targetUserId,
+                );
+              }(),
+              builder: (context, snapshot) {
+                if (snapshot.hasData) {
+                  return ChatRoomScreen(conversation: snapshot.data!);
+                } else if (snapshot.hasError) {
+                  return Scaffold(
+                    appBar: AppBar(title: const Text('Chat')),
+                    body: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Text(
+                          'Unable to open chat: ${snapshot.error}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator(color: Color(0xFF1A1A1A))),
+                );
+              },
+            ),
+          );
+        }
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const ConversationsScreen(),
+        );
+      case AppRoutes.createGroup:
+        return MaterialPageRoute(
+          settings: settings,
+          builder: (_) => const CreateGroupScreen(),
+        );
       default:
         return play.AppRoutes.onGenerateRoute(settings);
     }
