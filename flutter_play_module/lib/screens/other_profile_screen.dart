@@ -469,6 +469,7 @@ class _OtherProfileScreenState extends State<OtherProfileScreen>
                                     padding: const EdgeInsets.symmetric(
                                         vertical: 40),
                                     child: Column(
+                                      // ignore: prefer_const_literals_to_create_immutables
                                       children: [
                                         const Icon(
                                           Icons.block_rounded,
