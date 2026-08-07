@@ -760,14 +760,33 @@ class _ReelItemWidgetState extends State<ReelItemWidget> {
               fit: StackFit.expand,
               children: [
                 if (hasThumb && !_playbackStarted)
-                  CachedNetworkImage(
-                    imageUrl: widget.reel.thumbnailUrl!,
-                    fit: BoxFit.cover,
-                    fadeInDuration: Duration.zero,
-                    fadeOutDuration: Duration.zero,
-                    memCacheWidth: 600,
-                    errorWidget: (_, __, ___) => const SizedBox.shrink(),
-                  ),
+                  _initialized &&
+                          _controller != null &&
+                          _controller!.value.size.width > 0 &&
+                          _controller!.value.size.height > 0
+                      ? FittedBox(
+                          fit: BoxFit.cover,
+                          child: SizedBox(
+                            width: _controller!.value.size.width,
+                            height: _controller!.value.size.height,
+                            child: CachedNetworkImage(
+                              imageUrl: widget.reel.thumbnailUrl!,
+                              fit: BoxFit.cover,
+                              fadeInDuration: Duration.zero,
+                              fadeOutDuration: Duration.zero,
+                              memCacheWidth: 600,
+                              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                            ),
+                          ),
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: widget.reel.thumbnailUrl!,
+                          fit: BoxFit.cover,
+                          fadeInDuration: Duration.zero,
+                          fadeOutDuration: Duration.zero,
+                          memCacheWidth: 600,
+                          errorWidget: (_, __, ___) => const SizedBox.shrink(),
+                        ),
                 if (_initialized && _controller != null)
                   FittedBox(
                     fit: BoxFit.cover,

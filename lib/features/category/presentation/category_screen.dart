@@ -76,7 +76,7 @@ class _CategoryScreenState extends State<CategoryScreen>
       
       setState(() {});
       if (_categories.isNotEmpty) {
-        _lazyLoadInner(0);
+        _preloadAllCategories();
       }
     } catch (e) {
       debugPrint('Error loading main categories: $e');
@@ -121,21 +121,30 @@ class _CategoryScreenState extends State<CategoryScreen>
     return future;
   }
 
+  Future<void> _preloadAllCategories() async {
+    for (int i = 0; i < _categories.length; i++) {
+      if (!mounted) return;
+      try {
+        await _lazyLoadInner(i);
+      } catch (_) {}
+      await Future.delayed(const Duration(milliseconds: 30));
+    }
+  }
+
   double _calculateBlockHeight(int i) {
     if (i < 0 || i >= _categories.length) return 0.0;
     
     double height = 0.0;
     
-    // Add banner height for index 0 if banner is present
     if (i == 0 && _bannerImage.isNotEmpty) {
-      final double rightPanelWidth = MediaQuery.sizeOf(context).width - 86 - 24; // Screen width - sidebar width - paddings
-      final double bannerHeight = rightPanelWidth * (9 / 16); // 16:9 ratio
-      height += bannerHeight + 14.0; // Banner height + spacing
+      final double rightPanelWidth = MediaQuery.sizeOf(context).width - 86 - 24;
+      final double bannerHeight = rightPanelWidth * (9 / 16);
+      height += bannerHeight + 14.0;
     }
 
     final block = _innerCategories[i];
     if (block == null) {
-      return height + 163.0; // Skeleton loader height
+      return height + 163.0;
     }
 
     if (block.isEmpty) {
@@ -143,12 +152,12 @@ class _CategoryScreenState extends State<CategoryScreen>
     }
 
     for (final s in block) {
-      double sectionHeight = 18.0; // Padding bottom
-      sectionHeight += 17.0 + 10.0; // Text height + spacing
+      double sectionHeight = 18.0;
+      sectionHeight += 17.0 + 10.0;
       
       final int rowCount = (s.children.length / 3).ceil();
       if (rowCount > 0) {
-        sectionHeight += rowCount * 99.0 + (rowCount - 1) * 14.0; // Grid item height + spacing
+        sectionHeight += rowCount * 99.0 + (rowCount - 1) * 14.0;
       }
       
       height += sectionHeight;
@@ -187,43 +196,67 @@ class _CategoryScreenState extends State<CategoryScreen>
 
     _scrollToLeftIndex(index);
 
-    // Scroll to computed math offset immediately for instant visual feedback
-    if (_rightScrollController.hasClients) {
-      final double targetOffset = _getTargetScrollOffset(index);
-      _rightScrollController.animateTo(
-        targetOffset.clamp(0.0, _rightScrollController.position.maxScrollExtent),
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeInOut,
-      );
+    Future<void> performScroll() async {
+      final key = _blockKeys[index];
+      if (key != null && key.currentContext != null) {
+        await Scrollable.ensureVisible(
+          key.currentContext!,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+        );
+      } else {
+        if (_rightScrollController.hasClients) {
+          final double targetOffset = _getTargetScrollOffset(index);
+          await _rightScrollController.animateTo(
+            targetOffset.clamp(0.0, _rightScrollController.position.maxScrollExtent),
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+          );
+        }
+      }
     }
 
     if (_innerCategories[index] == null) {
+      performScroll();
       _lazyLoadInner(index).then((_) {
         if (!mounted || _activeIndex != index) return;
         
-        WidgetsBinding.instance.addPostFrameCallback((_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (!mounted || _activeIndex != index) return;
-          if (_rightScrollController.hasClients) {
-            final double targetOffset = _getTargetScrollOffset(index);
-            _rightScrollController.animateTo(
-              targetOffset.clamp(0.0, _rightScrollController.position.maxScrollExtent),
+          final keyAfterLoad = _blockKeys[index];
+          if (keyAfterLoad != null && keyAfterLoad.currentContext != null) {
+            await Scrollable.ensureVisible(
+              keyAfterLoad.currentContext!,
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeInOut,
             );
+          } else {
+            if (_rightScrollController.hasClients) {
+              final double targetOffset = _getTargetScrollOffset(index);
+              await _rightScrollController.animateTo(
+                targetOffset.clamp(0.0, _rightScrollController.position.maxScrollExtent),
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+              );
+            }
           }
+          await Future.delayed(const Duration(milliseconds: 80));
           if (mounted && _activeIndex == index) {
             setState(() {
               _isSidebarClick = false;
             });
+            _onRightScroll();
           }
         });
       });
     } else {
-      Future.delayed(const Duration(milliseconds: 250), () {
+      performScroll().then((_) async {
+        await Future.delayed(const Duration(milliseconds: 120));
         if (mounted && _activeIndex == index) {
           setState(() {
             _isSidebarClick = false;
           });
+          _onRightScroll();
         }
       });
     }
@@ -257,7 +290,12 @@ class _CategoryScreenState extends State<CategoryScreen>
             const threshold = 80.0;
             if (relativeTop <= threshold && relativeTop + height > threshold) {
               activeIdx = i;
-              break;
+            }
+            
+            // Check visibility for preloading (within viewport + 300px buffer)
+            final viewportHeight = scrollBox.size.height;
+            if (relativeTop < viewportHeight + 300 && relativeTop + height > -300) {
+              _lazyLoadInner(i);
             }
           }
         }
@@ -271,6 +309,13 @@ class _CategoryScreenState extends State<CategoryScreen>
         _activeIndex = activeIdx!;
       });
       _scrollToLeftIndex(activeIdx);
+      _lazyLoadInner(activeIdx);
+      if (activeIdx + 1 < _categories.length) {
+        _lazyLoadInner(activeIdx + 1);
+      }
+      if (activeIdx - 1 >= 0) {
+        _lazyLoadInner(activeIdx - 1);
+      }
     }
   }
 
@@ -581,7 +626,6 @@ class _CategoryScreenState extends State<CategoryScreen>
                         
                         // Load item lazily if null
                         if (block == null) {
-                          _lazyLoadInner(i);
                           return Container(
                             key: key,
                             child: const _CategorySkeletonLoader(),
