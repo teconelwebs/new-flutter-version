@@ -34,6 +34,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   int _currentPage = 1;
   bool _hasMore = true;
   bool _loadingMore = false;
+  bool _showShadow = false;
 
   @override
   void initState() {
@@ -57,6 +58,17 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
   void _onScroll() {
     if (!_scrollController.hasClients) return;
+
+    // Detect scroll for header shadow
+    // ignore: prefer_const_declarations
+    final double threshold = 5.0;
+    final bool shouldShowShadow = _scrollController.offset > threshold;
+    if (shouldShowShadow != _showShadow) {
+      setState(() {
+        _showShadow = shouldShowShadow;
+      });
+    }
+
     final maxScroll = _scrollController.position.maxScrollExtent;
     final currentScroll = _scrollController.position.pixels;
     if (maxScroll - currentScroll <= 200) {
@@ -161,7 +173,9 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           _hasMore = false;
         } else {
           final existingIds = _products.map((p) => p.id).toSet();
-          final newProducts = payload.products.where((p) => !existingIds.contains(p.id)).toList();
+          final newProducts = payload.products
+              .where((p) => !existingIds.contains(p.id))
+              .toList();
           if (newProducts.isEmpty) {
             _hasMore = false;
           } else {
@@ -226,7 +240,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.close, color: Color(0xFF333333)),
+                            icon: const Icon(Icons.close,
+                                color: Color(0xFF333333)),
                             onPressed: () => Navigator.pop(context),
                           ),
                         ],
@@ -324,7 +339,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.close, color: Color(0xFF333333)),
+                            icon: const Icon(Icons.close,
+                                color: Color(0xFF333333)),
                             onPressed: () => Navigator.pop(context),
                           ),
                         ],
@@ -400,7 +416,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                               Wrap(
                                 spacing: 12,
                                 runSpacing: 12,
-                                children: List.generate(_colors.length, (index) {
+                                children:
+                                    List.generate(_colors.length, (index) {
                                   final colorItem = _colors[index];
                                   final isSelected =
                                       _isSameColor(_selectedColor, colorItem);
@@ -470,8 +487,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       final idA = a['id']?.toString();
       final idB = b['id']?.toString();
       if (idA != null && idB != null && idA == idB) return true;
-      final codeA = (a['code'] ?? a['color_code'] ?? a['color'] ?? '').toString();
-      final codeB = (b['code'] ?? b['color_code'] ?? b['color'] ?? '').toString();
+      final codeA =
+          (a['code'] ?? a['color_code'] ?? a['color'] ?? '').toString();
+      final codeB =
+          (b['code'] ?? b['color_code'] ?? b['color'] ?? '').toString();
       if (codeA.isNotEmpty && codeA == codeB) return true;
     }
     return false;
@@ -493,7 +512,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
     final lowerName = colorName.toLowerCase();
     final isExplicitMulti = colorCode.contains('linear-gradient');
-    final isMultiName = lowerName.contains('multi') || lowerName.contains('rainbow');
+    final isMultiName =
+        lowerName.contains('multi') || lowerName.contains('rainbow');
     final isComboName = lowerName.contains('combo');
 
     BoxDecoration decoration;
@@ -578,7 +598,9 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 10,
-                  color: isSelected ? const Color(0xFFFB5404) : const Color(0xFF666666),
+                  color: isSelected
+                      ? const Color(0xFFFB5404)
+                      : const Color(0xFF666666),
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
@@ -593,7 +615,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     try {
       final regex = RegExp(r'#(?:[0-9a-fA-F]{3}){1,2}\b');
       final matches = regex.allMatches(raw);
-      final colors = matches.map((m) => _parseSingleColor(m.group(0)!)).toList();
+      final colors =
+          matches.map((m) => _parseSingleColor(m.group(0)!)).toList();
       if (colors.length >= 2) return colors;
     } catch (_) {}
     return [Colors.black, Colors.white];
@@ -627,7 +650,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     if (hasCategoryFilter) {
       final match = _categories.firstWhere(
         (c) => c.id == _selectedCategory,
-        orElse: () => const SearchCategory(id: '', name: 'Category', iconUrl: ''),
+        orElse: () =>
+            const SearchCategory(id: '', name: 'Category', iconUrl: ''),
       );
       categoryName = match.name;
     }
@@ -682,6 +706,82 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     );
   }
 
+  Widget _buildMiniColorCircle(dynamic colorItem) {
+    String colorCode = '';
+    String colorName = '';
+    if (colorItem is String) {
+      colorCode = colorItem;
+    } else if (colorItem is Map) {
+      colorCode = (colorItem['color_code'] ??
+              colorItem['code'] ??
+              colorItem['color'] ??
+              '#CCC')
+          .toString();
+      colorName = (colorItem['name'] ?? '').toString();
+    }
+
+    final lowerName = colorName.toLowerCase();
+    final isExplicitMulti = colorCode.contains('linear-gradient');
+    final isMultiName =
+        lowerName.contains('multi') || lowerName.contains('rainbow');
+    final isComboName = lowerName.contains('combo');
+
+    BoxDecoration decoration;
+    if (isExplicitMulti || isMultiName) {
+      List<Color> gradientColors = [];
+      if (isExplicitMulti) {
+        gradientColors = _extractGradientColors(colorCode);
+      }
+      if (gradientColors.length < 2) {
+        gradientColors = const [
+          Color(0xFFFF0000),
+          Color(0xFFFF7F00),
+          Color(0xFFFFFF00),
+          Color(0xFF00FF00),
+          Color(0xFF0000FF),
+          Color(0xFF4B0082),
+          Color(0xFF8B00FF),
+        ];
+      }
+      decoration = BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradientColors,
+        ),
+        border: Border.all(color: const Color(0xFFDDDDDD), width: 0.5),
+      );
+    } else if (isComboName) {
+      decoration = BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF111111),
+            Color(0xFFFB5404),
+            Color(0xFFFFFFFF),
+          ],
+        ),
+        border: Border.all(color: const Color(0xFFDDDDDD), width: 0.5),
+      );
+    } else {
+      final parsedColor = _parseSingleColor(colorCode);
+      decoration = BoxDecoration(
+        color: parsedColor,
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFDDDDDD), width: 0.5),
+      );
+    }
+
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: decoration,
+    );
+  }
+
   Widget _buildActiveTag({
     required String label,
     dynamic colorItem,
@@ -699,11 +799,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (colorItem != null) ...[
-            SizedBox(
-              width: 12,
-              height: 12,
-              child: _buildColorCircle(colorItem, false),
-            ),
+            _buildMiniColorCircle(colorItem),
             const SizedBox(width: 6),
           ],
           Text(
@@ -731,7 +827,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
-      child: Scaffold(
+        child: Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         titleSpacing: 0,
@@ -740,7 +836,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         scrolledUnderElevation: 0,
         title: Text(
           _query.isNotEmpty ? _query : 'Products',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black),
+          style: const TextStyle(
+              fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black),
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
@@ -829,86 +926,10 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // Filter & Sort Bar
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: _showFilterSheet,
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFAFAFA),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFDDDDDD)),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.filter_alt_outlined, size: 18, color: Color(0xFF666666)),
-                          SizedBox(width: 6),
-                          Text(
-                            'Filters',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF666666),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: InkWell(
-                    onTap: _showSortSheet,
-                    borderRadius: BorderRadius.circular(6),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFAFAFA),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFDDDDDD)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            _currentSortLabel,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF666666),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Icon(
-                            Icons.keyboard_arrow_down,
-                            size: 18,
-                            color: Color(0xFF666666),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Active Filters Badges
-          _buildActiveFiltersBar(),
-
-          // Products List Grid
-          Expanded(
+          // 1. Scrollable Products List (Bottom Layer)
+          Positioned.fill(
             child: _loading
                 ? const Center(
                     child: CircularProgressIndicator(color: Color(0xFFFB5404)),
@@ -946,21 +967,33 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                           }
                         }
 
+                        // Determine if there are active filters to compute dynamic header height
+                        final hasActiveFilters = (_selectedCategory != null &&
+                                _selectedCategory!.isNotEmpty &&
+                                _selectedCategory != widget.categoryId) ||
+                            _selectedColor != null ||
+                            _sortBy.isNotEmpty;
+                        final headerHeight = hasActiveFilters ? 98.0 : 52.0;
+
                         return SingleChildScrollView(
                           controller: _scrollController,
                           physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                           child: Column(
                             children: [
+                              // Push content down below the floating header
+                              SizedBox(height: headerHeight),
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: leftColumnItems
                                           .map((item) => Padding(
-                                                padding: const EdgeInsets.only(bottom: 12),
+                                                padding: const EdgeInsets.only(
+                                                    bottom: 12),
                                                 child: ProductCard(item: item),
                                               ))
                                           .toList(),
@@ -969,10 +1002,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: rightColumnItems
                                           .map((item) => Padding(
-                                                padding: const EdgeInsets.only(bottom: 12),
+                                                padding: const EdgeInsets.only(
+                                                    bottom: 12),
                                                 child: ProductCard(item: item),
                                               ))
                                           .toList(),
@@ -984,13 +1019,120 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                 const Padding(
                                   padding: EdgeInsets.symmetric(vertical: 16),
                                   child: Center(
-                                    child: CircularProgressIndicator(color: Color(0xFFFB5404)),
+                                    child: CircularProgressIndicator(
+                                        color: Color(0xFFFB5404)),
                                   ),
                                 ),
                             ],
                           ),
                         );
                       })(),
+          ),
+
+          // 2. Floating Filter & Sort Bar + Active Filters Header (Top Layer - paints ON TOP of scrolling products)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: _showShadow
+                        // ignore: deprecated_member_use
+                        ? Colors.black.withOpacity(0.08)
+                        : Colors.transparent,
+                    blurRadius: _showShadow ? 16 : 0,
+                    spreadRadius: _showShadow ? 1.5 : 0,
+                    offset: Offset(0, _showShadow ? 6 : 0),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    color: Colors.white,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: _showFilterSheet,
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFAFAFA),
+                                borderRadius: BorderRadius.circular(6),
+                                border:
+                                    Border.all(color: const Color(0xFFDDDDDD)),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.filter_alt_outlined,
+                                      size: 18, color: Color(0xFF666666)),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Filters',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Color(0xFF666666),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: InkWell(
+                            onTap: _showSortSheet,
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFAFAFA),
+                                borderRadius: BorderRadius.circular(6),
+                                border:
+                                    Border.all(color: const Color(0xFFDDDDDD)),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    _currentSortLabel,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Color(0xFF666666),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Icon(
+                                    Icons.keyboard_arrow_down,
+                                    size: 18,
+                                    color: Color(0xFF666666),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _buildActiveFiltersBar(),
+                ],
+              ),
+            ),
           ),
         ],
       ),

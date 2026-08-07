@@ -586,15 +586,70 @@ class ReelsApi {
     }
     final body = jsonDecode(response.body);
     Map<String, dynamic>? data;
-    if (body is Map<String, dynamic>) {
-      if (body['data'] is List && (body['data'] as List).isNotEmpty) {
-        data = (body['data'] as List).first as Map<String, dynamic>;
-      } else {
-        data = body;
+    final List<Map<String, dynamic>> candidates = [];
+
+    void addCandidate(dynamic item) {
+      if (item is Map && (item['_id'] ?? item['id']) != null) {
+        candidates.add(Map<String, dynamic>.from(item));
       }
-    } else if (body is List && body.isNotEmpty) {
-      data = body.first as Map<String, dynamic>;
     }
+
+    if (body is Map<String, dynamic>) {
+      if (body['data'] is List) {
+        for (final item in body['data'] as List) {
+          addCandidate(item);
+        }
+      } else {
+        addCandidate(body);
+      }
+    } else if (body is List) {
+      for (final item in body) {
+        addCandidate(item);
+      }
+    }
+
+    if (candidates.isNotEmpty) {
+      Map<String, dynamic>? best;
+      for (final raw in candidates) {
+        if (best == null) {
+          best = raw;
+          continue;
+        }
+
+        final bestUsername = (best['username'] ?? '').toString().toLowerCase();
+        final curUsername = (raw['username'] ?? '').toString().toLowerCase();
+
+        final bestIsPlaceholder = bestUsername.isEmpty ||
+            bestUsername.startsWith('pending_') ||
+            bestUsername.startsWith('temp_') ||
+            RegExp(r'^user\d+$').hasMatch(bestUsername);
+
+        final curIsPlaceholder = curUsername.isEmpty ||
+            curUsername.startsWith('pending_') ||
+            curUsername.startsWith('temp_') ||
+            RegExp(r'^user\d+$').hasMatch(curUsername);
+
+        if (bestIsPlaceholder && !curIsPlaceholder) {
+          best = raw;
+        } else if (!bestIsPlaceholder && curIsPlaceholder) {
+          // Keep best
+        } else {
+          final bestPosts = int.tryParse(best['postCount']?.toString() ?? '0') ?? 0;
+          final curPosts = int.tryParse(raw['postCount']?.toString() ?? '0') ?? 0;
+          if (curPosts > bestPosts) {
+            best = raw;
+          } else if (curPosts == bestPosts) {
+            final bestId = (best['_id'] ?? best['id'] ?? '').toString();
+            final curId = (raw['_id'] ?? raw['id'] ?? '').toString();
+            if (curId.isNotEmpty && bestId.isNotEmpty && curId.compareTo(bestId) < 0) {
+              best = raw;
+            }
+          }
+        }
+      }
+      data = best;
+    }
+
     if (data == null) throw Exception('Invalid profile response');
     return UserProfile.fromJson(data);
   }

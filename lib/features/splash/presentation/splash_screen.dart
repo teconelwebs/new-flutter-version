@@ -30,12 +30,12 @@ class _SplashScreenState extends State<SplashScreen>
   Timer? _progressTimer;
 
   String _getLoadingText() {
-    final int elapsedMs = (_loadingProgress * 3500).toInt();
-    if (elapsedMs < 800) {
+    final int elapsedMs = (_loadingProgress * 2000).toInt();
+    if (elapsedMs < 500) {
       return "Getting things ready…";
-    } else if (elapsedMs < 1600) {
+    } else if (elapsedMs < 1000) {
       return "Loading deals & Play…";
-    } else if (elapsedMs < 2400) {
+    } else if (elapsedMs < 1500) {
       return "Almost there…";
     } else {
       return "Welcome to Welfog";
@@ -75,9 +75,9 @@ class _SplashScreenState extends State<SplashScreen>
 
     _animController.forward();
 
-    // 2. Setup smooth filling progress timer (ticks every 30ms -> total duration 3.5 seconds)
+    // 2. Setup smooth filling progress timer (ticks every 30ms -> total duration 2.0 seconds)
     const int stepDurationMs = 30;
-    const double stepSize = 30.0 / 3500.0;
+    const double stepSize = 30.0 / 2000.0;
 
     _progressTimer = Timer.periodic(const Duration(milliseconds: stepDurationMs), (timer) {
       if (!mounted) return;

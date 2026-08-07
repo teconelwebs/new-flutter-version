@@ -90,12 +90,15 @@ class _SearchScreenState extends State<SearchScreen> {
   double _videoTileWidth(BuildContext context) {
     const horizontalPadding = 24.0;
     final inner = MediaQuery.sizeOf(context).width - horizontalPadding;
-    return (inner - _gridSpacing * (_gridCrossAxisCount - 1)) / _gridCrossAxisCount;
+    return (inner - _gridSpacing * (_gridCrossAxisCount - 1)) /
+        _gridCrossAxisCount;
   }
 
-  double _videoTileHeight(BuildContext context) => _videoTileWidth(context) / _gridAspectRatio;
+  double _videoTileHeight(BuildContext context) =>
+      _videoTileWidth(context) / _gridAspectRatio;
 
-  int get _videoRowCount => (_videos.length + _gridCrossAxisCount - 1) ~/ _gridCrossAxisCount;
+  int get _videoRowCount =>
+      (_videos.length + _gridCrossAxisCount - 1) ~/ _gridCrossAxisCount;
 
   void _prefetchVideoThumbnails(Iterable<SearchVideoHit> videos) {
     if (!mounted) return;
@@ -118,11 +121,15 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   List<SearchUserHit> _filterBlockedUsers(List<SearchUserHit> users) {
-    return users.where((u) => !PlaySessionRegistry.isSearchUserBlocked(u)).toList();
+    return users
+        .where((u) => !PlaySessionRegistry.isSearchUserBlocked(u))
+        .toList();
   }
 
   List<SearchVideoHit> _filterBlockedVideos(List<SearchVideoHit> videos) {
-    return videos.where((v) => !PlaySessionRegistry.isSearchVideoBlocked(v)).toList();
+    return videos
+        .where((v) => !PlaySessionRegistry.isSearchVideoBlocked(v))
+        .toList();
   }
 
   void _purgeBlockedContent() {
@@ -293,7 +300,8 @@ class _SearchScreenState extends State<SearchScreen> {
         children: [
           IconButton(
             onPressed: _handleBack,
-            icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Color(0xFF333333)),
+            icon: const Icon(Icons.arrow_back_ios_new,
+                size: 20, color: Color(0xFF333333)),
             padding: const EdgeInsets.all(8),
           ),
           Expanded(
@@ -311,14 +319,17 @@ class _SearchScreenState extends State<SearchScreen> {
                 style: const TextStyle(fontSize: 15, color: Color(0xFF111827)),
                 decoration: InputDecoration(
                   hintText: 'Search videos, accounts...',
-                  hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-                  prefixIcon: const Icon(Icons.search, color: Color(0xFF9CA3AF), size: 20),
+                  hintStyle:
+                      const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+                  prefixIcon: const Icon(Icons.search,
+                      color: Color(0xFF9CA3AF), size: 20),
                   suffixIcon: _query.isNotEmpty
                       ? GestureDetector(
                           onTap: () => _queryController.clear(),
                           child: const Padding(
                             padding: EdgeInsets.all(12),
-                            child: Icon(Icons.cancel, color: Color(0xFF9CA3AF), size: 18),
+                            child: Icon(Icons.cancel,
+                                color: Color(0xFF9CA3AF), size: 18),
                           ),
                         )
                       : null,
@@ -355,7 +366,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     onTap: () => setState(() => _selectedTab = i),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 8),
                       decoration: BoxDecoration(
                         color: selected ? _accent : Colors.transparent,
                         borderRadius: BorderRadius.circular(20),
@@ -368,7 +380,8 @@ class _SearchScreenState extends State<SearchScreen> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: selected ? Colors.white : const Color(0xFF4B5563),
+                          color:
+                              selected ? Colors.white : const Color(0xFF4B5563),
                         ),
                       ),
                     ),
@@ -408,7 +421,9 @@ class _SearchScreenState extends State<SearchScreen> {
               'Accounts',
               icon: Icons.person_outline,
               count: _users.length,
-              onSeeAll: _users.length > 5 ? () => setState(() => _selectedTab = 2) : null,
+              onSeeAll: _users.length > 5
+                  ? () => setState(() => _selectedTab = 2)
+                  : null,
             ),
           ),
           SliverToBoxAdapter(
@@ -425,7 +440,8 @@ class _SearchScreenState extends State<SearchScreen> {
                   return Column(
                     children: [
                       _buildUserRow(e.value),
-                      if (!isLast) const Divider(height: 1, indent: 64, endIndent: 16),
+                      if (!isLast)
+                        const Divider(height: 1, indent: 64, endIndent: 16),
                     ],
                   );
                 }).toList(),
@@ -454,7 +470,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildVideosTab() {
     if (_videos.isEmpty) {
-      return _emptySection('No videos found for "$_query"', Icons.videocam_off_outlined);
+      return _emptySection(
+          'No videos found for "$_query"', Icons.videocam_off_outlined);
     }
     return FlashList<int>(
       data: List.generate(_videoRowCount, (i) => i),
@@ -466,7 +483,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildAccountsTab() {
     if (_users.isEmpty) {
-      return _emptySection('No accounts found for "$_query"', Icons.person_off_outlined);
+      return _emptySection(
+          'Account not found "$_query"', Icons.person_off_outlined);
     }
     return FlashList<SearchUserHit>(
       data: _users,
@@ -545,7 +563,10 @@ class _SearchScreenState extends State<SearchScreen> {
               children: [
                 const Text(
                   'Recent Searches',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111827)),
                 ),
                 const Spacer(),
                 GestureDetector(
@@ -553,7 +574,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     await RecentSearchStore.clear();
                     if (mounted) setState(() => _recent = []);
                   },
-                  child: const Text('Clear all', style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
+                  child: const Text('Clear all',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
                 ),
               ],
             ),
@@ -573,25 +595,33 @@ class _SearchScreenState extends State<SearchScreen> {
                   children: [
                     ListTile(
                       dense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
                       leading: CircleAvatar(
                         radius: 20,
                         backgroundColor: const Color(0xFFE5E7EB),
-                        backgroundImage: user.profilePicture != null && user.profilePicture!.isNotEmpty
+                        backgroundImage: user.profilePicture != null &&
+                                user.profilePicture!.isNotEmpty
                             ? NetworkImage(user.profilePicture!)
                             : null,
-                        child: user.profilePicture == null || user.profilePicture!.isEmpty
-                            ? const Icon(Icons.person, color: Color(0xFF9CA3AF), size: 20)
+                        child: user.profilePicture == null ||
+                                user.profilePicture!.isEmpty
+                            ? const Icon(Icons.person,
+                                color: Color(0xFF9CA3AF), size: 20)
                             : null,
                       ),
-                      title: Text(user.username, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      title: Text(user.username,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 14)),
                       trailing: IconButton(
-                        icon: const Icon(Icons.close, color: Color(0xFF9CA3AF), size: 18),
+                        icon: const Icon(Icons.close,
+                            color: Color(0xFF9CA3AF), size: 18),
                         onPressed: () => _deleteRecent(user.username),
                       ),
                       onTap: () => _selectUser(user),
                     ),
-                    if (!isLast) const Divider(height: 1, indent: 64, endIndent: 16),
+                    if (!isLast)
+                      const Divider(height: 1, indent: 64, endIndent: 16),
                   ],
                 );
               }).toList(),
@@ -605,7 +635,11 @@ class _SearchScreenState extends State<SearchScreen> {
             children: [
               Icon(Icons.local_fire_department, color: _accent, size: 20),
               SizedBox(width: 6),
-              Text('Popular Videos', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+              Text('Popular Videos',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111827))),
             ],
           ),
         ),
@@ -639,7 +673,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   // ─── Shared widgets ───────────────────────────────────────────────────────
 
-  Widget _sectionHeader(String title, {IconData? icon, int? count, VoidCallback? onSeeAll}) {
+  Widget _sectionHeader(String title,
+      {IconData? icon, int? count, VoidCallback? onSeeAll}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
@@ -648,20 +683,34 @@ class _SearchScreenState extends State<SearchScreen> {
             Icon(icon, size: 17, color: _accent),
             const SizedBox(width: 6),
           ],
-          Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF111827))),
           if (count != null && count > 0) ...[
             const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(10)),
-              child: Text('$count', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF6B7280))),
+              decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(10)),
+              child: Text('$count',
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF6B7280))),
             ),
           ],
           const Spacer(),
           if (onSeeAll != null)
             GestureDetector(
               onTap: onSeeAll,
-              child: const Text('See all', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _accent)),
+              child: const Text('See all',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: _accent)),
             ),
         ],
       ),
@@ -679,9 +728,10 @@ class _SearchScreenState extends State<SearchScreen> {
             CircleAvatar(
               radius: 22,
               backgroundColor: const Color(0xFFE5E7EB),
-              backgroundImage: user.profilePicture != null && user.profilePicture!.isNotEmpty
-                  ? NetworkImage(user.profilePicture!)
-                  : null,
+              backgroundImage:
+                  user.profilePicture != null && user.profilePicture!.isNotEmpty
+                      ? NetworkImage(user.profilePicture!)
+                      : null,
               child: user.profilePicture == null || user.profilePicture!.isEmpty
                   ? const Icon(Icons.person, color: Color(0xFF9CA3AF), size: 22)
                   : null,
@@ -691,15 +741,26 @@ class _SearchScreenState extends State<SearchScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(user.username, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF111827))),
+                  Text(user.username,
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111827))),
                   if (user.followersCount > 0)
-                    Text('${user.followersCount} followers', style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+                    Text('${user.followersCount} followers',
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF6B7280))),
                   if (user.bio != null && user.bio!.isNotEmpty)
-                    Text(user.bio!, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
+                    Text(user.bio!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF9CA3AF))),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios, size: 13, color: Color(0xFFD1D5DB)),
+            const Icon(Icons.arrow_forward_ios,
+                size: 13, color: Color(0xFFD1D5DB)),
           ],
         ),
       ),
@@ -745,7 +806,8 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                   fit: BoxFit.cover,
                   gaplessPlayback: true,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.videocam, color: Colors.white54),
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.videocam, color: Colors.white54),
                 )
               : const Icon(Icons.videocam, color: Colors.white54),
         ),
@@ -760,9 +822,15 @@ class _SearchScreenState extends State<SearchScreen> {
         children: [
           Icon(Icons.search_off_rounded, size: 56, color: Colors.grey.shade300),
           const SizedBox(height: 12),
-          Text('No results for "$_query"', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF6B7280))),
+          Text('No results for "$_query"',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF6B7280))),
           const SizedBox(height: 6),
-          const Text('Try a different search term', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13)),
+          const Text('Try a different search term',
+              style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13)),
         ],
       ),
     );
@@ -775,7 +843,9 @@ class _SearchScreenState extends State<SearchScreen> {
         children: [
           Icon(icon, size: 48, color: Colors.grey.shade300),
           const SizedBox(height: 12),
-          Text(msg, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 14)),
+          Text(msg,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFF6B7280), fontSize: 14)),
         ],
       ),
     );

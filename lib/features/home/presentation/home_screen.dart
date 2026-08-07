@@ -75,7 +75,8 @@ class _HomeScreenState extends State<HomeScreen>
   bool _routeCovered = false;
   String _shareReelId = '';
   final HomeApiService _homeApi = HomeApiService();
-  late Future<HomeBundle> _bundleFuture;
+  HomeBundle? _currentBundle;
+  String? _homeError;
   String? _loadedPincode;
   String? _displayCity;
   String? _displayPincode;
@@ -124,6 +125,50 @@ class _HomeScreenState extends State<HomeScreen>
     return bundle;
   }
 
+  Future<void> _loadInitialHomeBundle() async {
+    if (mounted) {
+      setState(() {
+        _homeError = null;
+      });
+    }
+    try {
+      final cached = await _homeApi.getCachedHomeBundle();
+      if (cached != null) {
+        if (mounted) {
+          setState(() {
+            _currentBundle = cached;
+            _loadedPincode = cached.pincode;
+          });
+        }
+        // background refresh silently
+        _fetchBundleWithPincodeTracking().then((fresh) {
+          if (mounted) {
+            setState(() {
+              _currentBundle = fresh;
+            });
+          }
+        }).catchError((_) {});
+      } else {
+        // no cache, load fresh with loading indicator
+        final fresh = await _fetchBundleWithPincodeTracking();
+        if (mounted) {
+          setState(() {
+            _currentBundle = fresh;
+            _loadedPincode = fresh.pincode;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          if (_currentBundle == null) {
+            _homeError = e.toString();
+          }
+        });
+      }
+    }
+  }
+
   // Layout & Navigation State
   // ignore: unused_field
   bool _isOffline = false;
@@ -155,26 +200,7 @@ class _HomeScreenState extends State<HomeScreen>
       _currentIndex = widget.initialTab!;
     }
     _loadActiveAddressFromPrefs();
-    _bundleFuture = _homeApi.getCachedHomeBundle().then((cached) {
-      if (cached != null) {
-        if (mounted) {
-          setState(() {
-            _loadedPincode = cached.pincode;
-          });
-        }
-        // Trigger a background refresh to fetch fresh API promotions & categories
-        _fetchBundleWithPincodeTracking().then((fresh) {
-          if (mounted) {
-            setState(() {
-              _bundleFuture = Future.value(fresh);
-            });
-          }
-        }).catchError((_) {});
-        return cached;
-      } else {
-        return _fetchBundleWithPincodeTracking();
-      }
-    });
+    _loadInitialHomeBundle();
 
     // Offline toast slide-up animation setup
     _offlineAnimController = AnimationController(
@@ -715,7 +741,8 @@ class _HomeScreenState extends State<HomeScreen>
                 children: [
                   RepaintBoundary(
                     child: _HomeTab(
-                    bundleFuture: _bundleFuture,
+                    bundle: _currentBundle,
+                    homeError: _homeError,
                     displayCity: _displayCity,
                     displayPincode: _displayPincode,
                     isActive: _currentIndex == 0 && !_routeCovered,
@@ -733,15 +760,26 @@ class _HomeScreenState extends State<HomeScreen>
                       ) async {
                         _runAfterTransition(() async {
                           await _loadActiveAddressFromPrefs();
-                          // Only refetch the whole home bundle when the pincode
-                          // actually changed — same guard used on tab-switch —
-                          // otherwise every back-from-address hits the API again.
                           final prefs = await SharedPreferences.getInstance();
                           final savedPincode =
                               prefs.getString('postal_code') ?? '302001';
                           if (savedPincode != _loadedPincode) {
                             setState(() {
-                              _bundleFuture = _fetchBundleWithPincodeTracking();
+                              _currentBundle = null; // Show loader when address/pincode changes
+                              _homeError = null;
+                            });
+                            _fetchBundleWithPincodeTracking().then((fresh) {
+                              if (mounted) {
+                                setState(() {
+                                  _currentBundle = fresh;
+                                });
+                              }
+                            }).catchError((e) {
+                              if (mounted) {
+                                setState(() {
+                                  _homeError = e.toString();
+                                });
+                              }
                             });
                           }
                         });
@@ -749,10 +787,21 @@ class _HomeScreenState extends State<HomeScreen>
                     },
                     onRefresh: () async {
                       await _loadActiveAddressFromPrefs();
-                      setState(() {
-                        _bundleFuture = _fetchBundleWithPincodeTracking();
-                      });
-                      await _bundleFuture;
+                      try {
+                        final fresh = await _fetchBundleWithPincodeTracking();
+                        if (mounted) {
+                          setState(() {
+                            _currentBundle = fresh;
+                            _homeError = null;
+                          });
+                        }
+                      } catch (e) {
+                        if (mounted && _currentBundle == null) {
+                          setState(() {
+                            _homeError = e.toString();
+                          });
+                        }
+                      }
                     },
                     onSearch: () {
                       Navigator.of(context).pushNamed(SearchScreen.routeName);
@@ -785,7 +834,21 @@ class _HomeScreenState extends State<HomeScreen>
                             prefs.getString('postal_code') ?? '302001';
                         if (savedPincode != _loadedPincode) {
                           setState(() {
-                            _bundleFuture = _fetchBundleWithPincodeTracking();
+                            _currentBundle = null; // Show loader when pincode changes
+                            _homeError = null;
+                          });
+                          _fetchBundleWithPincodeTracking().then((fresh) {
+                            if (mounted) {
+                              setState(() {
+                                _currentBundle = fresh;
+                              });
+                            }
+                          }).catchError((e) {
+                            if (mounted) {
+                              setState(() {
+                                _homeError = e.toString();
+                              });
+                            }
                           });
                         }
                       }
@@ -996,7 +1059,21 @@ class _HomeScreenState extends State<HomeScreen>
                           prefs.getString('postal_code') ?? '302001';
                       if (savedPincode != _loadedPincode) {
                         setState(() {
-                          _bundleFuture = _fetchBundleWithPincodeTracking();
+                          _currentBundle = null; // Show loader when pincode changes
+                          _homeError = null;
+                        });
+                        _fetchBundleWithPincodeTracking().then((fresh) {
+                          if (mounted) {
+                            setState(() {
+                              _currentBundle = fresh;
+                            });
+                          }
+                        }).catchError((e) {
+                          if (mounted) {
+                            setState(() {
+                              _homeError = e.toString();
+                            });
+                          }
                         });
                       }
                     }
@@ -1050,7 +1127,8 @@ class _HomeScreenState extends State<HomeScreen>
 
 class _HomeTab extends StatefulWidget {
   final VoidCallback onSearch;
-  final Future<HomeBundle> bundleFuture;
+  final HomeBundle? bundle;
+  final String? homeError;
   final Future<void> Function() onRefresh;
   final bool isGuest;
   final VoidCallback promptLogin;
@@ -1065,7 +1143,8 @@ class _HomeTab extends StatefulWidget {
 
   const _HomeTab({
     required this.onSearch,
-    required this.bundleFuture,
+    required this.bundle,
+    this.homeError,
     required this.onRefresh,
     required this.isGuest,
     required this.promptLogin,
@@ -1195,241 +1274,232 @@ class _HomeTabState extends State<_HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<HomeBundle>(
-      future: widget.bundleFuture,
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            backgroundColor: Colors.white,
-            body: Center(
-              child: CircularProgressIndicator(),
+    if (widget.homeError != null && widget.bundle == null) {
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          centerTitle: true,
+          title: const Text(
+            'Welfog',
+            style: TextStyle(
+              color: Color(0xFFFB5404),
+              fontWeight: FontWeight.w900,
+              fontSize: 22,
+              letterSpacing: 0.5,
             ),
-          );
-        }
-        if (snap.hasError || !snap.hasData) {
-          return Scaffold(
-            appBar: AppBar(
-              backgroundColor: Colors.white,
-              elevation: 0,
-              scrolledUnderElevation: 0,
-              centerTitle: true,
-              title: const Text(
-                'Welfog',
-                style: TextStyle(
-                  color: Color(0xFFFB5404),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 22,
-                  letterSpacing: 0.5,
+          ),
+        ),
+        body: NoInternetWidget(
+          onRetry: widget.onRefresh,
+          title: 'No Internet Connection',
+          message: 'Failed to load home data. Check your connection.',
+        ),
+      );
+    }
+
+    final bundle = widget.bundle;
+    if (bundle == null) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFFFB5404)),
+        ),
+      );
+    }
+
+    final dealList = bundle.todayDeals.take(10).toList();
+    final sections = bundle.sections;
+
+    return Stack(
+      children: [
+        CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: MediaQuery.of(context).padding.top + 140,
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: RepaintBoundary(
+                child: CategoryWidget(
+                  pullRefreshKey: _pullRefreshKey,
+                  onTabChange: widget.onTabChange,
+                  isActive: widget.isActive,
                 ),
               ),
             ),
-            body: NoInternetWidget(
-              onRetry: widget.onRefresh,
-              title: 'No Internet Connection',
-              message: 'Failed to load home data. Check your connection.',
+            SliverToBoxAdapter(
+              child: RepaintBoundary(
+                child: BannerWidget(
+                  slides: bundle.mobileSlider,
+                  isActive: widget.isActive,
+                ),
+              ),
             ),
-          );
-        }
-
-        final bundle = snap.data!;
-        final dealList = bundle.todayDeals.take(10).toList();
-        final sections = bundle.sections;
-
-        return Stack(
-          children: [
-            CustomScrollView(
-              controller: _scrollController,
-              slivers: [
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height: MediaQuery.of(context).padding.top + 140,
+            if (_recentProducts.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: RepaintBoundary(
+                    child: ProductStrip(
+                      title: 'Recently Viewed',
+                      products: _recentProducts,
+                      onProductTap: (p) {
+                        Navigator.of(context)
+                            .pushNamed(
+                              AppRoutes.product,
+                              arguments: _toProductItem(
+                                p,
+                                _recentProducts.indexOf(p),
+                              ),
+                            )
+                            .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
+                      },
+                      onRightIconTap: () {
+                        Navigator.of(context)
+                            .pushNamed(AppRoutes.recentlyViewed)
+                            .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
+                      },
                     ),
                   ),
-                  SliverToBoxAdapter(
-                    child: RepaintBoundary(
-                      child: CategoryWidget(
-                        pullRefreshKey: _pullRefreshKey,
-                        onTabChange: widget.onTabChange,
-                        isActive: widget.isActive,
-                      ),
-                    ),
+                ),
+              ),
+            if (bundle.banner1.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                  child: Column(
+                    children: bundle.banner1
+                        .where((b) => b.image.trim().isNotEmpty)
+                        .map(
+                          (b) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: PromoBannerImage(imageUrl: b.image),
+                          ),
+                        )
+                        .toList(),
                   ),
-                  SliverToBoxAdapter(
-                    child: RepaintBoundary(
-                      child: BannerWidget(
-                        slides: bundle.mobileSlider,
-                        isActive: widget.isActive,
-                      ),
+                ),
+              ),
+            const SliverToBoxAdapter(child: TrustStrip()),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: RepaintBoundary(
+                  child: ProductStrip(
+                    title: 'Today Deals',
+                    titleIcon: SvgPicture.string(
+                      '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FB5404" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>''',
                     ),
+                    products: dealList,
+                    onProductTap: (p) {
+                      Navigator.of(context)
+                          .pushNamed(
+                            AppRoutes.product,
+                            arguments: _toProductItem(
+                              p,
+                              dealList.indexOf(p),
+                            ),
+                          )
+                          .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
+                    },
+                    onRightIconTap: () {
+                      Navigator.of(context)
+                          .pushNamed(AppRoutes.todayDeals)
+                          .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
+                    },
                   ),
-                  if (_recentProducts.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child: RepaintBoundary(
+                ),
+              ),
+            ),
+            if (bundle.banner2.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                  child: Column(
+                    children: bundle.banner2
+                        .where((b) => b.image.trim().isNotEmpty)
+                        .take(2)
+                        .map(
+                          (b) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: PromoBannerImage(imageUrl: b.image),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+              ),
+            SliverList.builder(
+              itemCount: sections.length,
+              itemBuilder: (context, index) {
+                final s = sections[index];
+                return RepaintBoundary(
+                  child: Column(
+                    children: [
+                      if (s.products.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
                           child: ProductStrip(
-                            title: 'Recently Viewed',
-                            products: _recentProducts,
+                            title: s.name,
+                            products: s.products.take(10).toList(),
                             onProductTap: (p) {
                               Navigator.of(context)
                                   .pushNamed(
                                     AppRoutes.product,
                                     arguments: _toProductItem(
                                       p,
-                                      _recentProducts.indexOf(p),
+                                      s.products.indexOf(p),
                                     ),
                                   )
                                   .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
                             },
                             onRightIconTap: () {
-                              Navigator.of(context)
-                                  .pushNamed(AppRoutes.recentlyViewed)
-                                  .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
+                              Navigator.of(context).pushNamed(
+                                AppRoutes.searchResults,
+                                arguments: {
+                                  'query': s.name,
+                                  'categoryId': s.id,
+                                },
+                              ).then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
                             },
                           ),
                         ),
-                      ),
-                    ),
-                  if (bundle.banner1.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-                        child: Column(
-                          children: bundle.banner1
-                              .where((b) => b.image.trim().isNotEmpty)
-                              .map(
-                                (b) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: PromoBannerImage(imageUrl: b.image),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ),
-                    ),
-                  const SliverToBoxAdapter(child: TrustStrip()),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: RepaintBoundary(
-                        child: ProductStrip(
-                          title: 'Today Deals',
-                          titleIcon: SvgPicture.string(
-                            '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#FB5404" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>''',
+                      if (s.bannerData.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: BannerCarousel(
+                            items: s.bannerData,
+                            isActive: widget.isActive,
                           ),
-                          products: dealList,
-                          onProductTap: (p) {
-                            Navigator.of(context)
-                                .pushNamed(
-                                  AppRoutes.product,
-                                  arguments: _toProductItem(
-                                    p,
-                                    dealList.indexOf(p),
-                                  ),
-                                )
-                                .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
-                          },
-                          onRightIconTap: () {
-                            Navigator.of(context)
-                                .pushNamed(AppRoutes.todayDeals)
-                                .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
-                          },
                         ),
+                      CategoryPromotionWidget(
+                        categoryId: s.id,
+                        isActive: widget.isActive,
                       ),
-                    ),
+                    ],
                   ),
-                  if (bundle.banner2.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-                        child: Column(
-                          children: bundle.banner2
-                              .where((b) => b.image.trim().isNotEmpty)
-                              .take(2)
-                              .map(
-                                (b) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: PromoBannerImage(imageUrl: b.image),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ),
-                    ),
-                  // Lazy-built per section (was an eager .map spread) — with many
-                  // categories, eagerly building every section meant every
-                  // BannerCarousel's animation ran simultaneously even when
-                  // scrolled far off-screen, causing raster jank. Now a section
-                  // (and its carousel) only mounts once it's near the viewport.
-                  SliverList.builder(
-                    itemCount: sections.length,
-                    itemBuilder: (context, index) {
-                      final s = sections[index];
-                      return RepaintBoundary(
-                        child: Column(
-                          children: [
-                            if (s.products.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: ProductStrip(
-                                  title: s.name,
-                                  products: s.products.take(10).toList(),
-                                  onProductTap: (p) {
-                                    Navigator.of(context)
-                                        .pushNamed(
-                                          AppRoutes.product,
-                                          arguments: _toProductItem(
-                                            p,
-                                            s.products.indexOf(p),
-                                          ),
-                                        )
-                                        .then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
-                                  },
-                                  onRightIconTap: () {
-                                    Navigator.of(context).pushNamed(
-                                      AppRoutes.searchResults,
-                                      arguments: {
-                                        'query': s.name,
-                                        'categoryId': s.id,
-                                      },
-                                    ).then((_) => _runAfterTransition(() => _loadRecentlyViewed()));
-                                  },
-                                ),
-                              ),
-                            if (s.bannerData.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 10),
-                                child: BannerCarousel(
-                                  items: s.bannerData,
-                                  isActive: widget.isActive,
-                                ),
-                              ),
-                            CategoryPromotionWidget(
-                              categoryId: s.id,
-                              isActive: widget.isActive,
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 20)),
-                ],
-              ),
-            Header(
-              isHome: true,
-              scrollController: _scrollController,
-              city: widget.displayCity ?? bundle.city,
-              pincode: widget.displayPincode ?? bundle.pincode,
-              isGuest: widget.isGuest,
-              isActive: widget.isActive,
-              onSearchTap: widget.onSearch,
-              promptLogin: widget.promptLogin,
-              onLocationTap: widget.onLocationTap,
+                );
+              },
             ),
+            const SliverToBoxAdapter(child: SizedBox(height: 20)),
           ],
-        );
-      },
+        ),
+        Header(
+          isHome: true,
+          scrollController: _scrollController,
+          city: widget.displayCity ?? bundle.city,
+          pincode: widget.displayPincode ?? bundle.pincode,
+          isGuest: widget.isGuest,
+          isActive: widget.isActive,
+          onSearchTap: widget.onSearch,
+          promptLogin: widget.promptLogin,
+          onLocationTap: widget.onLocationTap,
+        ),
+      ],
     );
   }
 }

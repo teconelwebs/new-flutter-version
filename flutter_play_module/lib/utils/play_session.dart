@@ -414,7 +414,7 @@ class PlaySessionScopeState extends State<PlaySessionScope> {
   Widget build(BuildContext context) {
     if (!_sessionReady) {
       return const Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.white,
         body: Center(
           child: CircularProgressIndicator(color: Color(0xFFfb5404)),
         ),

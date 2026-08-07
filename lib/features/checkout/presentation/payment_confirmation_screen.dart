@@ -1018,7 +1018,7 @@ class _PaymentConfirmationScreenState extends State<PaymentConfirmationScreen> {
         64.0 + systemBottomInset(context) + (isSmallScreen ? 12.0 : 24.0);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F6),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,

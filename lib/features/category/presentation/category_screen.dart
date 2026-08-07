@@ -121,6 +121,50 @@ class _CategoryScreenState extends State<CategoryScreen>
     return future;
   }
 
+  double _calculateBlockHeight(int i) {
+    if (i < 0 || i >= _categories.length) return 0.0;
+    
+    double height = 0.0;
+    
+    // Add banner height for index 0 if banner is present
+    if (i == 0 && _bannerImage.isNotEmpty) {
+      final double rightPanelWidth = MediaQuery.sizeOf(context).width - 86 - 24; // Screen width - sidebar width - paddings
+      final double bannerHeight = rightPanelWidth * (9 / 16); // 16:9 ratio
+      height += bannerHeight + 14.0; // Banner height + spacing
+    }
+
+    final block = _innerCategories[i];
+    if (block == null) {
+      return height + 163.0; // Skeleton loader height
+    }
+
+    if (block.isEmpty) {
+      return height + 64.0;
+    }
+
+    for (final s in block) {
+      double sectionHeight = 18.0; // Padding bottom
+      sectionHeight += 17.0 + 10.0; // Text height + spacing
+      
+      final int rowCount = (s.children.length / 3).ceil();
+      if (rowCount > 0) {
+        sectionHeight += rowCount * 99.0 + (rowCount - 1) * 14.0; // Grid item height + spacing
+      }
+      
+      height += sectionHeight;
+    }
+
+    return height;
+  }
+
+  double _getTargetScrollOffset(int index) {
+    double offset = 0.0;
+    for (int i = 0; i < index; i++) {
+      offset += _calculateBlockHeight(i);
+    }
+    return offset;
+  }
+
   void _scrollToLeftIndex(int index) {
     if (!_leftScrollController.hasClients) return;
     const itemHeight = 94.0; // Estimated height of sidebar item (padding + child height)
@@ -143,40 +187,26 @@ class _CategoryScreenState extends State<CategoryScreen>
 
     _scrollToLeftIndex(index);
 
-    // Scroll to the placeholder/skeleton block immediately for instant visual feedback
-    final key = _blockKeys[index];
-    if (key != null && key.currentContext != null) {
-      Scrollable.ensureVisible(
-        key.currentContext!,
+    // Scroll to computed math offset immediately for instant visual feedback
+    if (_rightScrollController.hasClients) {
+      final double targetOffset = _getTargetScrollOffset(index);
+      _rightScrollController.animateTo(
+        targetOffset.clamp(0.0, _rightScrollController.position.maxScrollExtent),
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeInOut,
       );
-    } else {
-      // Fallback post frame callback
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final retryKey = _blockKeys[index];
-        if (retryKey != null && retryKey.currentContext != null) {
-          Scrollable.ensureVisible(
-            retryKey.currentContext!,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-          );
-        }
-      });
     }
 
     if (_innerCategories[index] == null) {
-      // Fetch data in the background (no await here, so it doesn't block the instant scroll!)
       _lazyLoadInner(index).then((_) {
         if (!mounted || _activeIndex != index) return;
         
-        // Wait a frame to allow the newly loaded UI blocks to build and have their true layout dimensions
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || _activeIndex != index) return;
-          final keyAfterLoad = _blockKeys[index];
-          if (keyAfterLoad != null && keyAfterLoad.currentContext != null) {
-            Scrollable.ensureVisible(
-              keyAfterLoad.currentContext!,
+          if (_rightScrollController.hasClients) {
+            final double targetOffset = _getTargetScrollOffset(index);
+            _rightScrollController.animateTo(
+              targetOffset.clamp(0.0, _rightScrollController.position.maxScrollExtent),
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeInOut,
             );
@@ -189,7 +219,6 @@ class _CategoryScreenState extends State<CategoryScreen>
         });
       });
     } else {
-      // If already loaded, unlock after the scroll animation finishes (250ms)
       Future.delayed(const Duration(milliseconds: 250), () {
         if (mounted && _activeIndex == index) {
           setState(() {

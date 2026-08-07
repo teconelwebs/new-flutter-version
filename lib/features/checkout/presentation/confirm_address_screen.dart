@@ -397,7 +397,7 @@ class _ConfirmAddressScreenState extends State<ConfirmAddressScreen>
     final originalTotal = grandTotal + profit;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F6),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
